@@ -31,16 +31,24 @@ export default function BookingSuccessPage() {
     fetchListing();
   }, [listingId]);
 
-  const getNights = () => {
-    const start = new Date(checkIn || "");
-    const end = new Date(checkOut || "");
-    const diff = Math.ceil(
-      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return diff > 0 ? diff : 0;
-  };
+  const checkInDate = checkIn ? new Date(checkIn) : null;
+  const checkOutDate = checkOut ? new Date(checkOut) : null;
 
-  const totalNights = getNights();
+  const displayCheckOutDate =
+    checkInDate &&
+    checkOutDate &&
+    checkInDate.getTime() === checkOutDate.getTime()
+      ? new Date(checkOutDate.getTime() + 86400000)
+      : checkOutDate;
+
+  const totalNights =
+    checkInDate && checkOutDate
+      ? Math.max(
+          1,
+          Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / 86400000)
+        )
+      : 0;
+
   const totalPrice = listing ? totalNights * listing.price_per_night : 0;
 
   if (loading) return <div className="p-6">Ачааллаж байна...</div>;
@@ -59,12 +67,13 @@ export default function BookingSuccessPage() {
           <h2 className="text-xl font-semibold">{listing.title}</h2>
           <p>📍 Байршил: {listing.location_text}</p>
           <p>
-            📅 Огноо: {checkIn} → {checkOut} ({totalNights} шөнө)
+            📅 Огноо: {checkInDate?.toLocaleDateString()} →{" "}
+            {displayCheckOutDate?.toLocaleDateString()} ({totalNights} шөнө)
           </p>
           <p>
-            💰 Нийт үнэ: ₮
+            💰 Нийт үнэ:{" "}
             <strong className="text-green-700">
-              {totalPrice.toLocaleString()}
+              ₮{totalPrice.toLocaleString()}
             </strong>
           </p>
         </div>

@@ -1,17 +1,33 @@
-// 📄 app/checkout/page.tsx
-
+// filename: src/app/checkout/page.tsx
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import api from "@/lib/axios";
-import { useRouter } from "next/navigation";
+
+// ✅ Local YYYY-MM-DD formatter
+const formatDateString = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 
 export default function CheckoutPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const rawCheckInTs = searchParams.get("check_in_ts");
+  const rawCheckOutTs = searchParams.get("check_out_ts");
   const listingId = searchParams.get("listing");
-  const checkIn = searchParams.get("check_in");
-  const checkOut = searchParams.get("check_out");
+
+  const checkInDate = rawCheckInTs ? new Date(Number(rawCheckInTs)) : null;
+  const checkOutDate = rawCheckOutTs ? new Date(Number(rawCheckOutTs)) : null;
+
+  const displayCheckOutDate: Date | null =
+    checkInDate &&
+    checkOutDate &&
+    checkInDate.getTime() === checkOutDate.getTime()
+      ? new Date(checkOutDate.getTime() + 86400000)
+      : checkOutDate;
 
   const [listing, setListing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -23,7 +39,6 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [accepted, setAccepted] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     const fetchListing = async () => {
@@ -37,19 +52,21 @@ export default function CheckoutPage() {
       }
     };
 
-    if (listingId) fetchListing();
-  }, [listingId]);
+    if (listingId && checkInDate && checkOutDate) {
+      fetchListing();
+    }
+  }, [listingId, checkInDate, checkOutDate]);
 
-  const getNights = () => {
-    const start = new Date(checkIn || "");
-    const end = new Date(checkOut || "");
-    const diff = Math.ceil(
-      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    return diff > 0 ? diff : 0;
-  };
+  const totalNights =
+    checkInDate && displayCheckOutDate
+      ? Math.max(
+          1,
+          Math.ceil(
+            (displayCheckOutDate.getTime() - checkInDate.getTime()) / 86400000
+          )
+        )
+      : 0;
 
-  const totalNights = getNights();
   const totalPrice = listing ? totalNights * listing.price_per_night : 0;
 
   const handleConfirmBooking = async () => {
@@ -61,25 +78,29 @@ export default function CheckoutPage() {
       setErrorMsg("Нэр болон утасны дугаараа бөглөнө үү.");
       return;
     }
+    if (!checkInDate || !displayCheckOutDate) {
+      setErrorMsg("Огноо буруу байна.");
+      return;
+    }
+
+    const payload = {
+      listing_id: listingId,
+      check_in: formatDateString(checkInDate),
+      check_out: formatDateString(displayCheckOutDate),
+      full_name: name,
+      phone_number: phone,
+      notes: notes,
+      guest_count: guestCount,
+    };
+
+    console.log("📨 Payload to backend:", payload);
 
     try {
-      const payload = {
-        listing_id: listingId,
-        check_in: checkIn,
-        check_out: checkOut,
-        full_name: name,
-        phone_number: phone,
-        notes: notes,
-        guest_count: guestCount, // ✅ энэ мөрийг нэмсэн
-      };
-
       await api.post("/bookings/", payload);
-
       setSuccessMsg("✅ Захиалга амжилттай баталгаажлаа!");
       setErrorMsg("");
-
       router.push(
-        `/booking-success?listing=${listingId}&check_in=${checkIn}&check_out=${checkOut}`
+        `/booking-success?listing=${listingId}&check_in=${payload.check_in}&check_out=${payload.check_out}`
       );
     } catch (err: any) {
       console.error("Booking error:", err);
@@ -101,13 +122,14 @@ export default function CheckoutPage() {
           <h2 className="text-xl font-semibold">{listing.title}</h2>
           <p>📍 Байршил: {listing.location_text}</p>
           <p>
-            📅 {checkIn} → {checkOut} ({totalNights} шөнө)
+            📅 {checkInDate?.toLocaleDateString()} →{" "}
+            {displayCheckOutDate?.toLocaleDateString() ?? "—"} ({totalNights}{" "}
+            шөнө)
           </p>
           <p>
             💰 Үнэ: ₮{Number(listing.price_per_night).toLocaleString()} ×{" "}
-            {totalNights} =
+            {totalNights} ={" "}
             <strong className="text-green-700">
-              {" "}
               ₮{totalPrice.toLocaleString()}
             </strong>
           </p>

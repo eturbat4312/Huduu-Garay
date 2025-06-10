@@ -9,11 +9,13 @@ from .models import (
     Booking,
     Amenity,
     Favorite,
+    Notification,
 )
 
 User = get_user_model()
 
 # -------------------- AUTH --------------------
+
 
 class SignupSerializer(serializers.ModelSerializer):
     class Meta:
@@ -31,7 +33,9 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ("id", "username", "email", "is_host", "is_guest")
         read_only_fields = ("id", "email", "is_guest")
 
+
 # -------------------- CATEGORY --------------------
+
 
 class CategorySerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
@@ -48,14 +52,18 @@ class CategorySerializer(serializers.ModelSerializer):
             return obj.image.url
         return None
 
+
 # -------------------- AMENITY --------------------
+
 
 class AmenitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Amenity
         fields = "__all__"
 
+
 # -------------------- LISTING IMAGE --------------------
+
 
 class ListingImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -63,8 +71,8 @@ class ListingImageSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-
 # -------------------- LISTING --------------------
+
 
 class ListingSerializer(serializers.ModelSerializer):
     images = ListingImageSerializer(many=True, read_only=True)
@@ -73,17 +81,13 @@ class ListingSerializer(serializers.ModelSerializer):
     host_username = serializers.SerializerMethodField()
     is_favorited = serializers.SerializerMethodField()
     favorite_id = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()  # 🟢 ШИНЭЭР НЭМНЭ
 
     category_id = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(),
-        source="category",
-        write_only=True
+        queryset=Category.objects.all(), source="category", write_only=True
     )
     amenity_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Amenity.objects.all(),
-        many=True,
-        write_only=True,
-        required=False
+        queryset=Amenity.objects.all(), many=True, write_only=True, required=False
     )
 
     class Meta:
@@ -96,14 +100,15 @@ class ListingSerializer(serializers.ModelSerializer):
             "price_per_night",
             "max_guests",
             "beds",
-            "host_username",      # 🟢 Host info
+            "host_username",  # 🟢 Host info
             "category",
-            "category_id",        # 🟢 POST/PUT үед
+            "category_id",  # 🟢 POST/PUT үед
             "amenities",
-            "amenity_ids",        # 🟢 POST/PUT үед
+            "amenity_ids",  # 🟢 POST/PUT үед
             "images",
             "is_favorited",
             "favorite_id",
+            "thumbnail",
         ]
         read_only_fields = ("host",)
 
@@ -121,6 +126,13 @@ class ListingSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             fav = Favorite.objects.filter(user=request.user, listing=obj).first()
             return fav.id if fav else None
+        return None
+
+    def get_thumbnail(self, obj):
+        if obj.images.exists():
+            image = obj.images.first().image
+            request = self.context.get("request")
+            return request.build_absolute_uri(image.url) if request else image.url
         return None
 
     def create(self, validated_data):
@@ -141,23 +153,26 @@ class ListingSerializer(serializers.ModelSerializer):
 
 # -------------------- FAVORITE --------------------
 
+
 class FavoriteSerializer(serializers.ModelSerializer):
     listing = ListingSerializer(read_only=True)
     listing_id = serializers.PrimaryKeyRelatedField(
-        queryset=Listing.objects.all(),
-        write_only=True,
-        source="listing"
+        queryset=Listing.objects.all(), write_only=True, source="listing"
     )
 
     class Meta:
         model = Favorite
         fields = ["id", "listing", "listing_id"]
+
+
 # -------------------- AVAILABILITY --------------------
+
 
 class AvailabilitySerializer(serializers.ModelSerializer):
     class Meta:
         model = Availability
         fields = "__all__"
+
 
 class AvailabilityBulkSerializer(serializers.Serializer):
     listing = serializers.PrimaryKeyRelatedField(queryset=Listing.objects.all())
@@ -175,7 +190,9 @@ class AvailabilityBulkSerializer(serializers.Serializer):
                 created.append(obj)
         return created
 
+
 # -------------------- BOOKING --------------------
+
 
 class BookingSerializer(serializers.ModelSerializer):
     # listing = serializers.SerializerMethodField(read_only=True)
@@ -234,10 +251,18 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def get_total_price(self, obj):
         nights = (obj.check_out - obj.check_in).days
-        return nights * obj.listing.price_per_night if obj.listing.price_per_night else 0
+        return (
+            nights * obj.listing.price_per_night if obj.listing.price_per_night else 0
+        )
 
     def get_guest_name(self, obj):
         return obj.full_name
 
     def get_guest_phone(self, obj):
         return obj.phone_number
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ["id", "message", "is_read", "created_at"]

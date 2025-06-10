@@ -1,22 +1,33 @@
+// 📄 frontend/components/UserDropdownMenu.tsx
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { fetchUnreadNotifications } from "@/lib/api";
 
 export default function UserDropdownMenu() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (user?.is_host) {
+      fetchUnreadNotifications()
+        .then(setUnreadCount)
+        .catch(() => {});
+    }
+  }, [user]);
 
   if (!user) return null;
 
   const toggleDropdown = () => setOpen((prev) => !prev);
 
   const handleLogout = async () => {
-    // console.log("✅ LOGOUT clicked");
     await logout();
     window.location.href = "/";
   };
@@ -101,12 +112,30 @@ export default function UserDropdownMenu() {
             {user.is_host && (
               <>
                 <hr className="my-1" />
-                <li>
+                <li className="relative">
                   <button
                     onClick={() => go("/host-bookings")}
-                    className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100 flex justify-between items-center"
                   >
                     📥 Захиалга (Хост)
+                    {unreadCount > 0 && (
+                      <span className="text-xs bg-red-500 text-white rounded-full px-2 py-0.5 ml-2">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+                </li>
+                <li className="relative">
+                  <button
+                    onClick={() => go("/notifications")}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100 flex justify-between items-center"
+                  >
+                    🔔 Мэдэгдэл
+                    {unreadCount > 0 && (
+                      <span className="text-xs bg-red-500 text-white rounded-full px-2 py-0.5 ml-2">
+                        {unreadCount}
+                      </span>
+                    )}
                   </button>
                 </li>
                 <li>

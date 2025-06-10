@@ -19,6 +19,9 @@ from .views import (
     MyBookingView,
     HostBookingListView,
     HostBookingCancelView,
+    NotificationListView,
+    NotificationUnreadCountView,
+
 )
 
 urlpatterns = [
@@ -53,4 +56,6 @@ urlpatterns = [
     path("bookings/my/", MyBookingView.as_view(), name="my-bookings"),
     path("host-bookings/", HostBookingListView.as_view(), name="host-bookings"),
     path("bookings/<int:booking_id>/host-cancel/", HostBookingCancelView.as_view()),
+    path('notifications/', NotificationListView.as_view(), name='notification-list'),
+    path('notifications/unread-count/', NotificationUnreadCountView.as_view(), name='notification-unread-count'),
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -11,7 +11,16 @@ from PIL import Image
 from io import BytesIO
 from django.core.files.base import ContentFile
 
-from .models import Category, Listing, Availability, ListingImage, Amenity, Favorite, Booking
+from .models import (
+    Category,
+    Listing,
+    Availability,
+    ListingImage,
+    Amenity,
+    Favorite,
+    Booking,
+    Notification,
+)
 from .serializers import (
     CategorySerializer,
     ListingSerializer,
@@ -23,16 +32,19 @@ from .serializers import (
     UserSerializer,
     AmenitySerializer,
     FavoriteSerializer,
+    NotificationSerializer,
 )
 
 User = get_user_model()
 
 # ---------------------- AUTH ----------------------
 
+
 class SignupView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = SignupSerializer
     permission_classes = [permissions.AllowAny]
+
 
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -48,7 +60,9 @@ class MeView(APIView):
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
 
+
 # ---------------------- CATEGORY ----------------------
+
 
 class CategoryListCreateView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
@@ -57,13 +71,17 @@ class CategoryListCreateView(generics.ListCreateAPIView):
     def get_serializer_context(self):
         return {"request": self.request}
 
+
 # ---------------------- AMENITY ----------------------
+
 
 class AmenityListView(generics.ListAPIView):
     queryset = Amenity.objects.all()
     serializer_class = AmenitySerializer
 
+
 # ---------------------- LISTING ----------------------
+
 
 class ListingListCreateView(generics.ListCreateAPIView):
     queryset = Listing.objects.all().prefetch_related("images", "category", "amenities")
@@ -112,6 +130,7 @@ class ListingListCreateView(generics.ListCreateAPIView):
             )
         serializer.save(host=self.request.user)
 
+
 class ListingRetrieveView(RetrieveAPIView):
     queryset = Listing.objects.all()
     serializer_class = ListingSerializer
@@ -119,7 +138,9 @@ class ListingRetrieveView(RetrieveAPIView):
     def get_serializer_context(self):
         return {"request": self.request}
 
+
 # ---------------------- LISTING IMAGE ----------------------
+
 
 class ListingImageUploadView(APIView):
     parser_classes = (MultiPartParser, FormParser)
@@ -129,7 +150,9 @@ class ListingImageUploadView(APIView):
         listing_id = request.data.get("listing")
 
         if not uploaded_image or not listing_id:
-            return Response({"error": "Зураг болон listing ID шаардлагатай"}, status=400)
+            return Response(
+                {"error": "Зураг болон listing ID шаардлагатай"}, status=400
+            )
 
         try:
             image = Image.open(uploaded_image)
@@ -144,11 +167,11 @@ class ListingImageUploadView(APIView):
 
             # 🛠 listing_id-г шууд object болгоё
             from .models import Listing
+
             listing = Listing.objects.get(id=listing_id)
 
             new_image = ListingImage.objects.create(
-                listing=listing,
-                image=final_image_file
+                listing=listing, image=final_image_file
             )
 
             return Response(ListingImageSerializer(new_image).data, status=201)
@@ -159,11 +182,20 @@ class ListingImageUploadView(APIView):
                 status=400,
             )
 
+
 # ---------------------- AVAILABILITY ----------------------
 
+
 class AvailabilityListCreateView(generics.ListCreateAPIView):
-    queryset = Availability.objects.all()
     serializer_class = AvailabilitySerializer
+
+    def get_queryset(self):
+        queryset = Availability.objects.all()
+        listing_id = self.request.query_params.get("listing")
+        if listing_id:
+            queryset = queryset.filter(listing__id=listing_id)
+        return queryset
+
 
 class AvailabilityBulkCreateView(APIView):
     def post(self, request, format=None):
@@ -175,14 +207,29 @@ class AvailabilityBulkCreateView(APIView):
             )
         return Response(serializer.errors, status=400)
 
+
 class AvailabilityDeleteView(generics.DestroyAPIView):
     queryset = Availability.objects.all()
     lookup_field = "id"
 
+
 # ---------------------- BOOKING ----------------------
 
+
+# views.py
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from datetime import timedelta
+
+from .models import Booking, Availability, Notification
+from .serializers import BookingSerializer
+
+
 class BookingCreateView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, format=None):
         serializer = BookingSerializer(data=request.data)
@@ -192,17 +239,16 @@ class BookingCreateView(APIView):
             check_out = serializer.validated_data["check_out"]
             guest = request.user
 
+            # ✅ Зөвхөн ганц өдөр сонгосон үед checkout-г +1 хоног болгоно
+            if check_in == check_out:
+                check_out += timedelta(days=1)
+
             full_name = serializer.validated_data["full_name"]
             phone_number = serializer.validated_data["phone_number"]
             notes = serializer.validated_data.get("notes", "")
             guest_count = serializer.validated_data["guest_count"]
-            print(f"DEBUG - guest_count: '{guest_count}'")
 
-            print(f"DEBUG - full_name: '{full_name}'")
-            print(f"DEBUG - phone_number: '{phone_number}'")
-            print(f"DEBUG - request.data: {request.data}")
-
-            # ✅ Calculate all dates between check_in and check_out
+            # Захиалгад багтах бүх өдөр (checkout оролцохгүй)
             date = check_in
             requested_dates = []
             while date < check_out:
@@ -222,26 +268,35 @@ class BookingCreateView(APIView):
                     full_name=full_name,
                     phone_number=phone_number,
                     notes=notes,
-                    guest_count=guest_count, 
+                    guest_count=guest_count,
                 )
+
+                # ❗ зөвхөн орсон шөнүүдийг устгана (checkout өдөр биш)
                 Availability.objects.filter(
                     listing=listing, date__in=requested_dates
                 ).delete()
 
-                return Response(BookingSerializer(booking, context={"request": request}).data, status=status.HTTP_201_CREATED)
+                # Хостод мэдэгдэл илгээх
+                Notification.objects.create(
+                    user=listing.host,
+                    message=f"{guest.username} таны '{listing.title}' байранд захиалга хийлээ.",
+                )
+
+                return Response(
+                    BookingSerializer(booking, context={"request": request}).data,
+                    status=status.HTTP_201_CREATED,
+                )
 
             return Response(
                 {"error": "Сонгосон огнооны зарим нь боломжгүй байна."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        else:
-            print(serializer.errors)
-
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ---------------------- FAVORITE ----------------------
+
 
 class FavoriteCreateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -256,6 +311,7 @@ class FavoriteCreateView(APIView):
             return Response(FavoriteSerializer(favorite).data, status=201)
         return Response(serializer.errors, status=400)
 
+
 class FavoriteDeleteView(generics.DestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = FavoriteSerializer
@@ -265,6 +321,7 @@ class FavoriteDeleteView(generics.DestroyAPIView):
     def get_queryset(self):
         return self.queryset.filter(user=self.request.user)
 
+
 class FavoriteListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = FavoriteSerializer
@@ -272,14 +329,17 @@ class FavoriteListView(generics.ListAPIView):
     def get_queryset(self):
         return Favorite.objects.filter(user=self.request.user)
 
+
 class MyBookingView(generics.ListAPIView):
     serializer_class = BookingSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Booking.objects.filter(guest=self.request.user).select_related("listing").prefetch_related("listing__images")
-
-
+        return (
+            Booking.objects.filter(guest=self.request.user)
+            .select_related("listing")
+            .prefetch_related("listing__images")
+        )
 
 
 class HostBookingListView(ListAPIView):
@@ -288,9 +348,11 @@ class HostBookingListView(ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        return Booking.objects.filter(listing__host=user)\
-            .select_related("listing")\
-            .order_by("-created_at")  # 🟢 Шинэ захиалга дээрээ гарна
+        return (
+            Booking.objects.filter(listing__host=user)
+            .select_related("listing")
+            .order_by("-created_at")
+        )  # 🟢 Шинэ захиалга дээрээ гарна
 
     def get_serializer_context(self):
         return {"request": self.request}
@@ -306,7 +368,9 @@ class HostBookingCancelView(APIView):
             return Response({"error": "Захиалга олдсонгүй."}, status=404)
 
         if booking.is_cancelled_by_host:
-            return Response({"error": "Захиалгыг аль хэдийн цуцалсан байна."}, status=400)
+            return Response(
+                {"error": "Захиалгыг аль хэдийн цуцалсан байна."}, status=400
+            )
 
         # ✅ Цуцлалтыг бүртгэх
         booking.is_cancelled_by_host = True
@@ -321,4 +385,25 @@ class HostBookingCancelView(APIView):
             )
             date += timedelta(days=1)
 
-        return Response({"message": "Захиалгыг амжилттай цуцаллаа. Өдрүүд сэргээгдлээ."}, status=200)
+        return Response(
+            {"message": "Захиалгыг амжилттай цуцаллаа. Өдрүүд сэргээгдлээ."}, status=200
+        )
+
+
+class NotificationListView(generics.ListAPIView):
+    serializer_class = NotificationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(user=self.request.user).order_by(
+            "-created_at"
+        )
+
+
+# 🔹 Уншаагүй notification-ийн тоог авах view
+class NotificationUnreadCountView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        count = Notification.objects.filter(user=request.user, is_read=False).count()
+        return Response({"unread_count": count})
