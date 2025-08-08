@@ -2,6 +2,7 @@ export type Category = {
     id: number;
     name: string;
     icon?: string;
+    translation_key?: string;
   };
   
   export type Amenity = {
@@ -32,6 +33,7 @@ export type Category = {
     is_favorited?: boolean;
     favorite_id?: number | null;
     host_username?: string;
+    average_rating?: number;
   };
   
   export type User = {
@@ -40,7 +42,8 @@ export type Category = {
     email: string;
     avatar?: string;
     is_host: boolean;
-  };
+    host_application_status?: "pending" | "approved" | "rejected" | "none";
+  }
   
   export type Booking = {
     id: number;

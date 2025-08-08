@@ -1,54 +1,55 @@
-// frontend/lib/axios.ts
 import axios from "axios";
 
+const isBrowser = typeof window !== "undefined";
+
+const clientBase =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8010/api";
+
+const serverBase =
+  process.env.INTERNAL_API_URL || clientBase; // docker дотроос backend руу
+
 const api = axios.create({
-  baseURL: "http://localhost:8010/api",
+  baseURL: isBrowser ? clientBase : serverBase,
 });
 
 api.interceptors.request.use(
   (config) => {
-    const access = localStorage.getItem("access_token");
-    if (access) {
-      config.headers.Authorization = `Bearer ${access}`;
+    if (isBrowser) {
+      const access = localStorage.getItem("access_token");
+      if (access) config.headers.Authorization = `Bearer ${access}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (e) => Promise.reject(e)
 );
 
 api.interceptors.response.use(
-  (response) => response,
+  (r) => r,
   async (error) => {
-    const originalRequest = error.config;
+    if (!isBrowser) return Promise.reject(error); // SSR дээр refresh хийлгэхгүй
+
+    const originalRequest: any = error.config;
     const refresh = localStorage.getItem("refresh_token");
 
-    // Access token expired
-    if (
-      error.response?.status === 401 &&
-      !originalRequest._retry &&
-      refresh
-    ) {
+    if (error.response?.status === 401 && !originalRequest._retry && refresh) {
       originalRequest._retry = true;
-
       try {
-        const res = await axios.post("http://localhost:8010/api/token/refresh/", {
-          refresh,
-        });
-
+        const res = await axios.post(
+          `${clientBase}/token/refresh/`,
+          { refresh }
+        );
         const newAccessToken = res.data.access;
         localStorage.setItem("access_token", newAccessToken);
-
         originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
-
-        return api(originalRequest); // retry original request
+        return api(originalRequest);
       } catch (err) {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
-        window.location.href = "/login";
+        const locale = window.location.pathname.split("/")[1] || "mn";
+        window.location.href = `/${locale}/`;
         return Promise.reject(err);
       }
     }
-
     return Promise.reject(error);
   }
 );

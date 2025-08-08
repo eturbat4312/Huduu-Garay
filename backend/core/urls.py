@@ -21,8 +21,23 @@ from .views import (
     HostBookingCancelView,
     NotificationListView,
     NotificationUnreadCountView,
-
+    NotificationMarkAsReadView,
+    HostBookingDetailView,
+    MyListingsView,
+    HostBookingCalendarView,
+    ListingUpdateView,
+    AvailabilityDeleteByListingView,
+    ListingImageDeleteView,
+    ListingDeleteView,
+    ReviewCreateListView,
+    HostApplicationCreateView,
+    HostApplicationMeView,
+    BookingRetrieveView,
+    GoogleLogin,
 )
+
+# from core.adapters import GoogleOneTapLoginView
+# from core.views import GoogleOneTapLoginView
 
 urlpatterns = [
     path("categories/", CategoryListCreateView.as_view(), name="category-list-create"),
@@ -56,6 +71,38 @@ urlpatterns = [
     path("bookings/my/", MyBookingView.as_view(), name="my-bookings"),
     path("host-bookings/", HostBookingListView.as_view(), name="host-bookings"),
     path("bookings/<int:booking_id>/host-cancel/", HostBookingCancelView.as_view()),
-    path('notifications/', NotificationListView.as_view(), name='notification-list'),
-    path('notifications/unread-count/', NotificationUnreadCountView.as_view(), name='notification-unread-count'),
-]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    path("bookings/<int:pk>/", BookingRetrieveView.as_view(), name="booking-detail"),
+    path("notifications/", NotificationListView.as_view(), name="notification-list"),
+    path("host-bookings/<int:pk>/", HostBookingDetailView.as_view()),  # ✅ нэмсэн
+    path(
+        "notifications/unread-count/",
+        NotificationUnreadCountView.as_view(),
+        name="notification-unread-count",
+    ),
+    path("notifications/mark-read/", NotificationMarkAsReadView.as_view()),
+    path("my-listings/", MyListingsView.as_view(), name="my-listings"),
+    path("host-booking-calendar/", HostBookingCalendarView.as_view()),
+    path("listings/<int:pk>/edit/", ListingUpdateView.as_view(), name="listing-update"),
+    path(
+        "availability/delete-by-listing/",
+        AvailabilityDeleteByListingView.as_view(),
+        name="availability-delete-by-listing",
+    ),
+    path("listing-images/<int:image_id>/delete/", ListingImageDeleteView.as_view()),
+    path(
+        "listings/<int:listing_id>/delete/",
+        ListingDeleteView.as_view(),
+        name="listing-delete",
+    ),
+    path("reviews/", ReviewCreateListView.as_view(), name="review-list-create"),
+    path(
+        "listings/<int:listing_id>/reviews/",
+        ReviewCreateListView.as_view(),
+        name="review-listing",
+    ),
+    path("host/apply/", HostApplicationCreateView.as_view(), name="host-apply"),
+    path("host/application/me/", HostApplicationMeView.as_view()),
+    path("auth/google/", GoogleLogin.as_view(), name="google_login"),
+    # path("auth/google/", GoogleOneTapLoginView.as_view(), name="google-login"),
+    # path("auth/google/", GoogleOneTapLoginView.as_view(), name="google-login"),
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

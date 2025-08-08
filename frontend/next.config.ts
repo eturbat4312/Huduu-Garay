@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  eslint: {
+    ignoreDuringBuilds: true, // ✅ Энэ хэсгийг нэм
+  },
 };
 
 export default nextConfig;

@@ -12,6 +12,16 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+
+print("google info:", GOOGLE_CLIENT_ID)
+print("SK: ", GOOGLE_CLIENT_SECRET)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -40,8 +50,16 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "rest_framework_simplejwt",
+    "rest_framework.authtoken",
     "core",
     "corsheaders",
+    "django.contrib.sites",  # 🔹 хэрэгтэй
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
+    "dj_rest_auth",
+    "dj_rest_auth.registration",
 ]
 
 MIDDLEWARE = [
@@ -53,9 +71,15 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
 ]
 
 ROOT_URLCONF = "huduu_garay.urls"
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
 
 TEMPLATES = [
     {
@@ -78,20 +102,43 @@ REST_FRAMEWORK = {
     )
 }
 
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "SCOPE": ["profile", "email"],
+        "AUTH_PARAMS": {"access_type": "online"},
+        "APP": {
+            "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+            "secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+            "key": "",
+        },
+    }
+}
+
 WSGI_APPLICATION = "huduu_garay.wsgi.application"
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.postgresql",
+#         "NAME": "huduu_db",  # шинэ төслийн DB
+#         "USER": "huduu_user",
+#         "PASSWORD": "markhoyor",
+#         "HOST": "localhost",
+#         "PORT": "5432",  # Өмнөх төсөлтэй ижил байсан ч OK
+#     }
+# }
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "huduu_db",  # шинэ төслийн DB
-        "USER": "huduu_user",
-        "PASSWORD": "markhoyor",
-        "HOST": "localhost",
-        "PORT": "5432",  # Өмнөх төсөлтэй ижил байсан ч OK
+        "NAME": os.getenv("DB_NAME"),
+        "USER": os.getenv("DB_USER"),
+        "PASSWORD": os.getenv("DB_PASSWORD"),
+        "HOST": os.getenv("DB_HOST"),
+        "PORT": os.getenv("DB_PORT"),
     }
 }
 
@@ -122,6 +169,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# settings.py
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "tanaid.honoy1@gmail.com"  # таны Gmail хаяг
+EMAIL_HOST_PASSWORD = "cgah tioc ylzy fcbb"  # таны App password (шугамгүйгээр)
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
@@ -138,7 +192,13 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+
 STATIC_URL = "static/"
+ALLOWED_HOSTS = ["*"]
+
+
+SITE_ID = 1  # 🔹 заавал байх ёстой
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

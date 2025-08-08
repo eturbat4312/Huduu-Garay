@@ -1,11 +1,19 @@
+// filename: src/components/ListingCard.tsx
 "use client";
 
 import { useRef, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/axios";
 import { Listing } from "@/types";
+import { t } from "@/lib/i18n";
 
-export default function ListingCard({ listing }: { listing: Listing }) {
+export default function ListingCard({
+  listing,
+  locale,
+}: {
+  listing: Listing;
+  locale: string;
+}) {
   const [favorited, setFavorited] = useState(listing.is_favorited ?? false);
   const [favoriteId, setFavoriteId] = useState<number | null>(
     listing.favorite_id ?? null
@@ -18,8 +26,10 @@ export default function ListingCard({ listing }: { listing: Listing }) {
   const location = listing.location_text ?? "Байршил байхгүй";
   const categoryName = listing.category?.name ?? "Ангилалгүй";
   const categoryIcon = listing.category?.icon ?? "❓";
+  const categoryTranslationKey = listing.category?.translation_key ?? "";
   const hostUsername = listing.host_username ?? "Тодорхойгүй хэрэглэгч";
   const price = Number(listing.price_per_night ?? 0);
+  const averageRating = listing.average_rating ?? 0;
 
   const handleFavoriteToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -39,23 +49,18 @@ export default function ListingCard({ listing }: { listing: Listing }) {
   };
 
   const scrollLeft = () => {
-    if (carouselRef.current) {
-      carouselRef.current.scrollBy({ left: -300, behavior: "smooth" });
-    }
+    carouselRef.current?.scrollBy({ left: -300, behavior: "smooth" });
   };
 
   const scrollRight = () => {
-    if (carouselRef.current) {
-      carouselRef.current.scrollBy({ left: 300, behavior: "smooth" });
-    }
+    carouselRef.current?.scrollBy({ left: 300, behavior: "smooth" });
   };
 
   return (
-    <Link href={`/listings/${listing.id}`} className="block">
+    <Link href={`/${locale}/listings/${listing.id}`} className="block">
       <div className="rounded-xl border overflow-hidden shadow-md hover:shadow-xl transition-all bg-white">
-        {/* 📸 Image Carousel with arrows */}
+        {/* 📸 Image Carousel */}
         <div className="relative">
-          {/* Гүйлгэх товчнууд */}
           <button
             onClick={(e) => {
               e.preventDefault();
@@ -94,7 +99,7 @@ export default function ListingCard({ listing }: { listing: Listing }) {
               ))
             ) : (
               <div className="h-48 w-full bg-gray-200 flex items-center justify-center">
-                <span className="text-gray-400">Зураг алга</span>
+                <span className="text-gray-400">{t(locale, "no_image")}</span>
               </div>
             )}
           </div>
@@ -119,13 +124,14 @@ export default function ListingCard({ listing }: { listing: Listing }) {
           <h3 className="font-semibold text-lg text-gray-800">{title}</h3>
 
           <div className="text-sm text-gray-500 mt-1">
-            Зар эзэмшигч: <span className="font-medium">{hostUsername}</span>
+            {t(locale, "host_owner")}{" "}
+            <span className="font-medium">{hostUsername}</span>
           </div>
 
-          <div className="flex justify-between items-center mt-2">
+          <div className="flex justify-between items-center mt-2 flex-wrap gap-y-2">
             <div className="inline-flex items-center gap-1 text-sm px-2 py-1 rounded-full bg-gray-100 text-gray-600">
               <span>{categoryIcon}</span>
-              <span>{categoryName}</span>
+              <span>{t(locale, categoryTranslationKey) || categoryName}</span>
             </div>
             <div className="text-base font-bold text-green-700">
               ₮
@@ -133,7 +139,23 @@ export default function ListingCard({ listing }: { listing: Listing }) {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0,
               })}
-              <span className="text-sm text-gray-500"> / шөнө</span>
+              <span className="text-sm text-gray-500">
+                {" "}
+                {t(locale, "per_night")}
+              </span>
+            </div>
+            {/* ⭐ Rating */}
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <span key={n} className="text-yellow-400 text-sm">
+                  {n <= averageRating ? "⭐" : "☆"}
+                </span>
+              ))}
+              {averageRating > 0 && (
+                <span className="text-sm text-gray-500 ml-1">
+                  ({averageRating})
+                </span>
+              )}
             </div>
           </div>
         </div>

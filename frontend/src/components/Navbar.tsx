@@ -1,73 +1,149 @@
-// 📄 components/Navbar.tsx
+// filename: src/components/Navbar.tsx
 "use client";
 
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useNotification } from "@/context/NotificationContext";
 import api from "@/lib/axios";
 import UserDropdownMenu from "./UserDropdownMenu";
+import { useRouter, useParams, usePathname } from "next/navigation";
+import { Bell } from "lucide-react";
+import { useEffect } from "react";
+import { t } from "@/lib/i18n";
+
+const supportedLocales = [
+  { code: "mn", label: "🇲🇳" },
+  { code: "en", label: "🇬🇧" },
+  { code: "fr", label: "🇫🇷" },
+];
 
 export default function Navbar() {
   const { user, logout, loading } = useAuth();
+  const { totalUnread } = useNotification();
+  const router = useRouter();
+  const { locale } = useParams();
+  const pathname = usePathname();
+  const basePath = pathname.replace(/^\/(mn|en|fr)/, "");
+
+  useEffect(() => {
+    console.log("🔄 Navbar received user:", user);
+  }, [user]);
 
   const becomeHost = async () => {
     try {
       await api.patch("/me/", { is_host: true });
-      window.location.reload(); // дахин ачаалж context шинэчилнэ
+      window.location.reload();
     } catch (error) {
-      console.error("Host болох үед алдаа гарлаа", error);
-      alert("Host болох үед алдаа гарлаа");
+      console.error("❌ Error becoming host", error);
+      alert(t(locale, "become_host_error"));
     }
   };
-  //   console.log("🟢 Navbar component mounted");
 
   return (
     <nav className="bg-white shadow-md px-6 py-3 flex justify-between items-center">
-      <Link href="/" className="text-xl font-bold text-green-700">
-        Хөдөө Гарая
+      <Link href={`/${locale}`} className="text-xl font-bold text-green-700">
+        {t(locale, "navbar_brand")}
       </Link>
 
-      {!loading && (
-        <div className="flex items-center gap-4">
-          {user ? (
+      <div className="flex items-center gap-4">
+        {/* 🌍 Language switcher */}
+        <div className="flex gap-1 items-center">
+          {supportedLocales.map((lang) => (
+            <Link
+              key={lang.code}
+              href={`/${lang.code}${basePath}`}
+              className={`text-xl px-2 rounded ${
+                lang.code === locale
+                  ? "font-bold text-green-700"
+                  : "text-gray-400 hover:text-green-600"
+              }`}
+              title={lang.code}
+            >
+              {lang.label}
+            </Link>
+          ))}
+        </div>
+
+        {!loading ? (
+          user ? (
             <>
-              {/* Зөвхөн host хэрэглэгчид зар нэмэх товч харагдана */}
+              {/* Зар нэмэх / Түрээслүүлэгч болох */}
               {user.is_host ? (
                 <Link
-                  href="/listings/new"
+                  href={`/${locale}/listings/new`}
                   className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
                 >
-                  Зар нэмэх
+                  {t(locale, "add_listing")}
                 </Link>
+              ) : user.host_application_status === "pending" ? (
+                <span className="bg-gray-300 text-gray-700 px-3 py-1 rounded cursor-not-allowed text-sm">
+                  ⏳ {t(locale, "host_application_pending")}
+                </span>
               ) : (
-                <button
-                  onClick={becomeHost}
+                <Link
+                  href={`/${locale}/become-host`}
                   className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
                 >
-                  Host болох
+                  {t(locale, "become_host")}
+                </Link>
+              )}
+
+              {/* 🔔 Notifications */}
+              {user.is_host && (
+                <button
+                  onClick={() => router.push(`/${locale}/notifications`)}
+                  className="relative"
+                  aria-label="Notifications"
+                >
+                  <Bell className="w-6 h-6 text-gray-700 hover:text-green-700 transition" />
+                  {totalUnread > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 rounded-full">
+                      {totalUnread}
+                    </span>
+                  )}
                 </button>
               )}
 
-              {/* 👤 Dropdown menu */}
+              {/* 👤 User greeting & avatar */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600 hidden sm:block">
+                  {t(locale, "greeting")}, <b>{user.username}</b>!
+                </span>
+                {user.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt="Avatar"
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gray-400 flex items-center justify-center text-white font-semibold text-lg">
+                    {user.username?.[0]?.toUpperCase()}
+                  </div>
+                )}
+              </div>
+
               <UserDropdownMenu />
             </>
           ) : (
             <>
               <Link
-                href="/login"
+                href={`/${locale}/login`}
                 className="text-green-700 font-medium hover:underline"
               >
-                Нэвтрэх
+                {t(locale, "login")}
               </Link>
               <Link
-                href="/signup"
+                href={`/${locale}/signup`}
                 className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
               >
-                Бүртгүүлэх
+                {t(locale, "signup")}
               </Link>
             </>
-          )}
-        </div>
-      )}
+          )
+        ) : (
+          <span className="text-gray-400 text-sm">{t(locale, "loading")}</span>
+        )}
+      </div>
     </nav>
   );
 }

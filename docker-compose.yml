@@ -1,0 +1,43 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      POSTGRES_DB: huduu
+      POSTGRES_USER: huduu_user
+      POSTGRES_PASSWORD: markhoyor
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+    
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8010:8010"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+    command: sh -c "npm install && npm run build && npm start"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - INTERNAL_API_URL=http://backend:8010/api
+    env_file:
+      - ./frontend/.env.local
+
+
+volumes:
+  postgres_data:

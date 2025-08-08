@@ -1,9 +1,12 @@
+// filename: src/components/FilterSidebar.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import api from "@/lib/axios";
+import { t } from "@/lib/i18n";
 
 type Props = {
+  locale: string;
   filters: {
     category: string;
     search: string;
@@ -13,18 +16,35 @@ type Props = {
     amenities: string[];
   };
   setFilters: (filters: any) => void;
+  isOpen?: boolean;
 };
 
-export default function FilterSidebar({ filters, setFilters }: Props) {
-  const [amenityOptions, setAmenityOptions] = useState<string[]>([]);
-  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
+type CategoryOption = {
+  name: string;
+  translation_key: string;
+};
+
+type AmenityOption = {
+  name: string;
+  translation_key: string;
+};
+
+export default function FilterSidebar({
+  locale,
+  filters,
+  setFilters,
+  isOpen = true,
+}: Props) {
+  const [amenityOptions, setAmenityOptions] = useState<AmenityOption[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
 
   useEffect(() => {
     api.get("/amenities/").then((res) => {
-      setAmenityOptions(res.data.map((a: any) => a.name));
+      setAmenityOptions(res.data);
     });
     api.get("/categories/").then((res) => {
-      setCategoryOptions(res.data.map((c: any) => c.name));
+      console.log("✅ Category API response:", res.data);
+      setCategoryOptions(res.data);
     });
   }, []);
 
@@ -57,22 +77,32 @@ export default function FilterSidebar({ filters, setFilters }: Props) {
   };
 
   return (
-    <aside className="w-full md:w-72 border rounded p-4 space-y-6 sticky top-4 bg-white">
-      {/* 🔍 Search */}
+    <aside
+      className={`
+        border rounded p-4 space-y-6 bg-white w-full md:w-72
+        ${isOpen ? "block" : "hidden"}
+        md:block
+      `}
+    >
+      {/* Хайх */}
       <div>
-        <label className="block mb-1 font-medium">Хайх</label>
+        <label className="block mb-1 font-medium">
+          {t(locale, "search_label")}
+        </label>
         <input
           type="text"
           value={filters.search}
           onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-          placeholder="Нэр, байршил..."
+          placeholder={t(locale, "search_label")}
           className="w-full border rounded px-3 py-2"
         />
       </div>
 
-      {/* 📍 Location */}
+      {/* Байршил */}
       <div>
-        <label className="block mb-1 font-medium">Байршил</label>
+        <label className="block mb-1 font-medium">
+          {t(locale, "location_label")}
+        </label>
         <input
           type="text"
           value={filters.location}
@@ -82,9 +112,11 @@ export default function FilterSidebar({ filters, setFilters }: Props) {
         />
       </div>
 
-      {/* 💰 Price */}
+      {/* Үнэ */}
       <div>
-        <label className="block mb-1 font-medium">Үнэ (₮)</label>
+        <label className="block mb-1 font-medium">
+          {t(locale, "price_label")}
+        </label>
         <div className="flex gap-2">
           <input
             type="number"
@@ -107,66 +139,67 @@ export default function FilterSidebar({ filters, setFilters }: Props) {
         </div>
       </div>
 
-      {/* 🏡 Category */}
+      {/* Ангилал */}
       <div>
-        <label className="block mb-1 font-medium">Ангилал</label>
+        <label className="block mb-1 font-medium">
+          {t(locale, "category_label")}
+        </label>
         <div className="flex flex-wrap gap-2">
           {categoryOptions.map((cat) => (
             <button
-              key={cat}
+              key={cat.name}
               onClick={() =>
                 setFilters({
                   ...filters,
-                  category: cat === filters.category ? "" : cat,
+                  category: cat.name === filters.category ? "" : cat.name,
                 })
               }
               className={`px-3 py-1 border rounded-full ${
-                cat === filters.category
+                cat.name === filters.category
                   ? "bg-green-100 text-green-700 border-green-500"
                   : ""
               }`}
             >
-              {cat}
+              {t(locale, cat.translation_key) || cat.name}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ✅ Amenities */}
+      {/* Давуу талууд */}
       <div>
-        <label className="block mb-1 font-medium">Давуу талууд</label>
+        <label className="block mb-1 font-medium">
+          {t(locale, "amenities_label")}
+        </label>
         <div className="flex flex-col gap-1">
           {amenityOptions.map((a) => (
-            <label key={a} className="flex gap-2 items-center text-sm">
+            <label key={a.name} className="flex gap-2 items-center text-sm">
               <input
                 type="checkbox"
-                checked={filters.amenities.includes(a)}
-                onChange={() => handleAmenityToggle(a)}
+                checked={filters.amenities.includes(a.name)}
+                onChange={() => handleAmenityToggle(a.name)}
               />
-              {a}
+              {t(locale, a.translation_key) || a.name}
             </label>
           ))}
         </div>
       </div>
 
-      {/* 🧃 Action Buttons */}
+      {/* Action buttons */}
       <div className="space-y-2 pt-4">
-        <p className="text-xs text-gray-500">
-          Та бүх шүүлтүүрийг тохируулсны дараа "Хайх" товчийг дарж шинэчлэх
-          боломжтой.
-        </p>
+        <p className="text-xs text-gray-500">{t(locale, "filter_hint")}</p>
         <div className="flex gap-2 justify-between">
           <button
             onClick={handleClear}
             className="text-sm text-gray-600 underline"
           >
-            Цэвэрлэх
+            {t(locale, "clear")}
           </button>
           <button
             onClick={handleApply}
             className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm"
           >
-            Хайх
+            {t(locale, "search_button")}
           </button>
         </div>
       </div>

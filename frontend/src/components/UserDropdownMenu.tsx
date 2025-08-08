@@ -1,27 +1,19 @@
-// 📄 frontend/components/UserDropdownMenu.tsx
-
+// filename: src/components/UserDropdownMenu.tsx
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { fetchUnreadNotifications } from "@/lib/api";
+import { useNotification } from "@/context/NotificationContext";
+import { t } from "@/lib/i18n";
 
 export default function UserDropdownMenu() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    if (user?.is_host) {
-      fetchUnreadNotifications()
-        .then(setUnreadCount)
-        .catch(() => {});
-    }
-  }, [user]);
+  const { locale } = useParams();
+  const { totalUnread, bookingUnread } = useNotification();
 
   if (!user) return null;
 
@@ -29,7 +21,8 @@ export default function UserDropdownMenu() {
 
   const handleLogout = async () => {
     await logout();
-    window.location.href = "/";
+    // window.location.href = "/";
+    router.push(`/${locale}`);
   };
 
   const go = (path: string) => {
@@ -53,15 +46,8 @@ export default function UserDropdownMenu() {
         onClick={toggleDropdown}
         className="flex items-center gap-2 px-3 py-1 rounded-full hover:bg-gray-100 transition"
       >
-        <Avatar>
-          <AvatarImage
-            src={user.avatar || "/default-avatar.png"}
-            alt={user.username}
-          />
-          <AvatarFallback>{user.username[0]?.toUpperCase()}</AvatarFallback>
-        </Avatar>
         <span className="text-sm font-medium text-gray-700 hover:text-green-700 transition">
-          Menu ⌄
+          {t(locale, "menu_label")}
         </span>
       </button>
 
@@ -70,34 +56,35 @@ export default function UserDropdownMenu() {
           <ul className="text-sm">
             <li>
               <button
-                onClick={() => go("/profile")}
+                // onClick={() => go("/profile")}
+                onClick={() => go(`/${locale}/profile`)}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100"
               >
-                👤 Миний профайл
+                {t(locale, "menu_profile")}
               </button>
             </li>
             <li>
               <button
-                onClick={() => go("/bookings")}
+                onClick={() => go(`/${locale}/bookings`)}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100"
               >
-                📆 Миний захиалгууд
+                {t(locale, "menu_bookings")}
               </button>
             </li>
             <li>
               <button
-                onClick={() => go("/favorites")}
+                onClick={() => go(`/${locale}/favorites`)}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100"
               >
-                ❤️ Хадгалсан
+                {t(locale, "menu_favorites")}
               </button>
             </li>
             <li>
               <button
-                onClick={() => go("/trips")}
+                onClick={() => go(`/${locale}/terms`)}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100"
               >
-                🧳 Өмнөх аяллууд
+                {t(locale, "menu_terms")}
               </button>
             </li>
             <li>
@@ -105,7 +92,7 @@ export default function UserDropdownMenu() {
                 onClick={() => go("/account-settings")}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100"
               >
-                ⚙️ Тохиргоо
+                {t(locale, "menu_settings")}
               </button>
             </li>
 
@@ -114,44 +101,44 @@ export default function UserDropdownMenu() {
                 <hr className="my-1" />
                 <li className="relative">
                   <button
-                    onClick={() => go("/host-bookings")}
+                    onClick={() => go(`/${locale}/host-bookings`)}
                     className="w-full text-left px-4 py-2 hover:bg-gray-100 flex justify-between items-center"
                   >
-                    📥 Захиалга (Хост)
-                    {unreadCount > 0 && (
+                    {t(locale, "menu_host_bookings")}
+                    {bookingUnread > 0 && (
                       <span className="text-xs bg-red-500 text-white rounded-full px-2 py-0.5 ml-2">
-                        {unreadCount}
+                        {bookingUnread}
                       </span>
                     )}
                   </button>
                 </li>
                 <li className="relative">
                   <button
-                    onClick={() => go("/notifications")}
+                    onClick={() => go(`/${locale}/notifications`)}
                     className="w-full text-left px-4 py-2 hover:bg-gray-100 flex justify-between items-center"
                   >
-                    🔔 Мэдэгдэл
-                    {unreadCount > 0 && (
+                    {t(locale, "menu_notifications")}
+                    {totalUnread > 0 && (
                       <span className="text-xs bg-red-500 text-white rounded-full px-2 py-0.5 ml-2">
-                        {unreadCount}
+                        {totalUnread}
                       </span>
                     )}
                   </button>
                 </li>
                 <li>
                   <button
-                    onClick={() => go("/host/listings")}
+                    onClick={() => go(`/${locale}/my-listings`)}
                     className="w-full text-left px-4 py-2 hover:bg-gray-100"
                   >
-                    📋 Миний зарууд
+                    {t(locale, "menu_my_listings")}
                   </button>
                 </li>
                 <li>
                   <button
-                    onClick={() => go("/create-listing")}
+                    onClick={() => go(`/${locale}/listings/new`)}
                     className="w-full text-left px-4 py-2 hover:bg-gray-100"
                   >
-                    ➕ Зар нэмэх
+                    {t(locale, "menu_add_listing")}
                   </button>
                 </li>
               </>
@@ -163,7 +150,7 @@ export default function UserDropdownMenu() {
                 onClick={handleLogout}
                 className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50"
               >
-                🚪 Гарах
+                {t(locale, "menu_logout")}
               </button>
             </li>
           </ul>

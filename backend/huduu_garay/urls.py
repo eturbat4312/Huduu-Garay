@@ -17,6 +17,14 @@ urlpatterns = [
     path(
         "api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"
     ),  # JWT refresh
+    path("auth/", include("dj_rest_auth.urls")),  # Login/logout/password reset
+    path(
+        "auth/registration/", include("dj_rest_auth.registration.urls")
+    ),  # Registration
+    path("auth/", include("allauth.socialaccount.urls")),  # Social logins (Google)
+    path(
+        "accounts/", include("allauth.urls")
+    ),  # UI redirects like /accounts/google/login/
 ]
 
 if settings.DEBUG:

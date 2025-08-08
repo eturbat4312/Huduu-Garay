@@ -2,7 +2,7 @@ from rest_framework import generics, status, permissions, serializers
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.generics import RetrieveAPIView
+from rest_framework.generics import RetrieveAPIView, RetrieveUpdateAPIView
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
@@ -10,6 +10,22 @@ from datetime import timedelta
 from PIL import Image
 from io import BytesIO
 from django.core.files.base import ContentFile
+from rest_framework.exceptions import ValidationError
+from django.utils import timezone
+from core.utils.email_notifications import send_notification_email
+from decimal import Decimal
+from google.oauth2 import id_token
+
+# from dj_rest_auth.jwt_auth import get_refresh_view
+
+
+# from dj_rest_auth.registration.views import SocialLoginView
+
+# from core.adapters import GoogleOneTapAdapter
+# from allauth.socialaccount.providers.oauth2.client import OAuth2Client
+# from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from rest_framework_simplejwt.tokens import RefreshToken
+
 
 from .models import (
     Category,
@@ -20,6 +36,8 @@ from .models import (
     Favorite,
     Booking,
     Notification,
+    Review,
+    HostApplication,
 )
 from .serializers import (
     CategorySerializer,
@@ -33,6 +51,8 @@ from .serializers import (
     AmenitySerializer,
     FavoriteSerializer,
     NotificationSerializer,
+    ReviewSerializer,
+    HostApplicationSerializer,
 )
 
 User = get_user_model()
@@ -46,15 +66,61 @@ class SignupView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
 
 
+class GoogleLogin(APIView):
+    def post(self, request):
+        token = request.data.get("access_token")  # really it's an id_token
+
+        try:
+            idinfo = id_token.verify_oauth2_token(token, google_requests.Request())
+            email = idinfo.get("email")
+            if not email:
+                return Response({"error": "Email not found in token"}, status=400)
+
+            user, created = User.objects.get_or_create(
+                email=email, defaults={"username": email.split("@")[0]}
+            )
+
+            refresh = RefreshToken.for_user(user)
+            return Response(
+                {
+                    "refresh": str(refresh),
+                    "access": str(refresh.access_token),
+                }
+            )
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+# class GoogleOneTapLoginView(SocialLoginView):
+#     adapter_class = GoogleOneTapAdapter
+#     callback_url = "http://localhost:3000"
+#     client_class = OAuth2Client
+
+#     def get_serializer(self, *args, **kwargs):
+#         kwargs["data"] = {
+#             "access_token": "",  # хоосон үлдээнэ
+#             "code": None,
+#             "id_token": self.request.data.get("access_token"),  # JWT
+#         }
+#         return super().get_serializer(*args, **kwargs)
+
+
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
     def get(self, request):
-        serializer = UserSerializer(request.user)
+        serializer = UserSerializer(request.user, context={"request": request})
         return Response(serializer.data)
 
     def patch(self, request):
-        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        serializer = UserSerializer(
+            request.user,
+            data=request.data,
+            partial=True,
+            context={"request": request},
+        )
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -144,43 +210,62 @@ class ListingRetrieveView(RetrieveAPIView):
 
 class ListingImageUploadView(APIView):
     parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, format=None):
-        uploaded_image = request.FILES.get("image")
+        images = request.FILES.getlist("images")  # ✅ олон зураг дэмжих
         listing_id = request.data.get("listing")
 
-        if not uploaded_image or not listing_id:
+        if not images or not listing_id:
             return Response(
                 {"error": "Зураг болон listing ID шаардлагатай"}, status=400
             )
 
         try:
-            image = Image.open(uploaded_image)
-            max_size = (1024, 768)
-            image.thumbnail(max_size)
-
-            buffer = BytesIO()
-            image.convert("RGB").save(buffer, format="JPEG", quality=85)
-            buffer.seek(0)  # 🛠 ЭНЭ ЧУХАЛ — буцааж эхлэлд шилжүүлнэ
-
-            final_image_file = ContentFile(buffer.read(), name="listing.jpg")
-
-            # 🛠 listing_id-г шууд object болгоё
             from .models import Listing
 
             listing = Listing.objects.get(id=listing_id)
 
-            new_image = ListingImage.objects.create(
-                listing=listing, image=final_image_file
-            )
+            created_images = []
 
-            return Response(ListingImageSerializer(new_image).data, status=201)
+            for uploaded_image in images:
+                image = Image.open(uploaded_image)
+                max_size = (1024, 768)
+                image.thumbnail(max_size)
+
+                buffer = BytesIO()
+                image.convert("RGB").save(buffer, format="JPEG", quality=85)
+                buffer.seek(0)
+
+                final_image_file = ContentFile(buffer.read(), name="listing.jpg")
+
+                new_image = ListingImage.objects.create(
+                    listing=listing, image=final_image_file
+                )
+                created_images.append(new_image)
+
+            serializer = ListingImageSerializer(
+                created_images, many=True, context={"request": request}
+            )
+            return Response(serializer.data, status=201)
 
         except Exception as e:
             return Response(
                 {"error": f"Зураг боловсруулахад алдаа гарлаа: {str(e)}"},
                 status=400,
             )
+
+
+class ListingImageDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, image_id):
+        try:
+            image = ListingImage.objects.get(id=image_id, listing__host=request.user)
+            image.delete()
+            return Response({"message": "Зураг амжилттай устгагдлаа"}, status=200)
+        except ListingImage.DoesNotExist:
+            return Response({"error": "Зураг олдсонгүй эсвэл таных биш"}, status=404)
 
 
 # ---------------------- AVAILABILITY ----------------------
@@ -226,20 +311,20 @@ from datetime import timedelta
 
 from .models import Booking, Availability, Notification
 from .serializers import BookingSerializer
+from google.auth.transport import requests as google_requests
 
 
 class BookingCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, format=None):
-        serializer = BookingSerializer(data=request.data)
+        serializer = BookingSerializer(data=request.data, context={"request": request})
         if serializer.is_valid():
             listing = serializer.validated_data["listing"]
             check_in = serializer.validated_data["check_in"]
             check_out = serializer.validated_data["check_out"]
             guest = request.user
 
-            # ✅ Зөвхөн ганц өдөр сонгосон үед checkout-г +1 хоног болгоно
             if check_in == check_out:
                 check_out += timedelta(days=1)
 
@@ -248,7 +333,7 @@ class BookingCreateView(APIView):
             notes = serializer.validated_data.get("notes", "")
             guest_count = serializer.validated_data["guest_count"]
 
-            # Захиалгад багтах бүх өдөр (checkout оролцохгүй)
+            # Захиалгад багтах бүх өдөр
             date = check_in
             requested_dates = []
             while date < check_out:
@@ -260,6 +345,13 @@ class BookingCreateView(APIView):
             ).values_list("date", flat=True)
 
             if set(requested_dates).issubset(set(available_dates)):
+                # ✅ Үнийн тооцоо
+                total_nights = len(requested_dates)
+                base_price = listing.price_per_night or 0
+                total_price = Decimal(total_nights * base_price)
+                service_fee = (total_price * Decimal("0.10")).quantize(Decimal("1"))
+
+                # ✅ Захиалгыг үүсгэх
                 booking = Booking.objects.create(
                     listing=listing,
                     guest=guest,
@@ -269,18 +361,39 @@ class BookingCreateView(APIView):
                     phone_number=phone_number,
                     notes=notes,
                     guest_count=guest_count,
+                    total_price=total_price,
+                    service_fee=service_fee,
                 )
 
-                # ❗ зөвхөн орсон шөнүүдийг устгана (checkout өдөр биш)
+                # ✅ Хуваарь устгах
                 Availability.objects.filter(
                     listing=listing, date__in=requested_dates
                 ).delete()
 
-                # Хостод мэдэгдэл илгээх
+                # ✅ Notification
                 Notification.objects.create(
                     user=listing.host,
                     message=f"{guest.username} таны '{listing.title}' байранд захиалга хийлээ.",
+                    type="booking_created",
+                    related_booking=booking,
                 )
+
+                try:
+                    send_notification_email(
+                        user=listing.host,
+                        notif_type="booking_created",
+                        context={
+                            "listing_title": listing.title,
+                            "guest_name": guest.username,
+                            "full_name": full_name,
+                            "phone_number": phone_number,
+                            "check_in": check_in.strftime("%Y-%m-%d"),
+                            "check_out": check_out.strftime("%Y-%m-%d"),
+                            "guest_count": guest_count,
+                        },
+                    )
+                except Exception as e:
+                    print(f"❌ Email илгээхэд алдаа гарлаа: {e}")
 
                 return Response(
                     BookingSerializer(booking, context={"request": request}).data,
@@ -293,6 +406,11 @@ class BookingCreateView(APIView):
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BookingRetrieveView(RetrieveAPIView):
+    queryset = Booking.objects.all()
+    serializer_class = BookingSerializer
 
 
 # ---------------------- FAVORITE ----------------------
@@ -385,6 +503,29 @@ class HostBookingCancelView(APIView):
             )
             date += timedelta(days=1)
 
+        # ✅ Notification: захиалга цуцлагдсан тухай хэрэглэгчид мэдэгдэл
+        Notification.objects.create(
+            user=booking.guest,
+            message=f"Таны захиалга ({booking.listing.title}) цуцлагдлаа.",
+            type="booking_cancelled",
+            related_booking=booking,
+        )
+        try:
+            send_notification_email(
+                user=booking.guest,
+                notif_type="booking_cancelled",
+                context={
+                    "listing_title": booking.listing.title,
+                    "check_in": booking.check_in.strftime("%Y-%m-%d"),
+                    "check_out": booking.check_out.strftime("%Y-%m-%d"),
+                    "full_name": booking.full_name,
+                    "guest_count": booking.guest_count,
+                    "phone_number": booking.phone_number,
+                },
+            )
+        except Exception as e:
+            print(f"❌ Цуцлалтын имэйл илгээхэд алдаа гарлаа: {e}")
+
         return Response(
             {"message": "Захиалгыг амжилттай цуцаллаа. Өдрүүд сэргээгдлээ."}, status=200
         )
@@ -405,5 +546,213 @@ class NotificationUnreadCountView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        count = Notification.objects.filter(user=request.user, is_read=False).count()
-        return Response({"unread_count": count})
+        user = request.user
+        total = Notification.objects.filter(user=user, is_read=False).count()
+        booking = Notification.objects.filter(
+            user=user, is_read=False, type="booking_created"
+        ).count()
+        return Response(
+            {
+                "total_unread": total,
+                "booking_unread": booking,
+            }
+        )
+
+
+class NotificationMarkAsReadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, format=None):
+        type_filter = request.data.get("type")
+        qs = Notification.objects.filter(user=request.user, is_read=False)
+        if type_filter:
+            qs = qs.filter(type=type_filter)
+        qs.update(is_read=True)
+        return Response({"message": "Marked as read."})
+
+
+class HostBookingDetailView(RetrieveAPIView):
+    serializer_class = BookingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # зөвхөн тухайн хэрэглэгчийн хост захиалгуудыг зөвшөөрнө
+        return Booking.objects.filter(listing__host=self.request.user)
+
+
+class MyListingsView(generics.ListAPIView):
+    serializer_class = ListingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Listing.objects.filter(host=self.request.user).prefetch_related(
+            "images", "amenities", "category"
+        )
+
+
+class HostBookingCalendarView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        bookings = Booking.objects.filter(listing__host=user)
+
+        data = []
+        for booking in bookings:
+            # check_in -> check_out хоорондох өдрүүдийг бүгдийг авна
+            current = booking.check_in
+            while current < booking.check_out:
+                data.append(
+                    {
+                        "date": current,
+                        "booking_id": booking.id,
+                        "listing_id": booking.listing.id,
+                        "listing_title": booking.listing.title,
+                        "guest_name": booking.guest.username,
+                        "is_cancelled_by_host": booking.is_cancelled_by_host,
+                    }
+                )
+                current += timedelta(days=1)
+
+        return Response(data)
+
+
+class ListingUpdateView(RetrieveUpdateAPIView):
+    queryset = Listing.objects.all()
+    serializer_class = ListingSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Зөвхөн өөрийн заруудыг засах эрхтэй
+        return Listing.objects.filter(host=self.request.user)
+
+    def get_serializer_context(self):
+        return {"request": self.request}
+
+
+class AvailabilityDeleteByListingView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        listing_id = request.data.get("listing")
+        if not listing_id:
+            return Response({"error": "listing ID шаардлагатай"}, status=400)
+        deleted, _ = Availability.objects.filter(listing__id=listing_id).delete()
+        return Response({"message": f"{deleted} огноо устгагдлаа."}, status=200)
+
+
+class ListingDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, listing_id):
+        try:
+            listing = Listing.objects.get(id=listing_id, host=request.user)
+        except Listing.DoesNotExist:
+            return Response(
+                {"error": "Зар олдсонгүй эсвэл таных биш."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Захиалга байгаа эсэхийг шалгах
+        has_active_bookings = Booking.objects.filter(
+            listing=listing, is_cancelled_by_host=False
+        ).exists()
+
+        if has_active_bookings:
+            return Response(
+                {
+                    "error": "Таны зар дээр захиалга хийгдсэн тул устгах боломжгүй байна. Эхлээд захиалгаа цуцална уу."
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        listing.delete()
+        return Response(
+            {"message": "Зар амжилттай устгагдлаа."}, status=status.HTTP_200_OK
+        )
+
+
+class ReviewCreateListView(generics.ListCreateAPIView):
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        listing_id = self.kwargs.get("listing_id")
+        return Review.objects.filter(listing__id=listing_id).order_by("-created_at")
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        listing = serializer.validated_data["listing"]
+
+        booking = (
+            Booking.objects.filter(
+                listing=listing, guest=user, check_out__lte=timezone.now()
+            )
+            .order_by("-check_out")
+            .first()
+        )
+
+        if not booking:
+            raise ValidationError("Та энэ байранд буусан байх ёстой.")
+
+        if Review.objects.filter(listing=listing, guest=user).exists():
+            raise ValidationError("Та аль хэдийн сэтгэгдэл үлдээсэн байна.")
+
+        serializer.save(guest=user, booking=booking)
+
+        Notification.objects.create(
+            user=listing.host,
+            message=f"{user.username} таны '{listing.title}' зар дээр сэтгэгдэл үлдээлээ.",
+            type="review",
+            related_listing=listing,
+        )
+        try:
+            send_notification_email(
+                user=listing.host,
+                notif_type="review",
+                context={
+                    "guest_name": user.username,
+                    "listing_title": listing.title,
+                },
+            )
+        except Exception as e:
+            print(f"❌ Сэтгэгдлийн имэйл илгээхэд алдаа гарлаа: {e}")
+
+
+class HostApplicationCreateView(generics.CreateAPIView):
+    queryset = HostApplication.objects.all()
+    serializer_class = HostApplicationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if HostApplication.objects.filter(user=user).exists():
+            raise ValidationError(
+                "Та аль хэдийн түрээслүүлэгч болох хүсэлт илгээсэн байна."
+            )
+        serializer.save(user=user)
+
+
+class HostApplicationMeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            app = HostApplication.objects.get(user=request.user)
+            serializer = HostApplicationSerializer(app)
+            return Response(serializer.data)
+        except HostApplication.DoesNotExist:
+            return Response({"detail": "HostApplication not found."}, status=404)
+
+    def patch(self, request):
+        try:
+            app = HostApplication.objects.get(user=request.user)
+        except HostApplication.DoesNotExist:
+            return Response({"detail": "HostApplication not found."}, status=404)
+
+        serializer = HostApplicationSerializer(app, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
