@@ -16,3 +16,4 @@ backend/.env
 *.sqlite3
 .vscode/
 .idea/
+frontend.zip
