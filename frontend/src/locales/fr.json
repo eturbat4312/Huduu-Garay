@@ -250,7 +250,17 @@
   "platform_moderation_rights": "La plateforme se réserve le droit de supprimer tout utilisateur ou annonce à sa discrétion.",
   "platform_terms_change": "Les conditions peuvent changer à tout moment sans préavis.",
   "terms_last_updated": "Dernière mise à jour :",
-  "email_label": "Email"
+  "email_label": "Email",
+"general_info": "Informations générales",
+"details_section": "Détails",
+"title_placeholder": "ex. Yourte cosy avec 4 lits au centre",
+"description_placeholder": "Brève présentation, points forts, règles…",
+"location_placeholder": "ex. Arkhangai, Tsetserleg",
+"price_placeholder": "Prix par nuit",
+
+"image_tip_max6": "Vous pouvez téléverser jusqu’à 6 images."
+
+
 
   }
   

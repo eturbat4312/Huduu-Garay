@@ -250,7 +250,17 @@
   "platform_moderation_rights": "Платформ нь шаардлагатай гэж үзвэл хэрэглэгч эсвэл заруудыг устгах эрхтэй.",
   "platform_terms_change": "Энэхүү нөхцлийг урьдчилан мэдэгдэлгүйгээр өөрчлөх эрхтэй.",
   "terms_last_updated": "Сүүлийн шинэчлэл:",
-  "email_label": "Email хаяг"
+  "email_label": "Email хаяг",
+"general_info": "Ерөнхий мэдээлэл",
+"details_section": "Дэлгэрэнгүй",
+"title_placeholder": "Жишээ: Төвд байрлах 4 ортой гэр",
+"description_placeholder": "Орон байрны товч танилцуулга, онцлог, дүрэм...",
+"location_placeholder": "Жишээ: Архангай, Цэнхэр сум",
+"price_placeholder": "Нэг шөнийн үнэ",
+
+"image_tip_max6": "Дээд тал нь 6 зураг оруулна уу."
+
+  
 
   
 

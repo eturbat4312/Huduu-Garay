@@ -1,3 +1,4 @@
+// filename: src/app/[locale]/listings/new/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,6 +8,10 @@ import { format } from "date-fns";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { t } from "@/lib/i18n";
+import NumberStepper from "@/components/NumberStepper";
+
+type Category = { id: number; name: string };
+type Amenity = { id: number; name: string };
 
 export default function CreateListingPage() {
   const router = useRouter();
@@ -19,9 +24,9 @@ export default function CreateListingPage() {
   const [beds, setBeds] = useState(1);
   const [maxGuests, setMaxGuests] = useState(1);
   const [categoryId, setCategoryId] = useState<number | null>(null);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [amenityIds, setAmenityIds] = useState<number[]>([]);
-  const [amenityOptions, setAmenityOptions] = useState([]);
+  const [amenityOptions, setAmenityOptions] = useState<Amenity[]>([]);
   const [images, setImages] = useState<File[]>([]);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
 
@@ -85,10 +90,12 @@ export default function CreateListingPage() {
       await handleImageUpload(listingId);
 
       const dateList = selectedDates.map((d) => format(d, "yyyy-MM-dd"));
-      await api.post("/availability/bulk/", {
-        listing: listingId,
-        dates: dateList,
-      });
+      if (dateList.length) {
+        await api.post("/availability/bulk/", {
+          listing: listingId,
+          dates: dateList,
+        });
+      }
 
       router.push(`/${locale}/listings/${listingId}`);
     } catch (err: any) {
@@ -100,165 +107,233 @@ export default function CreateListingPage() {
     val.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white shadow rounded">
+    <div className="max-w-6xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">
         {t(locale as string, "create_listing_title")}
       </h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <label className="block">
-          {t(locale as string, "title_label")}
-          <input
-            className="w-full border p-2 mt-1"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            required
-          />
-        </label>
 
-        <label className="block">
-          {t(locale as string, "description_label")}
-          <textarea
-            className="w-full border p-2 mt-1"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            required
-          />
-        </label>
+      {/* 2 багана layout */}
+      <form
+        onSubmit={handleSubmit}
+        className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+      >
+        {/* Зүүн тал — үндсэн мэдээлэл (2 багана эзэлнэ) */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Ерөнхий мэдээлэл */}
+          <section className="bg-white p-6 rounded-xl shadow">
+            <h2 className="text-lg font-semibold mb-4">
+              📄 {t(locale as string, "general_info")}
+            </h2>
 
-        <label className="block">
-          {t(locale as string, "location_label")}
-          <input
-            className="w-full border p-2 mt-1"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            required
-          />
-        </label>
+            <label className="block mb-4">
+              <span className="block text-sm font-medium">
+                {t(locale as string, "title_label")}
+              </span>
+              <input
+                className="w-full border p-2 mt-1 rounded-md"
+                placeholder={t(locale as string, "title_placeholder")}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
+            </label>
 
-        <label className="block">
-          {t(locale as string, "price_label")}
-          <input
-            className="w-full border p-2 mt-1"
-            value={price}
-            onChange={(e) => setPrice(formatPrice(e.target.value))}
-            required
-          />
-        </label>
+            <label className="block mb-4">
+              <span className="block text-sm font-medium">
+                {t(locale as string, "description_label")}
+              </span>
+              <textarea
+                className="w-full border p-2 mt-1 rounded-md"
+                placeholder={t(locale as string, "description_placeholder")}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                required
+              />
+            </label>
 
-        <label className="block">
-          {t(locale as string, "beds_label")}
-          <input
-            type="number"
-            className="w-full border p-2 mt-1"
-            value={beds}
-            onChange={(e) => setBeds(Number(e.target.value))}
-            required
-          />
-        </label>
-
-        <label className="block">
-          {t(locale as string, "guests_label")}
-          <input
-            type="number"
-            className="w-full border p-2 mt-1"
-            value={maxGuests}
-            onChange={(e) => setMaxGuests(Number(e.target.value))}
-            required
-          />
-        </label>
-
-        <label className="block">
-          {t(locale as string, "category_label")}
-          <select
-            className="w-full border p-2 mt-1"
-            value={categoryId ?? ""}
-            onChange={(e) => setCategoryId(Number(e.target.value))}
-            required
-          >
-            <option value="">{t(locale as string, "select_option")}</option>
-            {categories.map((cat: any) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          {t(locale as string, "amenities_label")}
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            {amenityOptions.map((a: any) => (
-              <label key={a.id} className="flex items-center space-x-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="block text-sm font-medium">
+                  {t(locale as string, "location_label")}
+                </span>
                 <input
-                  type="checkbox"
-                  value={a.id}
-                  checked={amenityIds.includes(a.id)}
-                  onChange={(e) => {
-                    const id = Number(e.target.value);
-                    setAmenityIds((prev) =>
-                      prev.includes(id)
-                        ? prev.filter((x) => x !== id)
-                        : [...prev, id]
-                    );
-                  }}
+                  className="w-full border p-2 mt-1 rounded-md"
+                  placeholder={t(locale as string, "location_placeholder")}
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  required
                 />
-                <span>{a.name}</span>
               </label>
-            ))}
-          </div>
-        </label>
 
-        <label className="block">
-          {t(locale as string, "images_label")}
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            className="block mt-2 text-sm text-gray-700 border border-gray-300 rounded w-full p-1 file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-            onChange={handleImageChange}
-          />
-        </label>
-
-        {images.length > 0 && (
-          <div className="grid grid-cols-3 gap-2 mt-2">
-            {images.map((file, i) => (
-              <div key={i} className="relative">
-                <img
-                  src={URL.createObjectURL(file)}
-                  alt={`preview-${i}`}
-                  className="w-full h-28 object-cover rounded"
+              <label className="block">
+                <span className="block text-sm font-medium">
+                  {t(locale as string, "price_label")}
+                </span>
+                <input
+                  className="w-full border p-2 mt-1 rounded-md"
+                  placeholder={t(locale as string, "price_placeholder")}
+                  value={price}
+                  onChange={(e) => setPrice(formatPrice(e.target.value))}
+                  required
                 />
-                <button
-                  type="button"
-                  onClick={() => removeImage(i)}
-                  className="absolute top-1 right-1 bg-white text-red-600 rounded-full px-2 py-1 text-xs shadow"
-                >
-                  X
-                </button>
+              </label>
+            </div>
+          </section>
+
+          {/* Байрны дэлгэрэнгүй */}
+          <section className="bg-white p-6 rounded-xl shadow">
+            <h2 className="text-lg font-semibold mb-4">
+              🛏 {t(locale as string, "details_section")}
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <span className="block text-sm font-medium mb-1">
+                  {t(locale as string, "beds_label")}
+                </span>
+                <NumberStepper
+                  value={beds}
+                  onChange={setBeds}
+                  min={1}
+                  max={20}
+                  step={1}
+                  label={t(locale as string, "beds_label")}
+                />
               </div>
-            ))}
-          </div>
-        )}
 
-        <label className="block">
-          {t(locale as string, "available_dates_label")}
-          <div className="mt-2 border rounded p-2">
-            <DayPicker
-              mode="multiple"
-              selected={selectedDates}
-              onSelect={setSelectedDates}
-              required
-              fromDate={new Date()}
+              <div>
+                <span className="block text-sm font-medium mb-1">
+                  {t(locale as string, "guests_label")}
+                </span>
+                <NumberStepper
+                  value={maxGuests}
+                  onChange={setMaxGuests}
+                  min={1}
+                  max={30}
+                  step={1}
+                  label={t(locale as string, "guests_label")}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <label className="block">
+                <span className="block text-sm font-medium">
+                  {t(locale as string, "category_label")}
+                </span>
+                <select
+                  className="w-full border p-2 mt-1 rounded-md"
+                  value={categoryId ?? ""}
+                  onChange={(e) => setCategoryId(Number(e.target.value))}
+                  required
+                >
+                  <option value="">
+                    {t(locale as string, "select_option")}
+                  </option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="block">
+                <span className="block text-sm font-medium">
+                  {t(locale as string, "amenities_label")}
+                </span>
+                <div className="grid grid-cols-2 gap-2 mt-2 border rounded-md p-3 max-h-44 overflow-auto">
+                  {amenityOptions.map((a) => (
+                    <label
+                      key={a.id}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        value={a.id}
+                        checked={amenityIds.includes(a.id)}
+                        onChange={(e) => {
+                          const id = Number(e.target.value);
+                          setAmenityIds((prev) =>
+                            prev.includes(id)
+                              ? prev.filter((x) => x !== id)
+                              : [...prev, id]
+                          );
+                        }}
+                      />
+                      <span>{a.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        {/* Баруун тал — зураг, календар */}
+        <div className="space-y-6">
+          {/* Зураг */}
+          <section className="bg-white p-6 rounded-xl shadow">
+            <h2 className="text-lg font-semibold mb-4">
+              🖼 {t(locale as string, "images_label")}
+            </h2>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="block text-sm text-gray-700 border border-dashed border-gray-300 rounded-lg w-full p-4 cursor-pointer hover:bg-gray-50"
+              onChange={handleImageChange}
             />
-          </div>
-        </label>
+            {!!images.length && (
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                {images.map((file, i) => (
+                  <div key={i} className="relative">
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt={`preview-${i}`}
+                      className="w-full h-28 object-cover rounded"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(i)}
+                      className="absolute top-1 right-1 bg-white text-red-600 rounded-full px-2 py-1 text-xs shadow"
+                      aria-label="remove image"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-2">
+              {t(locale as string, "image_tip_max6")}
+            </p>
+          </section>
 
-        <button
-          type="submit"
-          className="w-full bg-green-600 text-white py-2 rounded"
-        >
-          {t(locale as string, "submit_button")}
-        </button>
+          {/* Календар */}
+          <section className="bg-white p-6 rounded-xl shadow">
+            <h2 className="text-lg font-semibold mb-4">
+              📅 {t(locale as string, "available_dates_label")}
+            </h2>
+            <div className="border rounded p-2">
+              <DayPicker
+                mode="multiple"
+                selected={selectedDates}
+                onSelect={(dates) => setSelectedDates(dates ?? [])}
+                fromDate={new Date()}
+              />
+            </div>
+          </section>
+
+          {/* Илгээх товч (баруун талын доод хэсэгт харагдана) */}
+          <button
+            type="submit"
+            className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition"
+          >
+            {t(locale as string, "submit_button")}
+          </button>
+        </div>
       </form>
     </div>
   );

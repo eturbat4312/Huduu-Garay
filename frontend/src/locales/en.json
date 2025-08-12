@@ -247,7 +247,15 @@
   "platform_moderation_rights": "The platform reserves the right to remove users or listings at its discretion.",
   "platform_terms_change": "Terms may change at any time without prior notice.",
   "terms_last_updated": "Last updated:",
-  "email_label": "Email"
-  
+  "email_label": "Email",
+"general_info": "General info",
+"details_section": "Details",
+"title_placeholder": "e.g., Cozy ger with 4 beds in the center",
+"description_placeholder": "Brief intro, highlights, rules...",
+"location_placeholder": "e.g., Arkhangai, Tsetserleg",
+"price_placeholder": "Price per night",
+
+"image_tip_max6": "You can upload up to 6 images."
+
   }
   
