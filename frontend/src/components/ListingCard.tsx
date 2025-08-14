@@ -91,7 +91,11 @@ export default function ListingCard({
                   src={
                     img.image?.startsWith("http")
                       ? img.image
-                      : `http://localhost:8000${img.image}`
+                      : `${
+                          img.image?.startsWith("/")
+                            ? img.image
+                            : `/${img.image}`
+                        }`
                   }
                   alt={`image-${i}`}
                   className="h-48 w-72 object-cover flex-shrink-0 rounded-md"
