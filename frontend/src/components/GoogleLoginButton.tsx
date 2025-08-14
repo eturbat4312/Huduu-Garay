@@ -17,12 +17,9 @@ export default function GoogleLoginButton() {
       client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
       callback: async (response: any) => {
         try {
-          const res = await axios.post(
-            "http://localhost:8010/api/auth/google/",
-            {
-              access_token: response.credential,
-            }
-          );
+          const res = await axios.post("api/auth/google/", {
+            access_token: response.credential,
+          });
 
           localStorage.setItem("access_token", res.data.access);
           localStorage.setItem("refresh_token", res.data.refresh);

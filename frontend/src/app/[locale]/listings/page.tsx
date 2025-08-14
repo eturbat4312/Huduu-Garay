@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import api from "@/lib/axios";
 import { t } from "@/lib/i18n";
 
-const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || "http://localhost:8010";
+const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || "/media";
 
 export default function ListingsPage() {
   const { locale } = useParams();

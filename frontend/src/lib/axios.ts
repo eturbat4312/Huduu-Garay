@@ -1,58 +1,53 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 
-const isBrowser = typeof window !== "undefined";
+const baseURL = process.env.NEXT_PUBLIC_API_URL || "/api";
+const api = axios.create({ baseURL });
 
-// const clientBase =
-//   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8010/api";
-
-const clientBase = process.env.NEXT_PUBLIC_API_URL || "http://54.64.78.102/api";
-
-const serverBase =
-  process.env.INTERNAL_API_URL || clientBase; // docker дотроос backend руу
-
-const api = axios.create({
-  baseURL: isBrowser ? clientBase : serverBase,
+// Access token-ийг хүсэлт бүр дээр автоматаар нэмэх
+api.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers = config.headers || {};
+      (config.headers as any).Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
 });
 
-api.interceptors.request.use(
-  (config) => {
-    if (isBrowser) {
-      const access = localStorage.getItem("access_token");
-      if (access) config.headers.Authorization = `Bearer ${access}`;
-    }
-    return config;
-  },
-  (e) => Promise.reject(e)
-);
-
+// (Сонголт) 401 дээр refresh → retry
+let isRefreshing = false;
+let waiters: Array<(t: string) => void> = [];
 api.interceptors.response.use(
-  (r) => r,
-  async (error) => {
-    if (!isBrowser) return Promise.reject(error); // SSR дээр refresh хийлгэхгүй
-
-    const originalRequest: any = error.config;
-    const refresh = localStorage.getItem("refresh_token");
-
-    if (error.response?.status === 401 && !originalRequest._retry && refresh) {
-      originalRequest._retry = true;
-      try {
-        const res = await axios.post(
-          `${clientBase}/token/refresh/`,
-          { refresh }
-        );
-        const newAccessToken = res.data.access;
-        localStorage.setItem("access_token", newAccessToken);
-        originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
-        return api(originalRequest);
-      } catch (err) {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        const locale = window.location.pathname.split("/")[1] || "mn";
-        window.location.href = `/${locale}/`;
-        return Promise.reject(err);
+  r => r,
+  async (err: AxiosError) => {
+    const original: any = err.config;
+    if (err.response?.status === 401 && !original?._retry) {
+      original._retry = true;
+      if (!isRefreshing) {
+        isRefreshing = true;
+        try {
+          const refresh = localStorage.getItem("refresh_token");
+          if (!refresh) throw new Error("No refresh token");
+          const { data } = await axios.post(`${baseURL}/token/refresh/`, { refresh });
+          localStorage.setItem("access_token", data.access);
+          waiters.forEach(fn => fn(data.access));
+          waiters = [];
+          return api(original);
+        } finally {
+          isRefreshing = false;
+        }
+      } else {
+        return new Promise((resolve, reject) => {
+          waiters.push((newToken) => {
+            original.headers = original.headers || {};
+            original.headers.Authorization = `Bearer ${newToken}`;
+            api(original).then(resolve).catch(reject);
+          });
+        });
       }
     }
-    return Promise.reject(error);
+    throw err;
   }
 );
 

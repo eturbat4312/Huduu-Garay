@@ -82,7 +82,7 @@ export const useRefreshUser = () => {
       if (error.response?.status === 401) {
         try {
           const refresh = localStorage.getItem("refresh_token");
-          const res = await fetch("http://localhost:8010/api/token/refresh/", {
+          const res = await fetch("/api/token/refresh/", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

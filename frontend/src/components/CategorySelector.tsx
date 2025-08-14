@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { cn } from "@/lib/utils";
 
-const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || "http://localhost:8010";
+// const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || "http://localhost:8010";
+const MEDIA_URL = process.env.NEXT_PUBLIC_MEDIA_URL || "/media";
 
 type Category = {
   id: number;
@@ -21,7 +22,7 @@ export default function CategorySelector() {
 
   useEffect(() => {
     axios
-      .get("http://localhost:8010/api/categories/")
+      .get("/api/categories/")
       .then((res) => {
         console.log("✅ Categories loaded:", res.data);
         setCategories(res.data);
