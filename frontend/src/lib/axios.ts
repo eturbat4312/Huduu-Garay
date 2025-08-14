@@ -2,8 +2,10 @@ import axios from "axios";
 
 const isBrowser = typeof window !== "undefined";
 
-const clientBase =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8010/api";
+// const clientBase =
+//   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8010/api";
+
+const clientBase = process.env.NEXT_PUBLIC_API_URL || "http://54.64.78.102/api";
 
 const serverBase =
   process.env.INTERNAL_API_URL || clientBase; // docker дотроос backend руу

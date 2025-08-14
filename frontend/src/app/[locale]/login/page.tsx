@@ -19,7 +19,7 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await axios.post("http://localhost:8010/api/token/", {
+      const res = await axios.post("http://54.64.78.102/api/token/", {
         username,
         password,
       });
