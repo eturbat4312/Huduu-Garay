@@ -14,7 +14,16 @@ const nextConfig: NextConfig = {
     ],
   },
   eslint: {
-    ignoreDuringBuilds: true, // ✅ Энэ хэсгийг нэм
+    ignoreDuringBuilds: true, // ✅ Build дээр eslint алдаа үл тооно
+  },
+  async redirects() {
+    return [
+      {
+        source: "/",              // үндсэн хаяг
+        destination: "/listings", // шилжүүлэх хуудас
+        permanent: false,
+      },
+    ];
   },
 };
 

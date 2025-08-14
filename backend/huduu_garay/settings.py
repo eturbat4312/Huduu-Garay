@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from datetime import timedelta
 
 load_dotenv()
 
@@ -36,7 +37,8 @@ SECRET_KEY = "django-insecure--ua!&czs90bsyojt8@&v*@oyb$1vfeews7fe8_!&-3fl@8-+ub
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["54.64.78.102", "localhost", "127.0.0.1", "*"]
 
 
 # Application definition
@@ -96,10 +98,26 @@ TEMPLATES = [
     },
 ]
 
+# REST_FRAMEWORK = {
+#     "DEFAULT_AUTHENTICATION_CLASSES": (
+#         "rest_framework_simplejwt.authentication.JWTAuthentication",
+#     )
+# }
+
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
+    "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-    )
+        "rest_framework.authentication.SessionAuthentication",  # debugging-ийн тулд
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
 }
 
 SOCIALACCOUNT_PROVIDERS = {
@@ -149,7 +167,11 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "http://54.64.78.102",  # таны deployment server
+    "https://54.64.78.102",  # хэрэв HTTPS ашиглаж байвал
 ]
+
+CORS_ALLOW_CREDENTIALS = True
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
