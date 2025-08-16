@@ -99,6 +99,10 @@ export default function ListingCard({
                   }
                   alt={`image-${i}`}
                   className="h-48 w-72 object-cover flex-shrink-0 rounded-md"
+                  loading="lazy"
+                  decoding="async"
+                  width={288} /* w-72 = 18rem = ~288px */
+                  height={192} /* h-48 = 12rem = ~192px */
                 />
               ))
             ) : (
