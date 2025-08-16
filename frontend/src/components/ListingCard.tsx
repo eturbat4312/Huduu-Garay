@@ -48,6 +48,24 @@ export default function ListingCard({
     }
   };
 
+  const normalizeImageUrl = (u?: string) => {
+    if (!u) return "";
+    if (/^https?:\/\//i.test(u)) {
+      try {
+        const url = new URL(u);
+        // localhost эсвэл 127.0.0.1 байвал host-г авч хаяад path-г л үлдээнэ
+        if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+          return url.pathname + url.search + url.hash; // → /media/...
+        }
+        return u; // жинхэнэ гадаад host бол хэвээр нь үлдээнэ
+      } catch {
+        // эвдэрхий URL байвал доошхийгээр явна
+      }
+    }
+    // media/... хэлбэртэй байвал /media/... болгоно
+    return u.startsWith("/") ? u : `/${u}`;
+  };
+
   const scrollLeft = () => {
     carouselRef.current?.scrollBy({ left: -300, behavior: "smooth" });
   };
@@ -88,15 +106,7 @@ export default function ListingCard({
               images.map((img, i) => (
                 <img
                   key={i}
-                  src={
-                    img.image?.startsWith("http")
-                      ? img.image
-                      : `${
-                          img.image?.startsWith("/")
-                            ? img.image
-                            : `/${img.image}`
-                        }`
-                  }
+                  src={normalizeImageUrl(img.image)}
                   alt={`image-${i}`}
                   className="h-48 w-72 object-cover flex-shrink-0 rounded-md"
                   loading="lazy"
