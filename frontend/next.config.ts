@@ -14,6 +14,12 @@ const nextConfig: NextConfig = {
     ],
   },
   eslint: { ignoreDuringBuilds: true },
+
+  async redirects() {
+    return [
+      { source: "/", destination: "/mn", permanent: false }, // ✅ root → /mn
+    ];
+  },
   // ❌ Энд redirects() байхгүй. Root-ыг middleware шийднэ.
 };
 
