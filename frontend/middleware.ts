@@ -8,17 +8,17 @@ const defaultLocale = "mn";
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Skip next internal files, API routes, or already-localized paths
+  // static/_next/api/.well-known эсвэл аль хэдийн locale-той path бол шууд нэвтрүүлнэ
   if (
     pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
+    pathname.includes("/.well-known") ||
     PUBLIC_FILE.test(pathname) ||
-    locales.some((locale) => pathname.startsWith(`/${locale}`))
+    locales.some((l) => pathname === `/${l}` || pathname.startsWith(`/${l}/`))
   ) {
     return NextResponse.next();
   }
 
-  // Redirect to locale-prefixed path
-  const locale = defaultLocale;
-  return NextResponse.redirect(new URL(`/${locale}${pathname}`, req.url));
+  // Locale-гүй бүх замыг /{locale}{pathname} руу
+  return NextResponse.redirect(new URL(`/${defaultLocale}${pathname}`, req.url));
 }

@@ -39,7 +39,8 @@ SECRET_KEY = "django-insecure--ua!&czs90bsyojt8@&v*@oyb$1vfeews7fe8_!&-3fl@8-+ub
 DEBUG = False
 
 # ALLOWED_HOSTS = []
-ALLOWED_HOSTS = ["54.64.78.102", "localhost", "127.0.0.1", "*"]
+ALLOWED_HOSTS = ["tanaid-honoy.mn", "www.tanaid-honoy.mn", "localhost", "127.0.0.1"]
+CSRF_TRUSTED_ORIGINS = ["https://tanaid-honoy.mn", "https://www.tanaid-honoy.mn"]
 
 
 # Application definition
