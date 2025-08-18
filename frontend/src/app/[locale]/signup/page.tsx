@@ -19,7 +19,7 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post("/signup/", {
+      await api.post("/auth/register/", {
         username,
         email,
         password,
