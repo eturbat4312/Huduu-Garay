@@ -78,15 +78,15 @@ api.interceptors.response.use(
             localStorage.removeItem("refresh_token");
         
             // ---- locale-аа URL-ees тодорхойлно
-            const locales = ["mn", "en", "fr"] as const;
-            const first = window.location.pathname.split("/").filter(Boolean)[0];
-            const loc = (locales as readonly string[]).includes(first) ? first : "mn";
-            const loginPath = `/${loc}/login`;
+            // const locales = ["mn", "en", "fr"] as const;
+            // const first = window.location.pathname.split("/").filter(Boolean)[0];
+            // const loc = (locales as readonly string[]).includes(first) ? first : "mn";
+            // const loginPath = `/${loc}/login`;
         
-            // ---- яг тэр хуудсан дээр байвал дахин үсрүүлэхгүй
-            if (window.location.pathname !== loginPath) {
-              window.location.replace(loginPath);
-            }
+            // // ---- яг тэр хуудсан дээр байвал дахин үсрүүлэхгүй
+            // if (window.location.pathname !== loginPath) {
+            //   window.location.replace(loginPath);
+            // }
           }
           throw e;
         } finally {
