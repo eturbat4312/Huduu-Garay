@@ -22,11 +22,21 @@ export default function SignupPage() {
       await api.post("/auth/registration/", {
         username,
         email,
-        password,
+        password1: password,
+        password2: password,
       });
       setError("");
       router.push(`/${locale}/login`);
-    } catch (err) {
+    } catch (err: any) {
+      const data = err?.response?.data || {};
+      const firstMsg =
+        data?.non_field_errors?.[0] ||
+        data?.username?.[0] ||
+        data?.email?.[0] ||
+        data?.password1?.[0] ||
+        data?.password2?.[0];
+      console.error("Signup error:", err?.response?.status, data);
+      setError(firstMsg || t(locale as string, "signup_failed"));
       // console.error("Signup error:", err?.response?.status, err?.response?.data);
       setError(t(locale as string, "signup_failed"));
     }
