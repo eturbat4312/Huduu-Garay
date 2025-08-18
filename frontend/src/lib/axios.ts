@@ -76,7 +76,17 @@ api.interceptors.response.use(
           if (typeof window !== "undefined") {
             localStorage.removeItem("access_token");
             localStorage.removeItem("refresh_token");
-            window.location.href = "/login";
+        
+            // ---- locale-аа URL-ees тодорхойлно
+            const locales = ["mn", "en", "fr"] as const;
+            const first = window.location.pathname.split("/").filter(Boolean)[0];
+            const loc = (locales as readonly string[]).includes(first) ? first : "mn";
+            const loginPath = `/${loc}/login`;
+        
+            // ---- яг тэр хуудсан дээр байвал дахин үсрүүлэхгүй
+            if (window.location.pathname !== loginPath) {
+              window.location.replace(loginPath);
+            }
           }
           throw e;
         } finally {
