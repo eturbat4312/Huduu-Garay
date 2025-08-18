@@ -6,6 +6,7 @@ import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import { t } from "@/lib/i18n";
+import api from "@/lib/axios"; // baseURL = "/api"
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,13 +20,13 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await axios.post("http://54.64.78.102/api/token/", {
+      const { data } = await api.post("/token/", {
         username,
         password,
       });
 
-      localStorage.setItem("access_token", res.data.access);
-      localStorage.setItem("refresh_token", res.data.refresh);
+      localStorage.setItem("access_token", data.access);
+      localStorage.setItem("refresh_token", data.refresh);
 
       await login();
       setError("");
