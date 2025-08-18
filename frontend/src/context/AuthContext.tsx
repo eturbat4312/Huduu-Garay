@@ -54,9 +54,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setLoading(false);
   };
 
+  // useEffect(() => {
+  //   if (typeof window === "undefined") return;
+  //   fetchUser().finally(() => setLoading(false));
+  // }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    fetchUser().finally(() => setLoading(false));
+
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      setUser(null);
+      setLoading(false);
+      return; // ⬅️ Энэ 3 мөрийг нэмээд END
+    }
+
+    fetchUser()
+      .catch(() => {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   return (
