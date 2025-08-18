@@ -19,7 +19,7 @@ export default function SignupPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await api.post("/auth/register/", {
+      await api.post("/auth/registration/", {
         username,
         email,
         password,
@@ -27,6 +27,7 @@ export default function SignupPage() {
       setError("");
       router.push(`/${locale}/login`);
     } catch (err) {
+      // console.error("Signup error:", err?.response?.status, err?.response?.data);
       setError(t(locale as string, "signup_failed"));
     }
   };
