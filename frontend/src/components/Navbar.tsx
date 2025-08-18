@@ -32,7 +32,7 @@ export default function Navbar() {
   const becomeHost = async () => {
     try {
       await api.patch("/me/", { is_host: true });
-      window.location.reload();
+      // window.location.reload();
     } catch (error) {
       console.error("❌ Error becoming host", error);
       alert(t(locale, "become_host_error"));
