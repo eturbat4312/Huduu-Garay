@@ -258,7 +258,18 @@
 "location_placeholder": "ex. Arkhangai, Tsetserleg",
 "price_placeholder": "Prix par nuit",
 
-"image_tip_max6": "Vous pouvez téléverser jusqu’à 6 images."
+"image_tip_max6": "Vous pouvez téléverser jusqu’à 6 images.",
+"confirm_password_label": "Confirmer le mot de passe",
+    "or_with_google": "ou avec Google",
+    "show": "Afficher",
+    "hide": "Masquer",
+    "weak": "Faible",
+    "okay": "Moyen",
+    "strong": "Fort",
+    "pw_rule_len": "Au moins 8 caractères",
+    "pw_rule_not_numeric": "Pas uniquement des chiffres",
+    "pw_rule_not_similar": "Pas similaire au nom d’utilisateur/e-mail",
+    "pw_rule_common": "Évitez les mots de passe trop courants (123456, password, etc.)"
 
 
 

@@ -258,7 +258,20 @@
 "location_placeholder": "Жишээ: Архангай, Цэнхэр сум",
 "price_placeholder": "Нэг шөнийн үнэ",
 
-"image_tip_max6": "Дээд тал нь 6 зураг оруулна уу."
+"image_tip_max6": "Дээд тал нь 6 зураг оруулна уу.",
+"confirm_password_label": "Нууц үг (давтах)",
+"or_with_google": "Google-ээр",
+    "show": "Харах",
+    "hide": "Нуух",
+    "weak": "Сул",
+    "okay": "Дунд",
+    "strong": "Хүчтэй",
+    "pw_rule_len": "Дор хаяж 8 тэмдэгт байх",
+    "pw_rule_not_numeric": "Зөвхөн тоо байхгүй",
+    "pw_rule_not_similar": "Хэрэглэгчийн нэр/имэйлтэй төстэй биш",
+    "pw_rule_common": "Хэт нийтлэг нууц үг ашиглахгүй (123456, password, гэх мэт)"
+    
+
 
   
 

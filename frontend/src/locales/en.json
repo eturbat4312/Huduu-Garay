@@ -255,7 +255,18 @@
 "location_placeholder": "e.g., Arkhangai, Tsetserleg",
 "price_placeholder": "Price per night",
 
-"image_tip_max6": "You can upload up to 6 images."
+"image_tip_max6": "You can upload up to 6 images.",
+"confirm_password_label": "Confirm password",
+    "or_with_google": "or with Google",
+    "show": "Show",
+    "hide": "Hide",
+    "weak": "Weak",
+    "okay": "Medium",
+    "strong": "Strong",
+    "pw_rule_len": "At least 8 characters",
+    "pw_rule_not_numeric": "Not only digits",
+    "pw_rule_not_similar": "Not similar to username/email",
+    "pw_rule_common": "Avoid very common passwords (123456, password, etc.)"
 
   }
   
