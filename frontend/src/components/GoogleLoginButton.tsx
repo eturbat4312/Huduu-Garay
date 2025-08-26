@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import api from "@/lib/axios"; // ⬅️ энд api instance-ийг зөв нэрлэ
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import axios from "axios";
+// import axios from "axios";
 
 interface GoogleCredentialResponse {
   clientId: string;
