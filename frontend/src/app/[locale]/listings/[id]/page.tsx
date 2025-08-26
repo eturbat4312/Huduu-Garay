@@ -1,3 +1,4 @@
+// filename: src/app/[locale]/listings/[id]/page.tsx
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
@@ -9,22 +10,27 @@ import { useAuth } from "@/context/AuthContext";
 import "react-day-picker/dist/style.css";
 import ReviewSection from "@/components/ReviewSection";
 import { t } from "@/lib/i18n";
+import { Listing, Booking } from "@/types";
+import { AxiosError } from "axios";
 
-const formatDateString = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
-
+// ---------- Extra Types ----------
 type BookingDay = {
   date: string;
   booking_id: number;
 };
 
+// ---------- Helper ----------
+const formatDateString = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+
 export default function ListingDetailPage() {
   const { id, locale } = useParams();
   const router = useRouter();
   const { user } = useAuth();
-  const [listing, setListing] = useState<any>(null);
+
+  const [listing, setListing] = useState<Listing | null>(null);
   const [availableDateStrings, setAvailableDateStrings] = useState<Set<string>>(
     new Set()
   );
@@ -38,30 +44,36 @@ export default function ListingDetailPage() {
 
   const isOwner = user && listing?.host?.id === user.id;
 
+  // ---------- Fetch ----------
   useEffect(() => {
     const fetchListing = async () => {
       try {
-        const res = await api.get(`/listings/${id}/`);
+        const res = await api.get<Listing>(`/listings/${id}/`);
         setListing(res.data);
 
-        const availabilityRes = await api.get(`/availability/?listing=${id}`);
-        const dates = availabilityRes.data.map((a: any) => a.date.trim());
+        const availabilityRes = await api.get<{ date: string }[]>(
+          `/availability/?listing=${id}`
+        );
+        const dates = availabilityRes.data.map((a) => a.date.trim());
         setAvailableDateStrings(new Set(dates));
 
         if (user && res.data.host?.id === user.id) {
-          const bookingsRes = await api.get("/host-bookings/");
+          const bookingsRes = await api.get<Booking[]>("/host-bookings/");
           const bookingDays: BookingDay[] = [];
-          bookingsRes.data.forEach((booking: any) => {
+
+          bookingsRes.data.forEach((booking) => {
             if (booking.listing.id !== Number(id)) return;
-            if (booking.is_cancelled_by_host) return;
-            let date = new Date(booking.check_in);
+            if (booking.is_cancelled_by_host) return; // serializer талбарыг ашиглаж байгаа тул any үлдээв
+            const startDate = new Date(booking.check_in);
             const end = new Date(booking.check_out);
-            while (date < end) {
+            const loopDate = new Date(startDate);
+
+            while (loopDate < end) {
               bookingDays.push({
-                date: formatDateString(date),
+                date: formatDateString(loopDate),
                 booking_id: booking.id,
               });
-              date.setDate(date.getDate() + 1);
+              loopDate.setDate(loopDate.getDate() + 1);
             }
           });
           setBookedDates(bookingDays);
@@ -73,16 +85,18 @@ export default function ListingDetailPage() {
     fetchListing();
   }, [id, user]);
 
+  // ---------- Helpers ----------
   const isDateAvailable = (date: Date) =>
     availableDateStrings.has(formatDateString(date));
 
   const isRangeValid = (range: DateRange) => {
     if (!range.from || !range.to) return false;
     const dates: Date[] = [];
-    let date = new Date(range.from);
-    while (date < range.to) {
-      dates.push(new Date(date));
-      date.setDate(date.getDate() + 1);
+    const loopDate = new Date(range.from);
+
+    while (loopDate < range.to) {
+      dates.push(new Date(loopDate));
+      loopDate.setDate(loopDate.getDate() + 1);
     }
     return dates.every(isDateAvailable);
   };
@@ -118,13 +132,11 @@ export default function ListingDetailPage() {
     selectedRange?.from && selectedRange?.to
       ? Math.max(
           1,
-          (selectedRange.to.getTime() - selectedRange.from.getTime()) /
-            (1000 * 60 * 60 * 24)
+          (selectedRange.to.getTime() - selectedRange.from.getTime()) / 86400000
         )
       : 0;
 
-  const totalPrice = () =>
-    calculateNights() * parseFloat(listing?.price_per_night || "0");
+  const totalPrice = () => calculateNights() * (listing?.price_per_night ?? 0);
 
   const handleBooking = () => {
     if (!selectedRange?.from || !selectedRange?.to) {
@@ -137,15 +149,16 @@ export default function ListingDetailPage() {
   };
 
   const handleDelete = async () => {
-    const confirm = window.confirm(t(locale as string, "confirm_delete"));
-    if (!confirm) return;
+    const confirmDelete = window.confirm(t(locale as string, "confirm_delete"));
+    if (!confirmDelete) return;
 
     try {
       await api.delete(`/listings/${id}/delete/`);
       alert(t(locale as string, "listing_deleted_success"));
       router.push(`/${locale}/`);
-    } catch (err: any) {
-      if (err.response?.status === 400 || err.response?.status === 409) {
+    } catch (err: unknown) {
+      const axiosErr = err as AxiosError;
+      if (axiosErr.response?.status === 409) {
         alert(t(locale as string, "delete_blocked_due_to_booking"));
       } else {
         alert(t(locale as string, "delete_failed"));
@@ -156,6 +169,7 @@ export default function ListingDetailPage() {
   const formatter = (date: Date) =>
     date.toLocaleDateString((locale as string) || "mn-MN");
 
+  // ---------- Render ----------
   if (!listing) return <p className="p-6">{t(locale as string, "loading")}</p>;
 
   return (
@@ -207,7 +221,7 @@ export default function ListingDetailPage() {
         <p className="text-gray-600">{listing.location_text}</p>
 
         <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-thin scrollbar-thumb-gray-400">
-          {listing.images?.map((img: any, i: number) => (
+          {listing.images?.map((img, i) => (
             <img
               key={i}
               src={img.image}
@@ -387,7 +401,7 @@ export default function ListingDetailPage() {
                 {t(locale as string, "amenities_title")}
               </h3>
               <ul className="list-disc pl-5 text-sm text-gray-600">
-                {listing.amenities.map((a: any, i: number) => (
+                {listing.amenities.map((a, i) => (
                   <li key={i}>
                     {t(locale as string, a.translation_key ?? a.name)}
                   </li>

@@ -3,8 +3,9 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image"; // ✅ next/image ашиглав
 import api from "@/lib/axios";
-import { Listing } from "@/types";
+import { Listing, ListingImage } from "@/types";
 import { t } from "@/lib/i18n";
 
 export default function ListingCard({
@@ -50,20 +51,18 @@ export default function ListingCard({
 
   const normalizeImageUrl = (u?: string) => {
     if (!u) return "";
+
+    // Хэрэв аль хэдийн бүрэн URL бол шууд буцаана
     if (/^https?:\/\//i.test(u)) {
-      try {
-        const url = new URL(u);
-        // localhost эсвэл 127.0.0.1 байвал host-г авч хаяад path-г л үлдээнэ
-        if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-          return url.pathname + url.search + url.hash; // → /media/...
-        }
-        return u; // жинхэнэ гадаад host бол хэвээр нь үлдээнэ
-      } catch {
-        // эвдэрхий URL байвал доошхийгээр явна
-      }
+      console.log("🌍 Already full URL:", u);
+      return u;
     }
-    // media/... хэлбэртэй байвал /media/... болгоно
-    return u.startsWith("/") ? u : `/${u}`;
+
+    // Otherwise relative path бол API-ийн base URL нэмнэ
+    const base = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "";
+    const finalUrl = u.startsWith("/") ? base + u : `${base}/${u}`;
+    console.log("🖼 Normalized URL:", { u, base, finalUrl });
+    return finalUrl;
   };
 
   const scrollLeft = () => {
@@ -103,16 +102,15 @@ export default function ListingCard({
             className="flex overflow-x-auto no-scrollbar space-x-1"
           >
             {images.length > 0 ? (
-              images.map((img, i) => (
-                <img
+              images.map((img: ListingImage, i: number) => (
+                <Image
                   key={i}
                   src={normalizeImageUrl(img.image)}
                   alt={`image-${i}`}
                   className="h-48 w-72 object-cover flex-shrink-0 rounded-md"
                   loading="lazy"
-                  decoding="async"
-                  width={288} /* w-72 = 18rem = ~288px */
-                  height={192} /* h-48 = 12rem = ~192px */
+                  width={288} // w-72
+                  height={192} // h-48
                 />
               ))
             ) : (

@@ -1,5 +1,10 @@
 // filename: src/lib/axios.ts
-import axios, { AxiosError, AxiosRequestConfig, AxiosRequestHeaders } from "axios";
+import axios, {
+  AxiosError,
+  AxiosRequestConfig,
+  AxiosRequestHeaders,
+  AxiosResponse,
+} from "axios";
 
 // --- Base URL (normalize) ---
 const rawBase = process.env.NEXT_PUBLIC_API_URL || "/api";
@@ -12,22 +17,25 @@ api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("access_token");
     if (token) {
-      // headers-ийг аюулгүйгээр бэлдэж онооно
       const hdrs: AxiosRequestHeaders =
-        (config.headers as AxiosRequestHeaders) ?? ({} as AxiosRequestHeaders);
+        (config.headers as AxiosRequestHeaders) ?? {};
       hdrs["Authorization"] = `Bearer ${token}`;
-      config.headers = hdrs; // ⬅️ type-safe
+      config.headers = hdrs;
     }
   }
   return config;
 });
 
-// --- 401 дээр refresh queue ---
+// --- Refresh response type ---
+interface RefreshResponse {
+  access: string;
+}
+
 let isRefreshing = false;
 let waiters: Array<(t: string) => void> = [];
 
 api.interceptors.response.use(
-  (r) => r,
+  (r: AxiosResponse) => r,
   async (err: AxiosError) => {
     const original = err.config as (AxiosRequestConfig & { _retry?: boolean });
     const status = err.response?.status;
@@ -41,63 +49,49 @@ api.interceptors.response.use(
         isRefreshing = true;
         try {
           const refresh =
-            typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
+            typeof window !== "undefined"
+              ? localStorage.getItem("refresh_token")
+              : null;
           if (!refresh) throw new Error("No refresh token");
 
-          // refresh-ийг interceptor-гүй axios-оор дуудна
-          const { data } = await axios.post(
+          // refresh хийх
+          const { data } = await axios.post<RefreshResponse>(
             `${baseURL}/token/refresh/`,
             { refresh },
             { headers: { "Content-Type": "application/json" } }
           );
 
-          const newAccess: string = (data as any).access;
+          const newAccess = data.access;
 
           if (typeof window !== "undefined") {
             localStorage.setItem("access_token", newAccess);
           }
-          // дараагийн хүсэлтүүдэд шууд хэрэгжинэ
-          (api.defaults.headers.common as any).Authorization = `Bearer ${newAccess}`;
+          api.defaults.headers.common["Authorization"] = `Bearer ${newAccess}`;
 
-          // дарааллаар хүлээгчдийг сэргээе
           waiters.forEach((fn) => fn(newAccess));
           waiters = [];
 
-          // анхны хүсэлтийг шинэ токеноор дахин явуулна
           const hdrs: AxiosRequestHeaders =
-            (original.headers as AxiosRequestHeaders) ?? ({} as AxiosRequestHeaders);
+            (original.headers as AxiosRequestHeaders) ?? {};
           hdrs["Authorization"] = `Bearer ${newAccess}`;
           original.headers = hdrs;
 
           return api(original);
         } catch (e) {
-          // refresh бүтэлгүй
           waiters = [];
           if (typeof window !== "undefined") {
             localStorage.removeItem("access_token");
             localStorage.removeItem("refresh_token");
-        
-            // ---- locale-аа URL-ees тодорхойлно
-            // const locales = ["mn", "en", "fr"] as const;
-            // const first = window.location.pathname.split("/").filter(Boolean)[0];
-            // const loc = (locales as readonly string[]).includes(first) ? first : "mn";
-            // const loginPath = `/${loc}/login`;
-        
-            // // ---- яг тэр хуудсан дээр байвал дахин үсрүүлэхгүй
-            // if (window.location.pathname !== loginPath) {
-            //   window.location.replace(loginPath);
-            // }
           }
           throw e;
         } finally {
           isRefreshing = false;
         }
       } else {
-        // refresh дуусахыг хүлээе
         return new Promise((resolve, reject) => {
           waiters.push((newToken) => {
             const hdrs: AxiosRequestHeaders =
-              (original.headers as AxiosRequestHeaders) ?? ({} as AxiosRequestHeaders);
+              (original.headers as AxiosRequestHeaders) ?? {};
             hdrs["Authorization"] = `Bearer ${newToken}`;
             original.headers = hdrs;
             api(original).then(resolve).catch(reject);

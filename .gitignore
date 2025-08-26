@@ -17,3 +17,5 @@ backend/.env
 .vscode/
 .idea/
 frontend.zip
+docker-compose.override.yml
+

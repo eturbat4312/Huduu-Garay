@@ -1,9 +1,17 @@
+// filename: src/components/GoogleLoginButton.tsx
 "use client";
 
 import { useEffect } from "react";
 import axios from "@/lib/axios";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+
+// Google response type
+interface GoogleCredentialResponse {
+  clientId: string;
+  credential: string;
+  select_by: string;
+}
 
 export default function GoogleLoginButton() {
   const router = useRouter();
@@ -15,9 +23,9 @@ export default function GoogleLoginButton() {
 
     window.google?.accounts.id.initialize({
       client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
-      callback: async (response: any) => {
+      callback: async (response: GoogleCredentialResponse) => {
         try {
-          const res = await axios.post("api/auth/google/", {
+          const res = await axios.post("/api/auth/google/", {
             access_token: response.credential,
           });
 

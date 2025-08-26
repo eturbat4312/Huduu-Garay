@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { t } from "@/lib/i18n";
 
 export default function TermsPage() {
-  const { locale } = useParams();
+  const raw = useParams().locale;
+  const locale = (typeof raw === "string" ? raw : "mn") as string;
   const router = useRouter();
 
   return (
@@ -47,6 +48,7 @@ export default function TermsPage() {
           {t(locale, "terms_last_updated")} 2025-08-02
         </p>
       </section>
+
       {/* Back Button */}
       <div className="mt-10">
         <button

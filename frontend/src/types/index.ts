@@ -8,11 +8,16 @@ export type Category = {
   export type Amenity = {
     id: number;
     name: string;
+    translation_key?: string;
   };
   
   export type ListingImage = {
     id: number;
     image: string; // URL
+  };
+
+  export type Host = {
+    id: number;
   };
   
   export type Listing = {
@@ -34,6 +39,7 @@ export type Category = {
     favorite_id?: number | null;
     host_username?: string;
     average_rating?: number;
+    host?: Host;
   };
   
   export type User = {
@@ -47,9 +53,38 @@ export type Category = {
   
   export type Booking = {
     id: number;
-    listing: Listing;
-    guest: User;
     check_in: string;
     check_out: string;
+    listing: {
+      id: number;
+      title: string;
+      location: string;
+      thumbnail: string | null;
+      price_per_night: number;
+    };
+    listing_id?: number; // write-only
+    total_price: number;
+    status: string;
+    created_at: string;
+    notes?: string;
+    full_name: string;
+    phone_number: string;
+    guest_name: string;
+    guest_phone: string;
+    is_cancelled_by_host: boolean;
+    guest_count: number;
+    is_unread: boolean;
+    host_name?: string | null;
+    host_phone?: string | null;
+  };
+
+
+  export type HostApplication = {
+    id: number;
+    status: "pending" | "approved" | "rejected";
+    bank_name?: string;
+    account_number?: string;
+    full_name?: string;
+    phone_number?: string;
   };
   

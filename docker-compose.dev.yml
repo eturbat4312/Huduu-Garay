@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: huduu_dev
+      POSTGRES_USER: huduu_user
+      POSTGRES_PASSWORD: markhoyor
+    volumes:
+      - db_data_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB -h localhost -p 5432 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    command: bash -lc "python manage.py migrate && python manage.py runserver 0.0.0.0:8010"
+    env_file: ./backend/.env.dev
+    volumes:
+      - ./backend:/app
+    ports: ["8010:8010"]
+    depends_on:
+      db:
+        condition: service_healthy      # ⬅️ энд шинэ
+    restart: unless-stopped             # ⬅️ унавал дахин асаана
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    command: bash -lc "npm run dev -- -p 3000"
+    env_file: ./frontend/.env.local
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports: ["3000:3000"]
+    depends_on: [backend]
+
+volumes:
+  db_data_dev:

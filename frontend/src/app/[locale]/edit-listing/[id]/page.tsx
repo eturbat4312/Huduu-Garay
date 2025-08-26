@@ -39,7 +39,9 @@ export default function EditListingPage() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [allAmenities, setAllAmenities] = useState<Amenity[]>([]);
-  const [images, setImages] = useState<any[]>([]);
+  // const [images, setImages] = useState<any[]>([]);
+  type ListingImage = { id: number; image: string };
+  const [images, setImages] = useState<ListingImage[]>([]);
   const [newImages, setNewImages] = useState<File[]>([]);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
@@ -75,28 +77,37 @@ export default function EditListingPage() {
         beds: listing.beds,
         max_guests: listing.max_guests,
         category_id: listing.category?.id || null,
-        amenity_ids: listing.amenities.map((a: any) => a.id),
+        amenity_ids: listing.amenities.map((a: Amenity) => a.id),
       });
 
       setImages(listing.images || []);
       setAllAmenities(amenitiesRes.data);
       setCategories(categoriesRes.data);
 
-      const available = availabilityRes.data.map((a: any) => a.date);
+      const available = availabilityRes.data.map(
+        (a: { date: string }) => a.date
+      );
       setInitialDates(available);
       setSelectedDates(available.map((d: string) => new Date(d + "T00:00:00")));
 
       const booked: string[] = [];
-      bookingsRes.data.forEach((booking: any) => {
-        if (booking.listing.id !== Number(id)) return;
-        if (booking.is_cancelled_by_host) return;
-        let date = new Date(booking.check_in);
-        const end = new Date(booking.check_out);
-        while (date < end) {
-          booked.push(formatDate(date));
-          date.setDate(date.getDate() + 1);
+      bookingsRes.data.forEach(
+        (booking: {
+          listing: { id: number };
+          is_cancelled_by_host: boolean;
+          check_in: string;
+          check_out: string;
+        }) => {
+          if (booking.listing.id !== Number(id)) return;
+          if (booking.is_cancelled_by_host) return;
+          const date = new Date(booking.check_in);
+          const end = new Date(booking.check_out);
+          while (date < end) {
+            booked.push(formatDate(date));
+            date.setDate(date.getDate() + 1);
+          }
         }
-      });
+      );
       setBookedDates(new Set(booked));
     };
 
@@ -137,7 +148,7 @@ export default function EditListingPage() {
       try {
         await api.delete(`/listing-images/${imageToDelete.id}/delete/`);
         setImages((prev) => prev.filter((_, i) => i !== index));
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Зураг устгах үед алдаа:", err);
       }
     }
@@ -165,8 +176,13 @@ export default function EditListingPage() {
 
       // router.push("/my-listings");
       router.push(`/${locale}/my-listings`);
-    } catch (err: any) {
-      if (err.response?.status === 409) {
+    } catch (err: unknown) {
+      if (
+        typeof err === "object" &&
+        err !== null &&
+        "response" in err &&
+        (err as { response?: { status?: number } }).response?.status === 409
+      ) {
         alert(t(locale, "alert_has_bookings_cannot_delete"));
       } else {
         alert(t(locale, "alert_delete_failed"));
@@ -217,7 +233,8 @@ export default function EditListingPage() {
       router.push(`/${locale}/listings/${id}`);
     } catch (err: unknown) {
       if (typeof err === "object" && err !== null && "response" in err) {
-        const errorData = (err as any).response?.data;
+        const errorData = (err as { response?: { data?: unknown } }).response
+          ?.data;
         console.error("Хадгалах үед алдаа:", errorData || err);
       } else {
         console.error("Алдааны мэдээлэл тодорхойгүй:", err);

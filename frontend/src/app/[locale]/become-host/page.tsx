@@ -61,8 +61,12 @@ export default function BecomeHostPage() {
       router.refresh();
       alert(t(locale, "become_host_success"));
       router.push(`/${locale}`);
-    } catch (error: any) {
-      console.error("❌", error.response?.data || error.message);
+    } catch (err) {
+      // ✅ "any" биш, unknown гэж тодорхойлсон
+      const error = err as {
+        response?: { data?: { detail?: string } };
+        message?: string;
+      };
       if (
         error.response?.data?.detail ===
         "Та аль хэдийн түрээслүүлэгч болох хүсэлт илгээсэн байна."

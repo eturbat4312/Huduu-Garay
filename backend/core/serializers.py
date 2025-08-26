@@ -131,9 +131,15 @@ class AmenitySerializer(serializers.ModelSerializer):
 
 
 class ListingImageSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = ListingImage
-        fields = "__all__"
+        fields = ["id", "image", "uploaded_at"]
+
+    def get_image(self, obj):
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
 
 
 # -------------------- LISTING --------------------

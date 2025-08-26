@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/axios";
 import { t } from "@/lib/i18n";
+import Image from "next/image"; // ✅ next/image ашиглаж байна
 
 type Booking = {
   id: number;
@@ -22,7 +23,7 @@ type Booking = {
 };
 
 export default function MyBookingsPage() {
-  const { locale } = useParams();
+  const { locale } = useParams() as { locale: string };
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
@@ -32,7 +33,7 @@ export default function MyBookingsPage() {
       try {
         const res = await api.get("/bookings/my/");
         setBookings(res.data);
-      } catch (error) {
+      } catch {
         setErrorMsg(t(locale, "error_fetching_bookings"));
       } finally {
         setLoading(false);
@@ -59,10 +60,12 @@ export default function MyBookingsPage() {
             <Link key={booking.id} href={`/${locale}/bookings/${booking.id}`}>
               <div className="border rounded shadow flex items-center gap-4 p-4 bg-white hover:bg-gray-50 cursor-pointer transition">
                 {booking.listing.thumbnail ? (
-                  <img
+                  <Image
                     src={booking.listing.thumbnail}
                     alt={booking.listing.title}
                     className="w-32 h-24 object-cover rounded"
+                    width={128}
+                    height={96}
                   />
                 ) : (
                   <div className="w-32 h-24 bg-gray-200 rounded flex items-center justify-center text-gray-500 text-sm">

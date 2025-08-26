@@ -15,21 +15,7 @@ export default function UserDropdownMenu() {
   const { locale } = useParams();
   const { totalUnread, bookingUnread } = useNotification();
 
-  if (!user) return null;
-
-  const toggleDropdown = () => setOpen((prev) => !prev);
-
-  const handleLogout = async () => {
-    await logout();
-    // window.location.href = "/";
-    router.push(`/${locale}`);
-  };
-
-  const go = (path: string) => {
-    setOpen(false);
-    router.push(path);
-  };
-
+  // ✅ Hook-ууд үргэлж дээд түвшинд байх ёстой
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -39,6 +25,21 @@ export default function UserDropdownMenu() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // ✅ Hook-уудаас ХОЙШ conditional return
+  if (!user) return null;
+
+  const toggleDropdown = () => setOpen((prev) => !prev);
+
+  const handleLogout = async () => {
+    await logout();
+    router.push(`/${locale}`);
+  };
+
+  const go = (path: string) => {
+    setOpen(false);
+    router.push(path);
+  };
 
   return (
     <div className="relative" ref={menuRef}>
@@ -56,7 +57,6 @@ export default function UserDropdownMenu() {
           <ul className="text-sm">
             <li>
               <button
-                // onClick={() => go("/profile")}
                 onClick={() => go(`/${locale}/profile`)}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100"
               >

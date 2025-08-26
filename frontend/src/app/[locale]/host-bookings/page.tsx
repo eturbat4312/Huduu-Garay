@@ -32,20 +32,20 @@ export default function HostBookingsPage() {
   const { locale } = useParams(); // 🔥 locale-г URL-аас авна
 
   useEffect(() => {
-    fetchBookings();
-    // markBookingNotificationsAsRead();
-  }, []);
+    const fetchBookings = async () => {
+      try {
+        const res = await api.get("/host-bookings/");
+        setBookings(res.data);
+        markBookingNotificationsAsRead(); // ✅ notification-уудыг уншсан болгож байна
+      } catch (err) {
+        console.error("Error fetching bookings:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const fetchBookings = async () => {
-    try {
-      const res = await api.get("/host-bookings/");
-      setBookings(res.data);
-    } catch (err) {
-      console.error("Error fetching bookings:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    fetchBookings();
+  }, [markBookingNotificationsAsRead]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">

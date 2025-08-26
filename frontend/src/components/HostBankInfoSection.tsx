@@ -1,8 +1,9 @@
 // filename: src/components/HostBankInfoSection.tsx
 import React from "react";
+import { User } from "@/types";
 
 type Props = {
-  user: any;
+  user: User; // ✅ any → User
   bankName: string;
   accountNumber: string;
   editMode: boolean;
@@ -21,6 +22,7 @@ const bankOptions = [
 ];
 
 export default function HostBankInfoSection({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   user,
   bankName,
   accountNumber,
@@ -34,6 +36,7 @@ export default function HostBankInfoSection({
         🏦 Банкны мэдээлэл
       </h2>
 
+      {/* Банкны нэр */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Банкны нэр:
@@ -56,6 +59,7 @@ export default function HostBankInfoSection({
         )}
       </div>
 
+      {/* Дансны дугаар */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
           Дансны дугаар:

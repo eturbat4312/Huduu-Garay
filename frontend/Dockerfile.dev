@@ -1,0 +1,6 @@
+# filename: frontend/Dockerfile.dev
+FROM node:18
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+# Кодыг run үед bind-mount-оор авна

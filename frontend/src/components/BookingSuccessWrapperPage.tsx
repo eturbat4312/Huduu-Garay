@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import api from "@/lib/axios";
 import BookingSuccessPage from "@/components/BookingSuccessPage";
 import { t } from "@/lib/i18n";
+import { Booking } from "@/types";
 
 export default function BookingSuccessWrapperPage() {
   const searchParams = useSearchParams();
@@ -12,14 +13,14 @@ export default function BookingSuccessWrapperPage() {
   const locale = typeof rawLocale === "string" ? rawLocale : "mn";
 
   const bookingId = searchParams.get("booking");
-  const [booking, setBooking] = useState<any>(null);
+  const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!bookingId) return;
     const fetchBooking = async () => {
       try {
-        const res = await api.get(`/bookings/${bookingId}/`);
+        const res = await api.get<Booking>(`/bookings/${bookingId}/`);
         setBooking(res.data);
       } catch (err) {
         console.error("❌ Захиалга авахад алдаа:", err);

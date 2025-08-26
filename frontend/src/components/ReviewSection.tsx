@@ -1,3 +1,4 @@
+// filename: src/components/ReviewSection.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -16,6 +17,13 @@ interface Review {
   created_at: string;
 }
 
+interface Booking {
+  id: number;
+  listing: { id: number };
+  check_in: string;
+  check_out: string;
+}
+
 export default function ReviewSection({ listingId }: { listingId: number }) {
   const { user } = useAuth();
   const { locale } = useParams() as { locale: string };
@@ -29,21 +37,24 @@ export default function ReviewSection({ listingId }: { listingId: number }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await api.get(`/listings/${listingId}/reviews/`);
+        const res = await api.get<Review[]>(`/listings/${listingId}/reviews/`);
         setReviews(res.data);
 
         if (user) {
-          const bookingRes = await api.get("/bookings/my/");
+          const bookingRes = await api.get<Booking[]>("/bookings/my/");
           const today = new Date();
 
           const hasPastBooking = bookingRes.data.some(
-            (b: any) =>
-              b.listing.id === listingId && new Date(b.check_out) < today
+            (b) => b.listing.id === listingId && new Date(b.check_out) < today
           );
           setHasBooking(hasPastBooking);
         }
-      } catch (err) {
-        console.error("Error fetching reviews:", err);
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          console.error("Error fetching reviews:", err.message);
+        } else {
+          console.error("Error fetching reviews:", err);
+        }
       }
     };
 
@@ -58,16 +69,18 @@ export default function ReviewSection({ listingId }: { listingId: number }) {
     setError("");
     setSubmitting(true);
     try {
-      const res = await api.post(`/listings/${listingId}/reviews/`, {
+      const res = await api.post<Review>(`/listings/${listingId}/reviews/`, {
         listing: listingId,
         rating,
         comment,
       });
-      setReviews([...reviews, res.data]);
+      setReviews((prev) => [...prev, res.data]);
       setComment("");
       setRating(0);
-    } catch (err: any) {
-      console.error("Review submit error:", err.response?.data || err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error("Review submit error:", err.message);
+      }
       setError(t(locale, "review.error_submit"));
     } finally {
       setSubmitting(false);

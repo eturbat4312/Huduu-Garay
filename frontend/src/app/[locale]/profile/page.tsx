@@ -1,17 +1,21 @@
+// filename: src/app/[locale]/profile/page.tsx
 "use client";
 
 import { useEffect, useState, ChangeEvent } from "react";
 import api from "@/lib/axios";
 import HostBankInfoSection from "@/components/HostBankInfoSection";
-import { User } from "@/types";
+import { User, HostApplication } from "@/types";
 import { useRefreshUser } from "@/context/AuthContext";
 import { t } from "@/lib/i18n";
 import { useParams } from "next/navigation";
 
 export default function ProfilePage() {
+  const raw = useParams().locale;
+  const locale = (typeof raw === "string" ? raw : "mn") as string;
+
   const [user, setUser] = useState<User | null>(null);
-  const [hostApp, setHostApp] = useState<any | null>(null);
-  const { locale } = useParams();
+  // const [hostApp, setHostApp] = useState<Record<string, unknown> | null>(null);
+  const [hostApp, setHostApp] = useState<HostApplication | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
@@ -21,7 +25,7 @@ export default function ProfilePage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [hostPhoneNumber, setHostPhoneNumber] = useState(""); // 🆕
+  const [hostPhoneNumber, setHostPhoneNumber] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
@@ -40,29 +44,29 @@ export default function ProfilePage() {
         setUsername(res.data.username);
         setEmail(res.data.email);
         setPhone(res.data.phone || "");
-        setHostPhoneNumber(res.data.host_phone_number || ""); // 🆕
+        setHostPhoneNumber(res.data.host_phone_number || "");
         setAvatarPreview(res.data.avatar || null);
         setFullName(res.data.full_name || "");
         setBio(res.data.bio || "");
         setAddress(res.data.address || "");
       } catch {
-        setErrorMsg("Профайл авахад алдаа гарлаа.");
+        setErrorMsg(t(locale, "error_fetch_profile"));
       } finally {
         setLoading(false);
       }
     };
     fetchProfile();
-  }, []);
+  }, [locale]);
 
   // 🟡 HostApplication fetch хийх
   useEffect(() => {
     const fetchHostApp = async () => {
       try {
-        const res = await api.get("/host/application/me/");
+        const res = await api.get<HostApplication>("/host/application/me/");
         setHostApp(res.data);
         setBankName(res.data.bank_name || "");
         setAccountNumber(res.data.account_number || "");
-      } catch (err) {
+      } catch {
         console.warn("❌ HostApplication not found.");
       }
     };
@@ -87,7 +91,7 @@ export default function ProfilePage() {
     formData.append("username", username);
     formData.append("email", email);
     formData.append("phone", phone);
-    formData.append("host_phone_number", hostPhoneNumber); // ✅
+    formData.append("host_phone_number", hostPhoneNumber);
     formData.append("full_name", fullName);
     formData.append("bio", bio);
     formData.append("address", address);
@@ -102,7 +106,6 @@ export default function ProfilePage() {
       setUser(res.data);
       setAvatarPreview(res.data.avatar || null);
       await refreshUser();
-      // setSuccessMsg({t(locale, "success_save_profile")});
       setSuccessMsg(t(locale, "success_save_profile"));
       setEditMode(false);
 
@@ -112,10 +115,15 @@ export default function ProfilePage() {
           account_number: accountNumber,
         });
       }
-    } catch (error: any) {
-      setErrorMsg(
-        error?.response?.data?.detail || "Мэдээлэл хадгалахад алдаа гарлаа."
-      );
+    } catch (err: unknown) {
+      if (typeof err === "object" && err && "response" in err) {
+        const e = err as { response?: { data?: { detail?: string } } };
+        setErrorMsg(
+          e.response?.data?.detail || t(locale, "error_save_profile")
+        );
+      } else {
+        setErrorMsg(t(locale, "error_save_profile"));
+      }
     }
   };
 
@@ -123,14 +131,15 @@ export default function ProfilePage() {
     try {
       await api.patch("/me/", { is_host: true });
       setUser((prev) => (prev ? { ...prev, is_host: true } : null));
-      alert("Таны хүсэлт хүлээн авлаа. Та одоо host боллоо!");
-    } catch (error) {
-      alert("Host болох үед алдаа гарлаа.");
+      alert(t(locale, "become_host_success"));
+    } catch {
+      alert(t(locale, "become_host_error"));
     }
   };
 
-  if (loading) return <p className="p-6">Ачааллаж байна...</p>;
-  if (!user) return <p className="p-6 text-red-600">Профайл олдсонгүй.</p>;
+  if (loading) return <p className="p-6">{t(locale, "loading")}</p>;
+  if (!user)
+    return <p className="p-6 text-red-600">{t(locale, "profile_not_found")}</p>;
 
   return (
     <main className="max-w-3xl mx-auto p-6 bg-white rounded shadow space-y-6">
@@ -145,6 +154,7 @@ export default function ProfilePage() {
       <div className="flex items-center gap-6">
         <div className="w-24 h-24 rounded-full overflow-hidden border bg-gray-100">
           {avatarPreview ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={avatarPreview}
               alt={username}

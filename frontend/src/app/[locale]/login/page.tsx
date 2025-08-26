@@ -1,3 +1,4 @@
+// filename: src/app/[locale]/login/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -30,13 +31,19 @@ export default function LoginPage() {
 
       await login(); // current user fetch гэх мэт
       router.replace(`/${locale}`); // амжилттай → эхлэл
-    } catch (err: any) {
-      const s = err?.response?.status;
+    } catch (err: unknown) {
+      // ✅ "unknown" болгож, runtime дээр шалгана
+      const status =
+        typeof err === "object" &&
+        err !== null &&
+        "response" in err &&
+        (err as { response?: { status?: number } }).response?.status;
+
       setError(
-        s === 400 || s === 401
+        status === 400 || status === 401
           ? t(locale, "invalid_credentials")
           : t(locale, "unknown_error")
-      ); // ⬅️ ЯМАР Ч redirect ХИЙХГҮЙ
+      );
     } finally {
       setLoading(false);
     }

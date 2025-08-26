@@ -8,16 +8,13 @@ import ListingCard from "@/components/ListingCard";
 import FilterSidebar from "@/components/FilterSidebar";
 import { useParams } from "next/navigation";
 import { t } from "@/lib/i18n";
-
-// ✅ Энэ function нь static route-уудыг үүсгэхэд хэрэгтэй
-// export async function generateStaticParams() {
-//   return [{ locale: "mn" }, { locale: "en" }, { locale: "fr" }];
-// }
+import Image from "next/image";
 
 export default function HomePage() {
-  const { locale } = useParams();
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const raw = useParams().locale;
+  const locale = (typeof raw === "string" ? raw : "mn") as string;
 
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [listings, setListings] = useState<Listing[]>([]);
   const [filters, setFilters] = useState({
     category: "",
@@ -43,16 +40,26 @@ export default function HomePage() {
       })
       .then((res) => setListings(res.data))
       .catch((err) => console.error("❌ Error fetching listings:", err));
-  }, [filters.__refresh]);
+  }, [
+    filters.category,
+    filters.search,
+    filters.location,
+    filters.priceMin,
+    filters.priceMax,
+    filters.amenities,
+    filters.__refresh,
+  ]);
 
   return (
     <main className="pb-16">
       {/* Hero Section */}
       <section className="relative w-full h-[420px]">
-        <img
+        <Image
           src="/images/hero.png"
           alt="Hero"
-          className="absolute inset-0 w-full h-full object-cover"
+          fill
+          className="object-cover rounded-none"
+          priority
         />
         <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white px-4">
           <h1 className="text-4xl md:text-5xl font-bold">
@@ -80,7 +87,7 @@ export default function HomePage() {
           filters={filters}
           setFilters={setFilters}
           isOpen={isFilterOpen}
-          locale={locale as string}
+          locale={locale}
         />
 
         <div>
@@ -91,11 +98,10 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
               {listings.map((listing) => (
-                // <ListingCard key={listing.id} listing={listing} />
                 <ListingCard
                   key={listing.id}
                   listing={listing}
-                  locale={locale as string}
+                  locale={locale}
                 />
               ))}
             </div>

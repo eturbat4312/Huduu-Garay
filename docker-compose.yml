@@ -18,6 +18,7 @@ services:
     
     volumes:
       - ./backend:/app
+      - ./backend/media:/app/media   # 📌 media volume нэмнэ
     ports:
       - "8010:8010"
     env_file:

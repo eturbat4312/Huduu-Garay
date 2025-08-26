@@ -11,8 +11,9 @@ type FieldErrors = Record<string, string[]>;
 
 export default function SignupPage() {
   const router = useRouter();
-  const { locale } = useParams();
-  const L = (k: string, fb: string) => t(locale as string, k) || fb;
+  const raw = useParams().locale;
+  const locale = (typeof raw === "string" ? raw : "mn") as string;
+  const L = (k: string, fb: string) => t(locale, k) || fb;
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -36,15 +37,13 @@ export default function SignupPage() {
     const digit = /\d/.test(pw1);
     const symbol = /[^A-Za-z0-9]/.test(pw1);
 
-    const longEnough = pw1.length >= 8; // Django MinimumLengthValidator
-    const notOnlyDigits = !/^\d+$/.test(pw1); // NumericPasswordValidator
-    // Хэрэглэгчийн нэр/имэйлтэй төстэй биш (энгийн шалгалт)
+    const longEnough = pw1.length >= 8;
+    const notOnlyDigits = !/^\d+$/.test(pw1);
     const notSimilar =
       pw1 &&
       !pw1.toLowerCase().includes(username.toLowerCase()) &&
       !pw1.toLowerCase().includes(emailLocal);
 
-    // Strength (зөвлөмж) — Django-д заавал биш, гэхдээ UX-д хэрэгтэй
     const classes = [lower, upper, digit, symbol].filter(Boolean).length;
     const strength = !pw1
       ? 0
@@ -72,7 +71,7 @@ export default function SignupPage() {
     setErrors({});
     setLoading(true);
 
-    // Client-side багахан шалгалт
+    // Client-side шалгалт
     const fieldErrs: FieldErrors = {};
     if (!username.trim())
       fieldErrs.username = [
@@ -108,29 +107,40 @@ export default function SignupPage() {
         password2: pw2,
       });
       router.push(`/${locale}/login?registered=1`);
-    } catch (err: any) {
-      const data = err?.response?.data || {};
-      // Server-ээс ирсэн алдааг талбарт буулгаж өгөх
-      const mapped: FieldErrors = {};
-      for (const k of [
-        "username",
-        "email",
-        "password1",
-        "password2",
-        "non_field_errors",
-      ]) {
-        if (Array.isArray(data[k]) && data[k].length) mapped[k] = data[k];
-      }
-      setErrors(mapped);
-      setFormErr(
-        mapped.non_field_errors?.[0] ||
+    } catch (err: unknown) {
+      if (typeof err === "object" && err && "response" in err) {
+        const e = err as {
+          response?: { data?: Record<string, string[] | undefined> };
+        };
+        const data = e.response?.data || {};
+        const mapped: FieldErrors = {};
+        for (const k of [
+          "username",
+          "email",
+          "password1",
+          "password2",
+          "non_field_errors",
+        ] as const) {
+          const arr = data[k];
+          if (Array.isArray(arr) && arr.length) mapped[k] = arr;
+        }
+        setErrors(mapped);
+        setFormErr(
+          mapped.non_field_errors?.[0] ||
+            L(
+              "signup_failed",
+              "Бүртгэл амжилтгүй. Оруулсан мэдээллээ шалгаарай."
+            )
+        );
+      } else {
+        setFormErr(
           L("signup_failed", "Бүртгэл амжилтгүй. Оруулсан мэдээллээ шалгаарай.")
-      );
+        );
+      }
     } finally {
       setLoading(false);
     }
   };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <form
@@ -142,10 +152,7 @@ export default function SignupPage() {
         </h2>
 
         {formErr && (
-          <p
-            className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3"
-            aria-live="polite"
-          >
+          <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3">
             {formErr}
           </p>
         )}
@@ -156,11 +163,10 @@ export default function SignupPage() {
         </label>
         <input
           autoComplete="username"
-          name="username"
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className={`w-full border rounded-lg px-3 py-2 mb-2 focus:outline-none ${
+          className={`w-full border rounded-lg px-3 py-2 mb-2 ${
             firstError("username") ? "border-red-500" : "border-gray-300"
           }`}
           required
@@ -175,11 +181,10 @@ export default function SignupPage() {
         </label>
         <input
           autoComplete="email"
-          name="email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className={`w-full border rounded-lg px-3 py-2 mb-2 focus:outline-none ${
+          className={`w-full border rounded-lg px-3 py-2 mb-2 ${
             firstError("email") ? "border-red-500" : "border-gray-300"
           }`}
           required

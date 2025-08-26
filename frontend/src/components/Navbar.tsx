@@ -4,12 +4,12 @@
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useNotification } from "@/context/NotificationContext";
-import api from "@/lib/axios";
 import UserDropdownMenu from "./UserDropdownMenu";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { Bell } from "lucide-react";
 import { useEffect } from "react";
 import { t } from "@/lib/i18n";
+import Image from "next/image"; // ✅ next/image ашиглая
 
 const supportedLocales = [
   { code: "mn", label: "🇲🇳" },
@@ -18,7 +18,7 @@ const supportedLocales = [
 ];
 
 export default function Navbar() {
-  const { user, logout, loading } = useAuth();
+  const { user, loading } = useAuth(); // ✅ logout хэрэггүй байсан тул авлаа
   const { totalUnread } = useNotification();
   const router = useRouter();
   const { locale } = useParams();
@@ -29,20 +29,10 @@ export default function Navbar() {
     console.log("🔄 Navbar received user:", user);
   }, [user]);
 
-  const becomeHost = async () => {
-    try {
-      await api.patch("/me/", { is_host: true });
-      // window.location.reload();
-    } catch (error) {
-      console.error("❌ Error becoming host", error);
-      alert(t(locale, "become_host_error"));
-    }
-  };
-
   return (
     <nav className="bg-white shadow-md px-6 py-3 flex justify-between items-center">
       <Link href={`/${locale}`} className="text-xl font-bold text-green-700">
-        {t(locale, "navbar_brand")}
+        {t(locale as string, "navbar_brand")}
       </Link>
 
       <div className="flex items-center gap-4">
@@ -73,18 +63,18 @@ export default function Navbar() {
                   href={`/${locale}/listings/new`}
                   className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
                 >
-                  {t(locale, "add_listing")}
+                  {t(locale as string, "add_listing")}
                 </Link>
               ) : user.host_application_status === "pending" ? (
                 <span className="bg-gray-300 text-gray-700 px-3 py-1 rounded cursor-not-allowed text-sm">
-                  ⏳ {t(locale, "host_application_pending")}
+                  ⏳ {t(locale as string, "host_application_pending")}
                 </span>
               ) : (
                 <Link
                   href={`/${locale}/become-host`}
                   className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
                 >
-                  {t(locale, "become_host")}
+                  {t(locale as string, "become_host")}
                 </Link>
               )}
 
@@ -107,12 +97,14 @@ export default function Navbar() {
               {/* 👤 User greeting & avatar */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600 hidden sm:block">
-                  {t(locale, "greeting")}, <b>{user.username}</b>!
+                  {t(locale as string, "greeting")}, <b>{user.username}</b>!
                 </span>
                 {user.avatar ? (
-                  <img
+                  <Image
                     src={user.avatar}
                     alt="Avatar"
+                    width={40}
+                    height={40}
                     className="w-10 h-10 rounded-full object-cover"
                   />
                 ) : (
@@ -130,18 +122,20 @@ export default function Navbar() {
                 href={`/${locale}/login`}
                 className="text-green-700 font-medium hover:underline"
               >
-                {t(locale, "login")}
+                {t(locale as string, "login")}
               </Link>
               <Link
                 href={`/${locale}/signup`}
                 className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
               >
-                {t(locale, "signup")}
+                {t(locale as string, "signup")}
               </Link>
             </>
           )
         ) : (
-          <span className="text-gray-400 text-sm">{t(locale, "loading")}</span>
+          <span className="text-gray-400 text-sm">
+            {t(locale as string, "loading")}
+          </span>
         )}
       </div>
     </nav>

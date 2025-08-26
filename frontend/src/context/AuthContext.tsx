@@ -122,8 +122,8 @@ export const useRefreshUser = () => {
           });
 
           setUser(retry.data);
-        } catch (_refreshErr) {
-          console.error("🔴 Refresh token expired or invalid");
+        } catch (err) {
+          console.error("🔴 Refresh token expired or invalid", err);
           localStorage.removeItem("access_token");
           localStorage.removeItem("refresh_token");
           setUser(null);

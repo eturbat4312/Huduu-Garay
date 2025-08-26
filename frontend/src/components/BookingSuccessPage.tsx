@@ -3,9 +3,10 @@
 
 import { useRouter } from "next/navigation";
 import { t } from "@/lib/i18n";
+import { Booking } from "@/types";
 
 interface BookingSuccessPageProps {
-  booking: any;
+  booking: Booking;
   locale: string;
 }
 

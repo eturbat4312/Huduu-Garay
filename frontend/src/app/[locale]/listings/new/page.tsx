@@ -6,6 +6,7 @@ import { useRouter, useParams } from "next/navigation";
 import api from "@/lib/axios";
 import { format } from "date-fns";
 import { DayPicker } from "react-day-picker";
+import Image from "next/image"; // ✅ next/image ашиглаж байна
 import "react-day-picker/dist/style.css";
 import { t } from "@/lib/i18n";
 import NumberStepper from "@/components/NumberStepper";
@@ -98,8 +99,12 @@ export default function CreateListingPage() {
       }
 
       router.push(`/${locale}/listings/${listingId}`);
-    } catch (err: any) {
-      console.error("Зар үүсгэж чадсангүй", err.response?.data || err.message);
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: unknown }; message?: string };
+      console.error(
+        "Зар үүсгэж чадсангүй",
+        error.response?.data || error.message
+      );
     }
   };
 
@@ -112,7 +117,6 @@ export default function CreateListingPage() {
         {t(locale as string, "create_listing_title")}
       </h1>
 
-      {/* 2 багана layout */}
       <form
         onSubmit={handleSubmit}
         className="grid grid-cols-1 lg:grid-cols-3 gap-6"
@@ -271,7 +275,7 @@ export default function CreateListingPage() {
           </section>
         </div>
 
-        {/* Баруун тал — зураг, календар */}
+        {/* --- Баруун тал (зураг + календар) --- */}
         <div className="space-y-6">
           {/* Зураг */}
           <section className="bg-white p-6 rounded-xl shadow">
@@ -289,9 +293,11 @@ export default function CreateListingPage() {
               <div className="grid grid-cols-3 gap-2 mt-3">
                 {images.map((file, i) => (
                   <div key={i} className="relative">
-                    <img
+                    <Image
                       src={URL.createObjectURL(file)}
                       alt={`preview-${i}`}
+                      width={200}
+                      height={200}
                       className="w-full h-28 object-cover rounded"
                     />
                     <button
@@ -326,7 +332,6 @@ export default function CreateListingPage() {
             </div>
           </section>
 
-          {/* Илгээх товч (баруун талын доод хэсэгт харагдана) */}
           <button
             type="submit"
             className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition"

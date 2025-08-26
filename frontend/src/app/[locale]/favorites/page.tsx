@@ -1,3 +1,4 @@
+// filename: src/app/[locale]/favorites/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,20 +6,25 @@ import { useParams } from "next/navigation";
 import api from "@/lib/axios";
 import ListingCard from "@/components/ListingCard";
 import { t } from "@/lib/i18n";
+import { Listing } from "@/types";
+
+type Favorite = {
+  id: number;
+  listing: Listing; // 👉 Listing type чинь `@/types` дотор байгаа бол яг тэрийг нь ашиглах
+};
 
 export default function FavoritesPage() {
-  //   const { locale } = useParams();
   const locale = (useParams().locale ?? "mn") as string;
 
-  const [favorites, setFavorites] = useState<any[]>([]);
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchFavorites = async () => {
       try {
-        const res = await api.get("/my-favorites/");
+        const res = await api.get<Favorite[]>("/my-favorites/");
         setFavorites(res.data);
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("💥 Favorites fetch error:", err);
       } finally {
         setLoading(false);
@@ -40,8 +46,8 @@ export default function FavoritesPage() {
         <p className="text-gray-500">{t(locale, "favorites_empty")}</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {favorites.map((fav, i) => (
-            <ListingCard key={i} listing={fav.listing} locale={locale} />
+          {favorites.map((fav) => (
+            <ListingCard key={fav.id} listing={fav.listing} locale={locale} />
           ))}
         </div>
       )}

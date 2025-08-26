@@ -1,10 +1,12 @@
+// filename: src/app/[locale]/host-bookings/[id]/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import api from "@/lib/axios";
 import { useNotification } from "@/context/NotificationContext";
 import { t } from "@/lib/i18n";
+import Image from "next/image";
 
 type BookingDetail = {
   id: number;
@@ -24,26 +26,26 @@ type BookingDetail = {
 };
 
 export default function HostBookingDetailPage() {
-  const { id, locale } = useParams();
+  const { id, locale } = useParams() as { id: string; locale: string };
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const { markBookingNotificationsAsRead } = useNotification();
 
-  useEffect(() => {
-    fetchBooking();
-    markBookingNotificationsAsRead();
-  }, []);
-
-  const fetchBooking = async () => {
+  const fetchBooking = useCallback(async () => {
     try {
       const res = await api.get(`/host-bookings/${id}/`);
       setBooking(res.data);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Booking detail fetch error:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    fetchBooking();
+    markBookingNotificationsAsRead();
+  }, [fetchBooking, markBookingNotificationsAsRead]);
 
   const handleCancel = async () => {
     if (!booking) return;
@@ -52,8 +54,8 @@ export default function HostBookingDetailPage() {
 
     try {
       await api.post(`/bookings/${booking.id}/host-cancel/`);
-      fetchBooking(); // Refresh after cancel
-    } catch (err) {
+      fetchBooking();
+    } catch (err: unknown) {
       console.error("Cancel booking error:", err);
     }
   };
@@ -83,9 +85,11 @@ export default function HostBookingDetailPage() {
       <div className="bg-white rounded shadow p-4 space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
           {booking.listing.thumbnail ? (
-            <img
+            <Image
               src={booking.listing.thumbnail}
               alt="Thumbnail"
+              width={192}
+              height={128}
               className="w-full md:w-48 h-32 object-cover rounded"
             />
           ) : (

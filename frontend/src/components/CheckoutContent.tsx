@@ -2,9 +2,11 @@
 "use client";
 
 import { useSearchParams, useRouter, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import api from "@/lib/axios";
 import { t } from "@/lib/i18n";
+import { Listing } from "@/types";
+import axios from "axios";
 
 // ✅ Local YYYY-MM-DD formatter
 const formatDateString = (d: Date) =>
@@ -21,8 +23,15 @@ export default function CheckoutContent() {
   const rawCheckOutTs = searchParams.get("check_out_ts");
   const listingId = searchParams.get("listing");
 
-  const checkInDate = rawCheckInTs ? new Date(Number(rawCheckInTs)) : null;
-  const checkOutDate = rawCheckOutTs ? new Date(Number(rawCheckOutTs)) : null;
+  // ✅ useMemo ашиглаж dependency warning арилгав
+  const checkInDate = useMemo(
+    () => (rawCheckInTs ? new Date(Number(rawCheckInTs)) : null),
+    [rawCheckInTs]
+  );
+  const checkOutDate = useMemo(
+    () => (rawCheckOutTs ? new Date(Number(rawCheckOutTs)) : null),
+    [rawCheckOutTs]
+  );
 
   const displayCheckOutDate: Date | null =
     checkInDate &&
@@ -31,7 +40,7 @@ export default function CheckoutContent() {
       ? new Date(checkOutDate.getTime() + 86400000)
       : checkOutDate;
 
-  const [listing, setListing] = useState<any>(null);
+  const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -46,11 +55,17 @@ export default function CheckoutContent() {
     if (!hasFetched && listingId && checkInDate && checkOutDate) {
       const fetchListing = async () => {
         try {
-          const res = await api.get(`/listings/${listingId}/`);
+          const res = await api.get<Listing>(`/listings/${listingId}/`);
           setListing(res.data);
           setHasFetched(true);
-        } catch (err) {
-          setErrorMsg(t(locale, "error.listing_not_found"));
+        } catch (err: unknown) {
+          if (axios.isAxiosError(err)) {
+            setErrorMsg(
+              err.response?.data?.detail || t(locale, "error.listing_not_found")
+            );
+          } else {
+            setErrorMsg(t(locale, "error.listing_not_found"));
+          }
         } finally {
           setLoading(false);
         }
@@ -99,14 +114,18 @@ export default function CheckoutContent() {
 
     try {
       const res = await api.post("/bookings/", payload);
-      const newBookingId = res.data.id;
+      const newBookingId: number = res.data.id;
       setSuccessMsg(t(locale, "success.booking_confirmed"));
       setErrorMsg("");
       router.push(`/${locale}/booking-success?booking=${newBookingId}`);
-    } catch (err: any) {
-      setErrorMsg(
-        err?.response?.data?.error || t(locale, "error.booking_failed")
-      );
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setErrorMsg(
+          err.response?.data?.error || t(locale, "error.booking_failed")
+        );
+      } else {
+        setErrorMsg(t(locale, "error.booking_failed"));
+      }
     }
   };
 

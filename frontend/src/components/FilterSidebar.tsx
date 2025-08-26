@@ -5,17 +5,21 @@ import { useEffect, useState } from "react";
 import api from "@/lib/axios";
 import { t } from "@/lib/i18n";
 
+// 🔹 Filter-ийн бүтэц тодорхойлно
+export type FilterValues = {
+  category: string;
+  search: string;
+  location: string;
+  priceMin: number | null;
+  priceMax: number | null;
+  amenities: string[];
+  __refresh: number; // дотоод refresh trigger
+};
+
 type Props = {
   locale: string;
-  filters: {
-    category: string;
-    search: string;
-    location: string;
-    priceMin: number | null;
-    priceMax: number | null;
-    amenities: string[];
-  };
-  setFilters: (filters: any) => void;
+  filters: FilterValues;
+  setFilters: (filters: FilterValues) => void;
   isOpen?: boolean;
 };
 
@@ -39,10 +43,10 @@ export default function FilterSidebar({
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
 
   useEffect(() => {
-    api.get("/amenities/").then((res) => {
+    api.get<AmenityOption[]>("/amenities/").then((res) => {
       setAmenityOptions(res.data);
     });
-    api.get("/categories/").then((res) => {
+    api.get<CategoryOption[]>("/categories/").then((res) => {
       console.log("✅ Category API response:", res.data);
       setCategoryOptions(res.data);
     });
