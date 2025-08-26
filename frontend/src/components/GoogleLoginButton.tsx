@@ -25,7 +25,10 @@ export default function GoogleLoginButton() {
       client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
       callback: async (response: GoogleCredentialResponse) => {
         try {
-          console.log("🔎 api baseURL (before request):", api.defaults.baseURL);
+          console.error(
+            "🔎 api baseURL (before request):",
+            api.defaults.baseURL
+          );
 
           const res = await api.post("/api/auth/google/", {
             access_token: response.credential,
