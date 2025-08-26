@@ -2,9 +2,10 @@
 "use client";
 
 import { useEffect } from "react";
-import api from "@/lib/axios"; // ⬅️ энд api instance-ийг зөв нэрлэ
+// import api from "@/lib/axios"; // ⬅️ энд api instance-ийг зөв нэрлэ
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import axios from "axios";
 
 interface GoogleCredentialResponse {
   clientId: string;
@@ -25,8 +26,7 @@ export default function GoogleLoginButton() {
       callback: async (response: GoogleCredentialResponse) => {
         try {
           console.log("🔎 Will POST to: /auth/google/");
-          const res = await api.post("/auth/google/", {
-            // ⬅️ api instance ашигла
+          const res = await axios.post("/auth/google/", {
             access_token: response.credential,
           });
 
