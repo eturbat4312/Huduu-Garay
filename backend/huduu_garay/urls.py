@@ -11,22 +11,18 @@ from rest_framework_simplejwt.views import (
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("core.urls")),  # core app API-ууд
+    # JWT
+    path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    # dj-rest-auth энд бүгдийг API доор хийе
+    path("api/auth/", include("dj_rest_auth.urls")),
+    path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
     path(
-        "api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"
-    ),  # JWT login
-    path(
-        "api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"
-    ),  # JWT refresh
-    path("auth/", include("dj_rest_auth.urls")),  # Login/logout/password reset
-    path(
-        "auth/registration/", include("dj_rest_auth.registration.urls")
-    ),  # Registration
-    path("auth/", include("allauth.socialaccount.urls")),  # Social logins (Google)
+        "api/auth/social/", include("allauth.socialaccount.urls")
+    ),  # Social logins (Google)
     path(
         "accounts/", include("allauth.urls")
     ),  # UI redirects like /accounts/google/login/
-    path("api/auth/", include("dj_rest_auth.urls")),
-    path("api/auth/registration/", include("dj_rest_auth.registration.urls")),
 ]
 
 if settings.DEBUG:
