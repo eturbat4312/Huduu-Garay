@@ -36,6 +36,7 @@ export default function GoogleLoginButton() {
           router.push(`/${locale}`); // ✅ locale-той redirect
         } catch (err) {
           console.error("Google login error:", err);
+          console.log("Google response:", response);
         }
       },
     });
