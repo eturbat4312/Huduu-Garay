@@ -25,10 +25,11 @@ export default function GoogleLoginButton() {
       client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
       callback: async (response: GoogleCredentialResponse) => {
         try {
-          const res = await api.post("/auth/google/", {
+          console.log("🔎 api baseURL (before request):", api.defaults.baseURL);
+
+          const res = await api.post("/api/auth/google/", {
             access_token: response.credential,
           });
-          console.log("🔎 api baseURL:", api.defaults.baseURL); // ← одоо ажиллана
 
           localStorage.setItem("access_token", res.data.access);
           localStorage.setItem("refresh_token", res.data.refresh);
