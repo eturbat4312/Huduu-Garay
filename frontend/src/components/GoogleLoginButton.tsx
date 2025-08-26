@@ -30,7 +30,7 @@ export default function GoogleLoginButton() {
             api.defaults.baseURL
           );
 
-          const res = await api.post("/api/auth/google/", {
+          const res = await api.post("/auth/google/", {
             access_token: response.credential,
           });
 
