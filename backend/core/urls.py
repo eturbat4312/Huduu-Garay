@@ -102,7 +102,7 @@ urlpatterns = [
     ),
     path("host/apply/", HostApplicationCreateView.as_view(), name="host-apply"),
     path("host/application/me/", HostApplicationMeView.as_view()),
-    path("auth/google/", GoogleLogin.as_view(), name="google_login"),
+    path("google/", GoogleLogin.as_view(), name="google_login"),
     # path("auth/google/", GoogleOneTapLoginView.as_view(), name="google-login"),
     # path("auth/google/", GoogleOneTapLoginView.as_view(), name="google-login"),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
