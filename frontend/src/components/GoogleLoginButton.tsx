@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect } from "react";
-// import api from "@/lib/axios"; // ⬅️ энд api instance-ийг зөв нэрлэ
+import api from "@/lib/axios"; // ⬅️ энд api instance-ийг зөв нэрлэ
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import axios from "axios";
@@ -31,6 +31,7 @@ export default function GoogleLoginButton() {
             access_token: response.credential,
           });
           console.log("✅ Response:", res.data);
+          console.log("🔎 api baseURL:", api.defaults.baseURL);
 
           localStorage.setItem("access_token", res.data.access);
           localStorage.setItem("refresh_token", res.data.refresh);
