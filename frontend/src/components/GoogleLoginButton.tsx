@@ -2,11 +2,10 @@
 "use client";
 
 import { useEffect } from "react";
-import axios from "@/lib/axios";
+import api from "@/lib/axios"; // ⬅️ зөв instance
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
-// Google response type
 interface GoogleCredentialResponse {
   clientId: string;
   credential: string;
@@ -25,7 +24,8 @@ export default function GoogleLoginButton() {
       client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
       callback: async (response: GoogleCredentialResponse) => {
         try {
-          const res = await axios.post("/auth/google/", {
+          // ⬇️ энд api instance ашигла
+          const res = await api.post("/auth/google/", {
             access_token: response.credential,
           });
 
@@ -33,10 +33,9 @@ export default function GoogleLoginButton() {
           localStorage.setItem("refresh_token", res.data.refresh);
 
           await login();
-          router.push(`/${locale}`); // ✅ locale-той redirect
+          router.push(`/${locale}`);
         } catch (err) {
           console.error("Google login error:", err);
-          console.log("Google response:", response);
         }
       },
     });
