@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect } from "react";
-import api from "@/lib/axios"; // ⬅️ зөв instance
+import api from "@/lib/axios"; // ⬅️ энд api instance-ийг зөв нэрлэ
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
@@ -24,13 +24,11 @@ export default function GoogleLoginButton() {
       client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
       callback: async (response: GoogleCredentialResponse) => {
         try {
-          const url = "/auth/google/";
-          console.log("🔎 Will POST to:", url);
-          const res = await api.post(url, {
+          console.log("🔎 Will POST to: /auth/google/");
+          const res = await api.post("/auth/google/", {
+            // ⬅️ api instance ашигла
             access_token: response.credential,
           });
-
-          console.log("✅ Response:", res.data);
 
           localStorage.setItem("access_token", res.data.access);
           localStorage.setItem("refresh_token", res.data.refresh);
