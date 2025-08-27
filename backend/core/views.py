@@ -15,6 +15,8 @@ from django.utils import timezone
 from core.utils.email_notifications import send_notification_email
 from decimal import Decimal
 from google.oauth2 import id_token
+import uuid
+from django.db import IntegrityError
 
 # from dj_rest_auth.jwt_auth import get_refresh_view
 
@@ -76,8 +78,18 @@ class GoogleLogin(APIView):
             if not email:
                 return Response({"error": "Email not found in token"}, status=400)
 
+            base_username = email.split("@")[0]
+            username = base_username
+
+            # username давхцахгүй болгож шалгана
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+
+            # хэрэглэгч авах эсвэл үүсгэх
             user, created = User.objects.get_or_create(
-                email=email, defaults={"username": email.split("@")[0]}
+                email=email, defaults={"username": username}
             )
 
             refresh = RefreshToken.for_user(user)
@@ -88,6 +100,8 @@ class GoogleLogin(APIView):
                 }
             )
 
+        except IntegrityError as e:
+            return Response({"error": "Username already exists"}, status=400)
         except Exception as e:
             return Response({"error": str(e)}, status=400)
 
