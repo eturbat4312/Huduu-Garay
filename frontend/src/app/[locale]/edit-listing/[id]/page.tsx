@@ -174,7 +174,7 @@ export default function EditListingPage() {
       await api.delete(`/listings/${id}/delete/`);
       alert(t(locale, "alert_deleted_success"));
       router.push(`/${locale}/my-listings`);
-    } catch (err: unknown) {
+    } catch {
       alert(t(locale, "alert_delete_failed"));
     } finally {
       setDeleting(false); // ⭐ CHANGE: reset
