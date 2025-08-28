@@ -3,7 +3,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image"; // ✅ next/image ашиглав
+import Image from "next/image";
 import api from "@/lib/axios";
 import { Listing, ListingImage } from "@/types";
 import { t } from "@/lib/i18n";
@@ -51,18 +51,9 @@ export default function ListingCard({
 
   const normalizeImageUrl = (u?: string) => {
     if (!u) return "";
-
-    // Хэрэв аль хэдийн бүрэн URL бол шууд буцаана
-    if (/^https?:\/\//i.test(u)) {
-      console.log("🌍 Already full URL:", u);
-      return u;
-    }
-
-    // Otherwise relative path бол API-ийн base URL нэмнэ
+    if (/^https?:\/\//i.test(u)) return u;
     const base = process.env.NEXT_PUBLIC_API_URL?.replace("/api", "") || "";
-    const finalUrl = u.startsWith("/") ? base + u : `${base}/${u}`;
-    console.log("🖼 Normalized URL:", { u, base, finalUrl });
-    return finalUrl;
+    return u.startsWith("/") ? base + u : `${base}/${u}`;
   };
 
   const scrollLeft = () => {
@@ -83,7 +74,7 @@ export default function ListingCard({
               e.preventDefault();
               scrollLeft();
             }}
-            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/70 hover:bg-white rounded-full p-1 shadow"
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/70 hover:bg-white rounded-full p-1 shadow text-sm"
           >
             ‹
           </button>
@@ -92,7 +83,7 @@ export default function ListingCard({
               e.preventDefault();
               scrollRight();
             }}
-            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/70 hover:bg-white rounded-full p-1 shadow"
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/70 hover:bg-white rounded-full p-1 shadow text-sm"
           >
             ›
           </button>
@@ -107,14 +98,14 @@ export default function ListingCard({
                   key={i}
                   src={normalizeImageUrl(img.image)}
                   alt={`image-${i}`}
-                  className="h-48 w-72 object-cover flex-shrink-0 rounded-md"
+                  className="h-40 sm:h-48 w-72 object-cover flex-shrink-0 rounded-md"
                   loading="lazy"
-                  width={288} // w-72
-                  height={192} // h-48
+                  width={288}
+                  height={192}
                 />
               ))
             ) : (
-              <div className="h-48 w-full bg-gray-200 flex items-center justify-center">
+              <div className="h-40 sm:h-48 w-full bg-gray-200 flex items-center justify-center">
                 <span className="text-gray-400">{t(locale, "no_image")}</span>
               </div>
             )}
@@ -135,42 +126,42 @@ export default function ListingCard({
         </div>
 
         {/* 📋 Info */}
-        <div className="p-4">
-          <div className="text-sm text-gray-500">{location}</div>
-          <h3 className="font-semibold text-lg text-gray-800">{title}</h3>
+        <div className="p-3 sm:p-4">
+          <div className="text-xs sm:text-sm text-gray-500">{location}</div>
+          <h3 className="font-semibold text-base sm:text-lg text-gray-800 truncate">
+            {title}
+          </h3>
 
-          <div className="text-sm text-gray-500 mt-1">
+          <div className="text-xs sm:text-sm text-gray-500 mt-1">
             {t(locale, "host_owner")}{" "}
             <span className="font-medium">{hostUsername}</span>
           </div>
 
-          <div className="flex justify-between items-center mt-2 flex-wrap gap-y-2">
-            <div className="inline-flex items-center gap-1 text-sm px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+          <div className="flex justify-between items-center mt-2 flex-wrap gap-y-1 sm:gap-y-2">
+            <div className="inline-flex items-center gap-1 text-xs sm:text-sm px-2 py-1 rounded-full bg-gray-100 text-gray-600">
               <span>{categoryIcon}</span>
               <span>{t(locale, categoryTranslationKey) || categoryName}</span>
             </div>
-            <div className="text-base font-bold text-green-700">
+            <div className="text-sm sm:text-base font-bold text-green-700">
               ₮
               {price.toLocaleString("mn-MN", {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 0,
               })}
-              <span className="text-sm text-gray-500">
+              <span className="text-xs sm:text-sm text-gray-500">
                 {" "}
                 {t(locale, "per_night")}
               </span>
             </div>
             {/* ⭐ Rating */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-0.5 sm:gap-1 text-xs sm:text-sm">
               {[1, 2, 3, 4, 5].map((n) => (
-                <span key={n} className="text-yellow-400 text-sm">
+                <span key={n} className="text-yellow-400">
                   {n <= averageRating ? "⭐" : "☆"}
                 </span>
               ))}
               {averageRating > 0 && (
-                <span className="text-sm text-gray-500 ml-1">
-                  ({averageRating})
-                </span>
+                <span className="ml-1 text-gray-500">({averageRating})</span>
               )}
             </div>
           </div>

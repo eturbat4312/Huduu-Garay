@@ -7,9 +7,9 @@ import { useNotification } from "@/context/NotificationContext";
 import UserDropdownMenu from "./UserDropdownMenu";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { Bell } from "lucide-react";
-import { useEffect } from "react";
+import { useState } from "react";
 import { t } from "@/lib/i18n";
-import Image from "next/image"; // ✅ next/image ашиглая
+import Image from "next/image";
 
 const supportedLocales = [
   { code: "mn", label: "🇲🇳" },
@@ -18,31 +18,30 @@ const supportedLocales = [
 ];
 
 export default function Navbar() {
-  const { user, loading } = useAuth(); // ✅ logout хэрэггүй байсан тул авлаа
+  const { user, loading } = useAuth();
   const { totalUnread } = useNotification();
   const router = useRouter();
   const { locale } = useParams();
   const pathname = usePathname();
   const basePath = pathname.replace(/^\/(mn|en|fr)/, "");
-
-  useEffect(() => {
-    console.log("🔄 Navbar received user:", user);
-  }, [user]);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <nav className="bg-white shadow-md px-6 py-2 flex justify-between items-center">
+    <nav className="bg-white shadow-md px-4 py-2 flex justify-between items-center relative">
+      {/* ✅ Logo */}
       <Link href={`/${locale}`} className="flex items-center">
         <Image
           src="/logo3.png"
           alt="Танаид Хонъё"
-          width={300}
-          height={120}
+          width={200}
+          height={80}
           priority
-          className="h-16 w-auto sm:h-18 md:h-20"
+          className="h-10 w-auto sm:h-12 md:h-14"
         />
       </Link>
 
-      <div className="flex items-center gap-4">
+      {/* ✅ Desktop menu */}
+      <div className="hidden md:flex items-center gap-4">
         {/* 🌍 Language switcher */}
         <div className="flex gap-1 items-center">
           {supportedLocales.map((lang) => (
@@ -64,7 +63,6 @@ export default function Navbar() {
         {!loading ? (
           user ? (
             <>
-              {/* Зар нэмэх / Түрээслүүлэгч болох */}
               {user.is_host ? (
                 <Link
                   href={`/${locale}/listings/new`}
@@ -85,7 +83,6 @@ export default function Navbar() {
                 </Link>
               )}
 
-              {/* 🔔 Notifications */}
               {user.is_host && (
                 <button
                   onClick={() => router.push(`/${locale}/notifications`)}
@@ -101,7 +98,6 @@ export default function Navbar() {
                 </button>
               )}
 
-              {/* 👤 User greeting & avatar */}
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600 hidden sm:block">
                   {t(locale as string, "greeting")}, <b>{user.username}</b>!
@@ -120,7 +116,6 @@ export default function Navbar() {
                   </div>
                 )}
               </div>
-
               <UserDropdownMenu />
             </>
           ) : (
@@ -145,6 +140,72 @@ export default function Navbar() {
           </span>
         )}
       </div>
+
+      {/* ✅ Mobile menu button */}
+      <button
+        onClick={() => setMenuOpen(!menuOpen)}
+        className="md:hidden text-2xl"
+      >
+        ☰
+      </button>
+
+      {/* ✅ Mobile dropdown */}
+      {menuOpen && (
+        <div className="absolute top-14 right-4 bg-white shadow-lg rounded p-4 flex flex-col gap-3 md:hidden z-50">
+          {supportedLocales.map((lang) => (
+            <Link
+              key={lang.code}
+              href={`/${lang.code}${basePath}`}
+              className={`${
+                lang.code === locale
+                  ? "font-bold text-green-700"
+                  : "text-gray-400 hover:text-green-600"
+              }`}
+            >
+              {lang.label}
+            </Link>
+          ))}
+
+          {!loading ? (
+            user ? (
+              <>
+                <Link
+                  href={`/${locale}/listings/new`}
+                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-center"
+                >
+                  {t(locale as string, "add_listing")}
+                </Link>
+                <Link
+                  href={`/${locale}/notifications`}
+                  className="text-gray-700 text-center"
+                >
+                  🔔 {t(locale as string, "notifications")}
+                </Link>
+                <UserDropdownMenu />
+              </>
+            ) : (
+              <>
+                <Link
+                  href={`/${locale}/login`}
+                  className="text-green-700 text-center"
+                >
+                  {t(locale as string, "login")}
+                </Link>
+                <Link
+                  href={`/${locale}/signup`}
+                  className="bg-green-600 text-white px-3 py-1 rounded text-center"
+                >
+                  {t(locale as string, "signup")}
+                </Link>
+              </>
+            )
+          ) : (
+            <span className="text-gray-400 text-sm">
+              {t(locale as string, "loading")}
+            </span>
+          )}
+        </div>
+      )}
     </nav>
   );
 }

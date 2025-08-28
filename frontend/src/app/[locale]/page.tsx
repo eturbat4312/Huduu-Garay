@@ -8,6 +8,7 @@ import ListingCard from "@/components/ListingCard";
 import FilterSidebar from "@/components/FilterSidebar";
 import { useParams } from "next/navigation";
 import { t } from "@/lib/i18n";
+import Image from "next/image";
 
 export default function HomePage() {
   const raw = useParams().locale;
@@ -71,28 +72,33 @@ export default function HomePage() {
     filters.__refresh,
   ]);
 
-  // ⏱ Hero зураг солигдох 1.5 секунд тутамд
+  // ⏱ Hero зураг солигдох 3 секунд тутамд
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrent((prev) => (prev + 1) % heroImages.length);
-    }, 1500);
+    }, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [heroImages.length]);
 
   return (
     <main className="pb-16">
-      {/* Hero Section */}
-      <section
-        className="relative w-full h-[420px] flex items-center justify-center text-center text-white"
-        style={{
-          backgroundImage: `url(${heroImages[current]})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-          transition: "background-image 0.4s ease-in-out",
-        }}
-      >
-        <div className="absolute inset-0 bg-black/40"></div>
-        <div className="relative z-10 px-4">
+      {/* Hero Section (fade transition) */}
+      <section className="relative w-full h-[420px] overflow-hidden">
+        {heroImages.map((img, index) => (
+          <Image
+            key={index}
+            src={img}
+            alt="Hero"
+            fill
+            priority={index === 0}
+            className={`object-cover transition-opacity duration-1000 ease-in-out ${
+              index === current ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        ))}
+
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white px-4">
           <h1 className="text-4xl md:text-5xl font-bold">
             {t(locale, "title")}
           </h1>
@@ -127,7 +133,7 @@ export default function HomePage() {
               {t(locale, "no_listings")}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {listings.map((listing) => (
                 <ListingCard
                   key={listing.id}
