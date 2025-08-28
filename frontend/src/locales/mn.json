@@ -269,7 +269,13 @@
     "pw_rule_len": "Дор хаяж 8 тэмдэгт байх",
     "pw_rule_not_numeric": "Зөвхөн тоо байхгүй",
     "pw_rule_not_similar": "Хэрэглэгчийн нэр/имэйлтэй төстэй биш",
-    "pw_rule_common": "Хэт нийтлэг нууц үг ашиглахгүй (123456, password, гэх мэт)"
+    "pw_rule_common": "Хэт нийтлэг нууц үг ашиглахгүй (123456, password, гэх мэт)",
+    "submitting_button": "Ачааллаж байна...",
+  "form_saving_button": "Хадгалж байна...",
+  "form_deleting_button": "Устгаж байна...",
+  "become_host.submitting": "Илгээж байна...",
+  "logging_in": "Нэвтэрч байна...",
+  "signing_up": "Бүртгэж байна…"
     
 
 

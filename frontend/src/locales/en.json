@@ -266,7 +266,13 @@
     "pw_rule_len": "At least 8 characters",
     "pw_rule_not_numeric": "Not only digits",
     "pw_rule_not_similar": "Not similar to username/email",
-    "pw_rule_common": "Avoid very common passwords (123456, password, etc.)"
+    "pw_rule_common": "Avoid very common passwords (123456, password, etc.)",
+    "submitting_button": "Submitting...",
+    "form_saving_button": "Saving...",
+    "form_deleting_button": "Deleting...",
+    "become_host.submitting": "Submitting...",
+    "logging_in": "Logging in...",
+    "signing_up": "Signing up…"
 
   }
   

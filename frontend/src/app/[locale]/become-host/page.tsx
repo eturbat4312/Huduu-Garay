@@ -1,4 +1,3 @@
-// filename: src/app/[locale]/become-host/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -7,6 +6,7 @@ import Image from "next/image";
 import api from "@/lib/axios";
 import { useAuth, useRefreshUser } from "@/context/AuthContext";
 import { t } from "@/lib/i18n";
+import LoadingButton from "@/components/LoadingButton"; // ⭐ CHANGE: импорт хийсэн
 
 const BANK_OPTIONS = [
   "Хаан Банк",
@@ -34,6 +34,8 @@ export default function BecomeHostPage() {
   const [idCardImage, setIdCardImage] = useState<File | null>(null);
   const [selfieImage, setSelfieImage] = useState<File | null>(null);
 
+  const [submitting, setSubmitting] = useState(false); // ⭐ CHANGE: state нэмсэн
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -42,8 +44,12 @@ export default function BecomeHostPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return; // ⭐ CHANGE: double-submit хамгаалалт
+    setSubmitting(true);
+
     if (!idCardImage || !selfieImage) {
       alert(t(locale, "become_host_alert_missing_images"));
+      setSubmitting(false);
       return;
     }
 
@@ -62,7 +68,6 @@ export default function BecomeHostPage() {
       alert(t(locale, "become_host_success"));
       router.push(`/${locale}`);
     } catch (err) {
-      // ✅ "any" биш, unknown гэж тодорхойлсон
       const error = err as {
         response?: { data?: { detail?: string } };
         message?: string;
@@ -77,6 +82,8 @@ export default function BecomeHostPage() {
       } else {
         alert(t(locale, "become_host.alert_error"));
       }
+    } finally {
+      setSubmitting(false); // ⭐ CHANGE: үргэлж reset
     }
   };
 
@@ -185,12 +192,13 @@ export default function BecomeHostPage() {
           </div>
         </div>
 
-        <button
+        <LoadingButton
           type="submit"
+          text={t(locale, "become_host.submit")}
+          loadingText={t(locale, "become_host.submitting")}
+          loading={submitting}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded mt-4"
-        >
-          {t(locale, "become_host.submit")}
-        </button>
+        />
       </form>
     </div>
   );

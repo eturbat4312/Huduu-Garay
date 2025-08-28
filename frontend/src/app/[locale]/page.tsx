@@ -8,7 +8,6 @@ import ListingCard from "@/components/ListingCard";
 import FilterSidebar from "@/components/FilterSidebar";
 import { useParams } from "next/navigation";
 import { t } from "@/lib/i18n";
-import Image from "next/image";
 
 export default function HomePage() {
   const raw = useParams().locale;
@@ -26,6 +25,16 @@ export default function HomePage() {
     __refresh: Date.now(),
   });
 
+  // 🖼 Hero images массив
+  const heroImages = [
+    "/images/hero.png",
+    "/images/hero2.png",
+    "/images/hero3.png",
+    "/images/hero4.png",
+    "/images/hero5.png",
+  ];
+  const [current, setCurrent] = useState(0);
+
   useEffect(() => {
     api
       .get("/listings/", {
@@ -38,7 +47,19 @@ export default function HomePage() {
           amenities: filters.amenities.join(","),
         },
       })
-      .then((res) => setListings(res.data))
+      .then((res) => {
+        // ✅ хамгийн сүүлд нэмэгдсэн listings эхэнд
+        const sorted = [...res.data].sort((a, b) => {
+          if (a.created_at && b.created_at) {
+            return (
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime()
+            );
+          }
+          return b.id - a.id; // fallback
+        });
+        setListings(sorted);
+      })
       .catch((err) => console.error("❌ Error fetching listings:", err));
   }, [
     filters.category,
@@ -50,18 +71,28 @@ export default function HomePage() {
     filters.__refresh,
   ]);
 
+  // ⏱ Hero зураг солигдох 1.5 секунд тутамд
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % heroImages.length);
+    }, 1500);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <main className="pb-16">
       {/* Hero Section */}
-      <section className="relative w-full h-[420px]">
-        <Image
-          src="/images/hero.png"
-          alt="Hero"
-          fill
-          className="object-cover rounded-none"
-          priority
-        />
-        <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white px-4">
+      <section
+        className="relative w-full h-[420px] flex items-center justify-center text-center text-white"
+        style={{
+          backgroundImage: `url(${heroImages[current]})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          transition: "background-image 0.4s ease-in-out",
+        }}
+      >
+        <div className="absolute inset-0 bg-black/40"></div>
+        <div className="relative z-10 px-4">
           <h1 className="text-4xl md:text-5xl font-bold">
             {t(locale, "title")}
           </h1>
@@ -96,7 +127,7 @@ export default function HomePage() {
               {t(locale, "no_listings")}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {listings.map((listing) => (
                 <ListingCard
                   key={listing.id}

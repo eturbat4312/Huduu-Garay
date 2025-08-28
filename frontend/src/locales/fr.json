@@ -269,7 +269,14 @@
     "pw_rule_len": "Au moins 8 caractères",
     "pw_rule_not_numeric": "Pas uniquement des chiffres",
     "pw_rule_not_similar": "Pas similaire au nom d’utilisateur/e-mail",
-    "pw_rule_common": "Évitez les mots de passe trop courants (123456, password, etc.)"
+    "pw_rule_common": "Évitez les mots de passe trop courants (123456, password, etc.)",
+    "submitting_button": "Envoi en cours...",
+    "form_saving_button": "Enregistrement...",
+    "form_deleting_button": "Suppression...",
+    "become_host.submitting": "Envoi en cours...",
+    "logging_in": "Connexion en cours...",
+    "signing_up": "Inscription en cours…"
+
 
 
 

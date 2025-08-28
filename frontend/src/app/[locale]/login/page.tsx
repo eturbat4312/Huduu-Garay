@@ -1,12 +1,12 @@
-// filename: src/app/[locale]/login/page.tsx
 "use client";
 
 import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import api from "@/lib/axios"; // ✅ baseURL="/api"
+import api from "@/lib/axios";
 import { useAuth } from "@/context/AuthContext";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import { t } from "@/lib/i18n";
+import LoadingButton from "@/components/LoadingButton"; // ⭐ CHANGE: импорт нэмсэн
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,10 +17,11 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // ⭐ CHANGE: энэ state-ийг LoadingButton-д ашиглана
 
   async function handleLogin(e: React.FormEvent) {
-    e.preventDefault(); // ⬅️ form-ийн default navigation-ийг зогсооно
+    e.preventDefault();
+    if (loading) return; // ⭐ CHANGE: double submit хамгаалалт
     setLoading(true);
     setError(null);
 
@@ -29,10 +30,9 @@ export default function LoginPage() {
       localStorage.setItem("access_token", data.access);
       localStorage.setItem("refresh_token", data.refresh);
 
-      await login(); // current user fetch гэх мэт
-      router.replace(`/${locale}`); // амжилттай → эхлэл
+      await login();
+      router.replace(`/${locale}`);
     } catch (err: unknown) {
-      // ✅ "unknown" болгож, runtime дээр шалгана
       const status =
         typeof err === "object" &&
         err !== null &&
@@ -81,13 +81,14 @@ export default function LoginPage() {
             required
           />
 
-          <button
+          {/* ⭐ CHANGE: энгийн button-ыг LoadingButton болгосон */}
+          <LoadingButton
             type="submit"
-            disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white font-bold py-2 px-4 rounded"
-          >
-            {loading ? t(locale, "loading") : t(locale, "login_button")}
-          </button>
+            text={t(locale, "login_button")}
+            loadingText={t(locale, "logging_in")}
+            loading={loading}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+          />
         </form>
 
         <div className="my-6 flex items-center justify-between">

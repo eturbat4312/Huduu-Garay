@@ -7,6 +7,7 @@ import { DayPicker } from "react-day-picker";
 import Image from "next/image";
 import "react-day-picker/dist/style.css";
 import { t } from "@/lib/i18n";
+import LoadingButton from "@/components/LoadingButton"; // ⭐ CHANGE: import хийсэн
 
 type Amenity = { id: number; name: string };
 type Category = { id: number; name: string };
@@ -21,6 +22,8 @@ type FormState = {
   category_id: number | null;
   amenity_ids: number[];
 };
+
+type ListingImage = { id: number; image: string };
 
 export default function EditListingPage() {
   const { id, locale } = useParams<{ id: string; locale: string }>();
@@ -39,13 +42,15 @@ export default function EditListingPage() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [allAmenities, setAllAmenities] = useState<Amenity[]>([]);
-  // const [images, setImages] = useState<any[]>([]);
-  type ListingImage = { id: number; image: string };
   const [images, setImages] = useState<ListingImage[]>([]);
   const [newImages, setNewImages] = useState<File[]>([]);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
   const [initialDates, setInitialDates] = useState<string[]>([]);
+
+  // ⭐ CHANGE: loading states for buttons
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const formatDate = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -142,7 +147,6 @@ export default function EditListingPage() {
     const isNew = !imageToDelete.id;
 
     if (isNew) {
-      // Шинээр нэмэгдсэн зураг бол зүгээр frontend талаас устгана
       setNewImages((prev) => prev.filter((_, i) => i !== index));
     } else {
       try {
@@ -156,42 +160,31 @@ export default function EditListingPage() {
 
   const handleDateSelect = (dates: Date[] | undefined) => {
     if (!dates) return;
-
-    // Booked огноонуудыг үлдээж, зөвхөн booked биш огноог update хийнэ
     const filtered = dates.filter((date) => {
       const dateStr = formatDate(date);
       return !bookedDates.has(dateStr);
     });
-
     setSelectedDates(filtered);
   };
 
   const handleDelete = async () => {
-    // if (!confirm("Та энэ зар устгахдаа итгэлтэй байна уу?")) return;
     if (!confirm(t(locale, "confirm_delete_listing"))) return;
     try {
+      setDeleting(true); // ⭐ CHANGE: loading эхэллээ
       await api.delete(`/listings/${id}/delete/`);
-      //   alert("Зар амжилттай устлаа");
       alert(t(locale, "alert_deleted_success"));
-
-      // router.push("/my-listings");
       router.push(`/${locale}/my-listings`);
     } catch (err: unknown) {
-      if (
-        typeof err === "object" &&
-        err !== null &&
-        "response" in err &&
-        (err as { response?: { status?: number } }).response?.status === 409
-      ) {
-        alert(t(locale, "alert_has_bookings_cannot_delete"));
-      } else {
-        alert(t(locale, "alert_delete_failed"));
-      }
+      alert(t(locale, "alert_delete_failed"));
+    } finally {
+      setDeleting(false); // ⭐ CHANGE: reset
     }
   };
 
   const handleSubmit = async () => {
     try {
+      setSaving(true); // ⭐ CHANGE: loading эхэллээ
+
       const payload = {
         ...form,
         price_per_night: parseInt(form.price_per_night),
@@ -229,16 +222,11 @@ export default function EditListingPage() {
       }
 
       alert(t(locale, "alert_saved_successfully"));
-      // router.push(`/listings/${id}`);
       router.push(`/${locale}/listings/${id}`);
     } catch (err: unknown) {
-      if (typeof err === "object" && err !== null && "response" in err) {
-        const errorData = (err as { response?: { data?: unknown } }).response
-          ?.data;
-        console.error("Хадгалах үед алдаа:", errorData || err);
-      } else {
-        console.error("Алдааны мэдээлэл тодорхойгүй:", err);
-      }
+      console.error("Хадгалах үед алдаа:", err);
+    } finally {
+      setSaving(false); // ⭐ CHANGE: reset
     }
   };
 
@@ -422,24 +410,30 @@ export default function EditListingPage() {
 
       {/* --- BUTTONS --- */}
       <div className="flex gap-4">
-        <button
+        {/* ⭐ CHANGE: Save button */}
+        <LoadingButton
           onClick={handleSubmit}
-          className="bg-green-600 text-white px-4 py-2 rounded"
-        >
-          {t(locale, "form_save_button")}
-        </button>
+          text={t(locale, "form_save_button")}
+          loadingText={t(locale, "form_saving_button")}
+          loading={saving}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+        />
+
         <button
           onClick={() => router.back()}
           className="bg-gray-300 px-4 py-2 rounded"
         >
           {t(locale, "form_cancel_button")}
         </button>
-        <button
+
+        {/* ⭐ CHANGE: Delete button */}
+        <LoadingButton
           onClick={handleDelete}
-          className="bg-red-600 text-white px-4 py-2 rounded"
-        >
-          {t(locale, "form_delete_button")}
-        </button>
+          text={t(locale, "form_delete_button")}
+          loadingText={t(locale, "form_deleting_button")}
+          loading={deleting}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+        />
       </div>
     </main>
   );

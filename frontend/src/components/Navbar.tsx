@@ -30,9 +30,16 @@ export default function Navbar() {
   }, [user]);
 
   return (
-    <nav className="bg-white shadow-md px-6 py-3 flex justify-between items-center">
-      <Link href={`/${locale}`} className="text-xl font-bold text-green-700">
-        {t(locale as string, "navbar_brand")}
+    <nav className="bg-white shadow-md px-6 py-2 flex justify-between items-center">
+      <Link href={`/${locale}`} className="flex items-center">
+        <Image
+          src="/logo3.png"
+          alt="Танаид Хонъё"
+          width={300}
+          height={120}
+          priority
+          className="h-16 w-auto sm:h-18 md:h-20"
+        />
       </Link>
 
       <div className="flex items-center gap-4">

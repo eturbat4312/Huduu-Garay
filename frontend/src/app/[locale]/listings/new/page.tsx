@@ -6,10 +6,11 @@ import { useRouter, useParams } from "next/navigation";
 import api from "@/lib/axios";
 import { format } from "date-fns";
 import { DayPicker } from "react-day-picker";
-import Image from "next/image"; // ✅ next/image ашиглаж байна
+import Image from "next/image";
 import "react-day-picker/dist/style.css";
 import { t } from "@/lib/i18n";
 import NumberStepper from "@/components/NumberStepper";
+import LoadingButton from "@/components/LoadingButton"; // ⭐ CHANGE: шинэ component импорт
 
 type Category = { id: number; name: string };
 type Amenity = { id: number; name: string };
@@ -30,6 +31,7 @@ export default function CreateListingPage() {
   const [amenityOptions, setAmenityOptions] = useState<Amenity[]>([]);
   const [images, setImages] = useState<File[]>([]);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [submitting, setSubmitting] = useState(false); // ⭐ CHANGE: submit state нэмсэн
 
   useEffect(() => {
     api.get("/categories/").then((res) => setCategories(res.data));
@@ -65,9 +67,13 @@ export default function CreateListingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return; // ⭐ CHANGE: олон дахин submit-ээс хамгаалж байна
+    setSubmitting(true); // ⭐ CHANGE: submit эхлэхэд true болгоно
+
     const plainPrice = Number(price.replace(/,/g, ""));
     if (!categoryId || plainPrice <= 0 || beds <= 0 || maxGuests <= 0) {
       alert(t(locale as string, "form_invalid_warning"));
+      setSubmitting(false); // ⭐ CHANGE: буруу болвол reset
       return;
     }
 
@@ -87,7 +93,6 @@ export default function CreateListingPage() {
       });
 
       const listingId = res.data.id;
-
       await handleImageUpload(listingId);
 
       const dateList = selectedDates.map((d) => format(d, "yyyy-MM-dd"));
@@ -105,6 +110,8 @@ export default function CreateListingPage() {
         "Зар үүсгэж чадсангүй",
         error.response?.data || error.message
       );
+    } finally {
+      setSubmitting(false); // ⭐ CHANGE: заавал reset хийнэ
     }
   };
 
@@ -332,12 +339,13 @@ export default function CreateListingPage() {
             </div>
           </section>
 
-          <button
+          <LoadingButton
             type="submit"
-            className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition"
-          >
-            {t(locale as string, "submit_button")}
-          </button>
+            text={t(locale as string, "submit_button")}
+            loadingText={t(locale as string, "submitting_button")}
+            loading={submitting}
+            className="w-full bg-green-600 hover:bg-green-700"
+          />
         </div>
       </form>
     </div>

@@ -6,6 +6,7 @@ import { useRouter, useParams } from "next/navigation";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import { t } from "@/lib/i18n";
 import api from "@/lib/axios";
+import LoadingButton from "@/components/LoadingButton"; // ⭐ CHANGE: импорт нэмсэн
 
 type FieldErrors = Record<string, string[]>;
 
@@ -20,12 +21,11 @@ export default function SignupPage() {
   const [pw1, setPw1] = useState("");
   const [pw2, setPw2] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // ⭐ CHANGE: LoadingButton-д ашиглана
 
   const [formErr, setFormErr] = useState<string>("");
   const [errors, setErrors] = useState<FieldErrors>({});
 
-  // --- Django default rule-тэй нийцсэн client-side зөвлөмж + strength ---
   const emailLocal = useMemo(
     () => email.split("@")[0]?.toLowerCase() || "",
     [email]
@@ -67,11 +67,11 @@ export default function SignupPage() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return; // ⭐ CHANGE: double-submit хамгаалалт
     setFormErr("");
     setErrors({});
     setLoading(true);
 
-    // Client-side шалгалт
     const fieldErrs: FieldErrors = {};
     if (!username.trim())
       fieldErrs.username = [
@@ -141,6 +141,7 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <form
@@ -297,17 +298,13 @@ export default function SignupPage() {
           </div>
         </div>
 
-        <button
+        <LoadingButton
           type="submit"
-          disabled={loading}
-          className={`w-full ${
-            loading ? "bg-green-400" : "bg-green-600 hover:bg-green-700"
-          } text-white font-semibold py-2 px-4 rounded-lg mt-2`}
-        >
-          {loading
-            ? L("signing_up", "Бүртгэж байна…")
-            : L("signup_button", "Бүртгүүлэх")}
-        </button>
+          text={L("signup_button", "Бүртгүүлэх")}
+          loadingText={L("signing_up", "Бүртгэж байна…")}
+          loading={loading}
+          className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg mt-2"
+        />
 
         <div className="my-6 border-t border-gray-200" />
 
