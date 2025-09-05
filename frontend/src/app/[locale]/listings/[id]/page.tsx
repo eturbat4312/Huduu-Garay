@@ -2,7 +2,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import api from "@/lib/axios";
 import { DayPicker, DateRange } from "react-day-picker";
 import { ChevronLeft, ChevronRight, X, Pencil, Trash2 } from "lucide-react";
@@ -12,6 +12,8 @@ import ReviewSection from "@/components/ReviewSection";
 import { t } from "@/lib/i18n";
 import { Listing, Booking } from "@/types";
 import { AxiosError } from "axios";
+import maplibregl from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 // ---------- Extra Types ----------
 type BookingDay = {
@@ -44,6 +46,10 @@ export default function ListingDetailPage() {
 
   const isOwner = user && listing?.host?.id === user.id;
 
+  // Map ref
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const map = useRef<maplibregl.Map | null>(null);
+
   // ---------- Fetch ----------
   useEffect(() => {
     const fetchListing = async () => {
@@ -63,7 +69,7 @@ export default function ListingDetailPage() {
 
           bookingsRes.data.forEach((booking) => {
             if (booking.listing.id !== Number(id)) return;
-            if (booking.is_cancelled_by_host) return; // serializer талбарыг ашиглаж байгаа тул any үлдээв
+            if (booking.is_cancelled_by_host) return;
             const startDate = new Date(booking.check_in);
             const end = new Date(booking.check_out);
             const loopDate = new Date(startDate);
@@ -84,6 +90,23 @@ export default function ListingDetailPage() {
     };
     fetchListing();
   }, [id, user]);
+
+  // ---------- Init Map ----------
+  useEffect(() => {
+    if (!listing || !mapRef.current || map.current) return;
+    if (!listing.location_lat || !listing.location_lng) return;
+
+    map.current = new maplibregl.Map({
+      container: mapRef.current,
+      style: `https://api.maptiler.com/maps/streets/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`,
+      center: [listing.location_lng, listing.location_lat],
+      zoom: 10,
+    });
+
+    new maplibregl.Marker()
+      .setLngLat([listing.location_lng, listing.location_lat])
+      .addTo(map.current);
+  }, [listing]);
 
   // ---------- Helpers ----------
   const isDateAvailable = (date: Date) =>
@@ -174,6 +197,7 @@ export default function ListingDetailPage() {
 
   return (
     <main className="max-w-6xl mx-auto px-4 md:px-6 py-10 space-y-10">
+      {/* Cover image */}
       {listing.images?.[0] && (
         <div
           className="h-[250px] md:h-[350px] w-full bg-cover bg-center rounded-xl shadow"
@@ -372,6 +396,19 @@ export default function ListingDetailPage() {
             </div>
           )}
         </div>
+
+        {/* 🗺 Location Map — always visible */}
+        {listing.location_lat && listing.location_lng && (
+          <div className="mt-8">
+            <h3 className="text-lg font-bold mb-2">
+              {t(locale as string, "location_map") || "Байршил"}
+            </h3>
+            <div
+              className="h-72 w-full rounded-xl overflow-hidden shadow"
+              ref={mapRef}
+            />
+          </div>
+        )}
 
         <div className="prose max-w-none mt-4 text-gray-700">
           <h3 className="text-lg font-bold mb-2">

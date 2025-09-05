@@ -40,6 +40,8 @@ export type Category = {
     host_username?: string;
     average_rating?: number;
     host?: Host;
+
+    
   };
   
   export type User = {

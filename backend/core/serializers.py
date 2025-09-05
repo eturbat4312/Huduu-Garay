@@ -184,6 +184,8 @@ class ListingSerializer(serializers.ModelSerializer):
             "thumbnail",
             "host",
             "average_rating",
+            "location_lat",  # ✅ нэмэв
+            "location_lng",  # ✅ нэмэв
         ]
         read_only_fields = ("host",)
 

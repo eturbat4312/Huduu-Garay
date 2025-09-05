@@ -6,3 +6,6 @@ declare global {
     google: any;
   }
 }
+
+// 🟢 maplibre-gl module-ийн type зарлал
+declare module "maplibre-gl";

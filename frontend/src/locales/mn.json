@@ -275,7 +275,13 @@
   "form_deleting_button": "Устгаж байна...",
   "become_host.submitting": "Илгээж байна...",
   "logging_in": "Нэвтэрч байна...",
-  "signing_up": "Бүртгэж байна…"
+  "signing_up": "Бүртгэж байна…",
+  "filters": "Шүүлтүүр харах",
+  "show_map": "Газрын зураг",
+  "choose_amenities": "Давуу талуудаас сонгох",
+  "close": "Хаах",
+  "apply": "Сонгох",
+  "location_map": "Байршил"
     
 
 

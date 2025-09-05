@@ -10,7 +10,8 @@ import Image from "next/image";
 import "react-day-picker/dist/style.css";
 import { t } from "@/lib/i18n";
 import NumberStepper from "@/components/NumberStepper";
-import LoadingButton from "@/components/LoadingButton"; // ⭐ CHANGE: шинэ component импорт
+import LoadingButton from "@/components/LoadingButton";
+import LocationField from "@/components/LocationField"; // 🆕 MAP-PIN КОМПОНЕНТ
 
 type Category = { id: number; name: string };
 type Amenity = { id: number; name: string };
@@ -19,9 +20,15 @@ export default function CreateListingPage() {
   const router = useRouter();
   const { locale } = useParams();
 
+  // ─── Form state ──────────────────────────────────────────────────────────────
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
+
+  // 🆕 Байршлын state: текст + координат
+  const [locationText, setLocationText] = useState("");
+  const [locationLat, setLocationLat] = useState<number | null>(null);
+  const [locationLng, setLocationLng] = useState<number | null>(null);
+
   const [price, setPrice] = useState("");
   const [beds, setBeds] = useState(1);
   const [maxGuests, setMaxGuests] = useState(1);
@@ -31,13 +38,15 @@ export default function CreateListingPage() {
   const [amenityOptions, setAmenityOptions] = useState<Amenity[]>([]);
   const [images, setImages] = useState<File[]>([]);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
-  const [submitting, setSubmitting] = useState(false); // ⭐ CHANGE: submit state нэмсэн
+  const [submitting, setSubmitting] = useState(false);
 
+  // ─── Load options ───────────────────────────────────────────────────────────
   useEffect(() => {
     api.get("/categories/").then((res) => setCategories(res.data));
     api.get("/amenities/").then((res) => setAmenityOptions(res.data));
   }, []);
 
+  // ─── Images ─────────────────────────────────────────────────────────────────
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -56,24 +65,34 @@ export default function CreateListingPage() {
   const handleImageUpload = async (listingId: number) => {
     if (images.length === 0) return;
     const formData = new FormData();
-    images.forEach((img) => {
-      formData.append("images", img);
-    });
+    images.forEach((img) => formData.append("images", img));
     formData.append("listing", String(listingId));
     await api.post("/listing-images/", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
   };
 
+  // ─── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submitting) return; // ⭐ CHANGE: олон дахин submit-ээс хамгаалж байна
-    setSubmitting(true); // ⭐ CHANGE: submit эхлэхэд true болгоно
+    if (submitting) return;
+    setSubmitting(true);
 
     const plainPrice = Number(price.replace(/,/g, ""));
+
+    // Байршлын pin заавал (текст нь optional, reverse geocode автоматаар бөглөнө)
+    if (locationLat == null || locationLng == null) {
+      alert(
+        t(locale as string, "please_drop_pin") ||
+          "Газрын зураг дээр байршлаа pin-ээр зааж өгнө үү."
+      );
+      setSubmitting(false);
+      return;
+    }
+
     if (!categoryId || plainPrice <= 0 || beds <= 0 || maxGuests <= 0) {
       alert(t(locale as string, "form_invalid_warning"));
-      setSubmitting(false); // ⭐ CHANGE: буруу болвол reset
+      setSubmitting(false);
       return;
     }
 
@@ -81,7 +100,15 @@ export default function CreateListingPage() {
       const formData = new FormData();
       formData.append("title", title);
       formData.append("description", description);
-      formData.append("location_text", location);
+
+      // Хаяг: текст (optional, хоосон бол координат fallback) + координат
+      const textFallback =
+        locationText?.trim() ||
+        `${locationLat.toFixed(5)}, ${locationLng.toFixed(5)}`;
+      formData.append("location_text", textFallback);
+      formData.append("location_lat", String(locationLat));
+      formData.append("location_lng", String(locationLng));
+
       formData.append("price_per_night", String(plainPrice));
       formData.append("beds", String(beds));
       formData.append("max_guests", String(maxGuests));
@@ -111,13 +138,14 @@ export default function CreateListingPage() {
         error.response?.data || error.message
       );
     } finally {
-      setSubmitting(false); // ⭐ CHANGE: заавал reset хийнэ
+      setSubmitting(false);
     }
   };
 
   const formatPrice = (val: string) =>
     val.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
+  // ─── UI ─────────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-6xl mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">
@@ -163,33 +191,35 @@ export default function CreateListingPage() {
               />
             </label>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="block">
-                <span className="block text-sm font-medium">
-                  {t(locale as string, "location_label")}
-                </span>
-                <input
-                  className="w-full border p-2 mt-1 rounded-md"
-                  placeholder={t(locale as string, "location_placeholder")}
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  required
-                />
-              </label>
+            {/* 🆕 Байршил: зөвхөн map pin (+ optional текст) */}
+            <LocationField
+              value={{
+                location_text: locationText,
+                location_lat: locationLat,
+                location_lng: locationLng,
+              }}
+              onChange={(v) => {
+                setLocationText(v.location_text);
+                setLocationLat(v.location_lat);
+                setLocationLng(v.location_lng);
+              }}
+              label={t(locale as string, "location_label")}
+              placeholder={t(locale as string, "location_placeholder")}
+            />
 
-              <label className="block">
-                <span className="block text-sm font-medium">
-                  {t(locale as string, "price_label")}
-                </span>
-                <input
-                  className="w-full border p-2 mt-1 rounded-md"
-                  placeholder={t(locale as string, "price_placeholder")}
-                  value={price}
-                  onChange={(e) => setPrice(formatPrice(e.target.value))}
-                  required
-                />
-              </label>
-            </div>
+            {/* Үнэ */}
+            <label className="block mt-6">
+              <span className="block text-sm font-medium">
+                {t(locale as string, "price_label")}
+              </span>
+              <input
+                className="w-full border p-2 mt-1 rounded-md"
+                placeholder={t(locale as string, "price_placeholder")}
+                value={price}
+                onChange={(e) => setPrice(formatPrice(e.target.value))}
+                required
+              />
+            </label>
           </section>
 
           {/* Байрны дэлгэрэнгүй */}
@@ -209,7 +239,6 @@ export default function CreateListingPage() {
                   min={1}
                   max={20}
                   step={1}
-                  label={t(locale as string, "beds_label")}
                 />
               </div>
 
@@ -223,7 +252,6 @@ export default function CreateListingPage() {
                   min={1}
                   max={30}
                   step={1}
-                  label={t(locale as string, "guests_label")}
                 />
               </div>
             </div>
@@ -282,9 +310,8 @@ export default function CreateListingPage() {
           </section>
         </div>
 
-        {/* --- Баруун тал (зураг + календар) --- */}
+        {/* Баруун тал: зураг + календар */}
         <div className="space-y-6">
-          {/* Зураг */}
           <section className="bg-white p-6 rounded-xl shadow">
             <h2 className="text-lg font-semibold mb-4">
               🖼 {t(locale as string, "images_label")}
@@ -324,7 +351,6 @@ export default function CreateListingPage() {
             </p>
           </section>
 
-          {/* Календар */}
           <section className="bg-white p-6 rounded-xl shadow">
             <h2 className="text-lg font-semibold mb-4">
               📅 {t(locale as string, "available_dates_label")}

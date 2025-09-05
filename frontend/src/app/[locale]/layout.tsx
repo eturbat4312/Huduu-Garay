@@ -1,5 +1,4 @@
 // filename: src/app/[locale]/layout.tsx
-
 import type { Metadata } from "next";
 import "../globals.css";
 import { notFound } from "next/navigation";
@@ -11,11 +10,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import Navbar from "@/components/Navbar";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
@@ -32,14 +27,16 @@ export async function generateStaticParams() {
   return [{ locale: "mn" }, { locale: "en" }, { locale: "fr" }];
 }
 
-export default function LocaleLayout({
+// ✅ params-ийг await хийдэг болголоо
+export default async function LocaleLayout({
   children,
   params,
 }: {
   children: ReactNode;
-  params: { locale: string };
+  // ✅ Next 15+ дээр Promise гэж тайлбарлавал TS алдаа арилна
+  params: Promise<{ locale: string }>;
 }) {
-  const { locale } = params;
+  const { locale } = await params;
 
   if (!locales.includes(locale)) notFound();
 
