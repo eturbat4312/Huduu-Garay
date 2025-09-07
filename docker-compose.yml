@@ -1,3 +1,4 @@
+# filename: docker-compose.yml
 version: '3.9'
 
 services:
@@ -11,20 +12,21 @@ services:
       POSTGRES_PASSWORD: markhoyor
     ports:
       - "5432:5432"
+    restart: always                # 🟢 нэмсэн
 
   backend:
     build:
       context: ./backend
-    
     volumes:
       - ./backend:/app
-      - ./backend/media:/app/media   # 📌 media volume нэмнэ
+      - ./backend/media:/app/media
     ports:
       - "8010:8010"
     env_file:
       - ./backend/.env
     depends_on:
       - db
+    restart: always                # 🟢 нэмсэн
 
   frontend:
     build:
@@ -38,7 +40,7 @@ services:
       - INTERNAL_API_URL=http://backend:8010/api
     env_file:
       - ./frontend/.env.local
-
+    restart: always                # 🟢 нэмсэн
 
 volumes:
   postgres_data:
