@@ -4,10 +4,9 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import api from "@/lib/axios";
 import { t } from "@/lib/i18n";
-// import { useEffect, useRef, useState, useMemo } from "react";
 
 export type FilterValues = {
-  category: string;
+  category: string; // Одоо зөвхөн pills-аас ирнэ
   search: string;
   location: string;
   priceMin: number | null;
@@ -22,17 +21,12 @@ type Props = {
   setFilters: (v: FilterValues) => void;
 };
 
-type CategoryOption = { name: string; translation_key: string };
 type AmenityOption = { name: string; translation_key: string };
 
 export default function FilterBar({ locale, filters, setFilters }: Props) {
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [amenities, setAmenities] = useState<AmenityOption[]>([]);
 
   useEffect(() => {
-    api
-      .get<CategoryOption[]>("/categories/")
-      .then((r) => setCategories(r.data));
     api.get<AmenityOption[]>("/amenities/").then((r) => setAmenities(r.data));
   }, []);
 
@@ -47,7 +41,7 @@ export default function FilterBar({ locale, filters, setFilters }: Props) {
 
   const clearAll = () => {
     setFilters({
-      category: "",
+      category: "", // pills-аас reset хийнэ
       search: "",
       location: "",
       priceMin: null,
@@ -62,7 +56,7 @@ export default function FilterBar({ locale, filters, setFilters }: Props) {
   return (
     <div className="w-full max-w-[1600px] px-6 mx-auto">
       <div className="bg-white shadow-lg rounded-2xl px-6 py-5 -mt-8 relative z-10">
-        {/* 1-р мөр: label + inputs */}
+        {/* 1-р мөр: inputs */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Search */}
           <div className="flex flex-col">
@@ -152,72 +146,27 @@ export default function FilterBar({ locale, filters, setFilters }: Props) {
           />
         </div>
 
-        {/* 2-р мөр: Categories + Actions */}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap gap-2">
-            {categories.map((cat) => {
-              const active = cat.name === filters.category;
-              return (
-                <button
-                  key={cat.name}
-                  onClick={() =>
-                    setFilters({ ...filters, category: active ? "" : cat.name })
-                  }
-                  className={`px-3 py-2 rounded-full border text-sm transition
-                    ${
-                      active
-                        ? "bg-green-600 text-white border-green-600"
-                        : "hover:bg-gray-50"
-                    }`}
-                >
-                  {t(locale, cat.translation_key) || cat.name}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={clearAll}
-              className="text-sm text-gray-600 underline"
-            >
-              {t(locale, "clear") || "clear"}
-            </button>
-            <button
-              onClick={() => setFilters({ ...filters, __refresh: Date.now() })}
-              className="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700"
-            >
-              {t(locale, "search_button") || "Хайх"}
-            </button>
-          </div>
+        {/* Actions */}
+        <div className="mt-4 flex justify-end gap-3">
+          <button
+            onClick={clearAll}
+            className="text-sm text-gray-600 underline"
+          >
+            {t(locale, "clear") || "Clear"}
+          </button>
+          <button
+            onClick={() => setFilters({ ...filters, __refresh: Date.now() })}
+            className="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700"
+          >
+            {t(locale, "search_button") || "Хайх"}
+          </button>
         </div>
-
-        {/* Сонгосон amenities */}
-        {filters.amenities.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {filters.amenities.map((name) => (
-              <span
-                key={name}
-                className="inline-flex items-center gap-2 text-sm bg-green-50 text-green-800 border border-green-200 rounded-full px-3 py-1"
-              >
-                {name}
-                <button
-                  aria-label="remove"
-                  onClick={() => toggleAmenity(name)}
-                  className="rounded-full w-5 h-5 flex items-center justify-center border hover:bg-green-100"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
 }
 
-/* ——— AmenityPicker ——— */
+/* ——— AmenityPicker (өөрчлөлтгүй) ——— */
 function AmenityPicker({
   locale,
   amenities,
@@ -302,7 +251,7 @@ function AmenityPicker({
               onClick={onClear}
               className="text-sm text-gray-600 underline"
             >
-              {t(locale, "clear") || "clear"}
+              {t(locale, "clear") || "Clear"}
             </button>
           </div>
 

@@ -12,6 +12,8 @@ import HomeMap from "@/components/HomeMap";
 import FilterBar, { type FilterValues } from "@/components/FilterBar";
 import FilterSidebar from "@/components/FilterSidebar";
 
+type SimpleCategory = { id: number; name: string; translation_key: string };
+
 export default function HomePage() {
   const raw = useParams().locale;
   const locale = (typeof raw === "string" ? raw : "mn") as string;
@@ -29,6 +31,28 @@ export default function HomePage() {
     __refresh: Date.now(),
   });
 
+  // Categories
+  const [categories, setCategories] = useState<SimpleCategory[]>([]);
+  const [catLoading, setCatLoading] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      try {
+        setCatLoading(true);
+        const res = await api.get("/categories/");
+        if (!ignore) setCategories(res.data);
+      } catch {
+        if (!ignore) setCategories([]);
+      } finally {
+        if (!ignore) setCatLoading(false);
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
   // Hero images
   const heroImages = [
     "/images/hero.png",
@@ -44,25 +68,15 @@ export default function HomePage() {
     api
       .get<Listing[]>("/listings/", {
         params: {
-          category: filters.category,
-          search: filters.search,
-          location: filters.location,
+          category: filters.category || undefined,
+          search: filters.search || undefined,
+          location: filters.location || undefined,
           price_min: filters.priceMin ?? undefined,
           price_max: filters.priceMax ?? undefined,
-          amenities: filters.amenities.join(","),
+          amenities: (filters.amenities || []).join(",") || undefined,
         },
       })
       .then((res) => {
-        // ✅ lint-friendly: Listing type ашигласан
-        console.log(
-          "coords check",
-          res.data.map((x: Listing) => ({
-            id: x.id,
-            lat: x.location_lat,
-            lng: x.location_lng,
-          }))
-        );
-
         const sorted = [...res.data].sort((a, b) => {
           if (a.created_at && b.created_at) {
             return (
@@ -70,9 +84,8 @@ export default function HomePage() {
               new Date(a.created_at).getTime()
             );
           }
-          return b.id - a.id;
+          return (b.id ?? 0) - (a.id ?? 0);
         });
-
         setListings(sorted);
       })
       .catch((err) => console.error("❌ Error fetching listings:", err));
@@ -95,20 +108,68 @@ export default function HomePage() {
     return () => clearInterval(id);
   }, [heroImages.length]);
 
-  // 🧩 Marker → Card scroll + highlight
-  useEffect(() => {
-    const onMarkerClick = (e: Event) => {
-      const id = (e as CustomEvent).detail?.id as number;
-      const el = document.querySelector<HTMLElement>(`[data-lid="${id}"]`);
-      if (!el) return;
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("ring-2", "ring-green-500", "rounded-xl");
-      setTimeout(() => el.classList.remove("ring-2", "ring-green-500"), 1200);
-    };
-    window.addEventListener("listing:marker-click", onMarkerClick);
-    return () =>
-      window.removeEventListener("listing:marker-click", onMarkerClick);
-  }, []);
+  // Category pills
+  const CategoryPills = () => {
+    if (catLoading || categories.length === 0) return null;
+    const active = filters.category || "";
+
+    return (
+      <div className="flex justify-center mt-6 relative z-30">
+        <div
+          className="flex gap-3 overflow-x-auto no-scrollbar py-3 px-2
+                        max-w-full xl:max-w-5xl xl:flex-wrap xl:justify-center"
+        >
+          {/* All button */}
+          <button
+            type="button"
+            aria-pressed={active === ""}
+            onClick={() =>
+              setFilters((f) => ({
+                ...f,
+                category: "",
+                __refresh: Date.now(),
+              }))
+            }
+            className={`px-5 py-2.5 rounded-full border text-sm md:text-base font-medium shadow-sm transition
+              ${
+                active === ""
+                  ? "bg-blue-600 text-white border-blue-600 shadow-md"
+                  : "bg-white text-gray-700 border-gray-200 hover:border-gray-300"
+              }`}
+          >
+            {t(locale, "all") || "Бүгд"}
+          </button>
+
+          {/* Category list */}
+          {categories.map((c) => {
+            const isActive = active === c.name;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={isActive}
+                onClick={() =>
+                  setFilters((f) => ({
+                    ...f,
+                    category: c.name, // ✅ зөвхөн name хадгалж байна
+                    __refresh: Date.now(),
+                  }))
+                }
+                className={`px-5 py-2.5 rounded-full border text-sm md:text-base font-medium shadow-sm transition
+                  ${
+                    isActive
+                      ? "bg-blue-600 text-white border-blue-600 shadow-md"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-gray-300"
+                  }`}
+              >
+                {t(locale, c.translation_key) || c.name}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <main className="pb-16">
@@ -134,8 +195,11 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Category pills */}
+      <CategoryPills />
+
       {/* Desktop filter bar */}
-      <div className="hidden xl:block">
+      <div className="hidden xl:block mt-4 relative z-20">
         <FilterBar locale={locale} filters={filters} setFilters={setFilters} />
       </div>
 
@@ -157,7 +221,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* MOBILE listings */}
+      {/* Mobile listings */}
       <div className="xl:hidden px-4 mt-4">
         {listings.length === 0 ? (
           <div className="text-center text-gray-500 mt-10">
@@ -166,17 +230,7 @@ export default function HomePage() {
         ) : (
           <div className="grid grid-cols-2 gap-4">
             {listings.map((listing) => (
-              <div
-                key={listing.id}
-                data-lid={listing.id}
-                onClick={() =>
-                  window.dispatchEvent(
-                    new CustomEvent("listing:card-click", {
-                      detail: { id: listing.id },
-                    })
-                  )
-                }
-              >
+              <div key={listing.id} data-lid={listing.id}>
                 <ListingCard listing={listing} locale={locale} />
               </div>
             ))}
@@ -184,7 +238,7 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* DESKTOP listings + map */}
+      {/* Desktop listings + map */}
       <div className="hidden xl:grid grid-cols-[1fr_560px] gap-6 px-6 mt-8 w-full">
         <div>
           {listings.length === 0 ? (
@@ -194,17 +248,7 @@ export default function HomePage() {
           ) : (
             <div className="grid grid-cols-3 gap-6">
               {listings.map((listing) => (
-                <div
-                  key={listing.id}
-                  data-lid={listing.id}
-                  onClick={() =>
-                    window.dispatchEvent(
-                      new CustomEvent("listing:card-click", {
-                        detail: { id: listing.id },
-                      })
-                    )
-                  }
-                >
+                <div key={listing.id} data-lid={listing.id}>
                   <ListingCard listing={listing} locale={locale} />
                 </div>
               ))}
@@ -218,7 +262,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* MOBILE filter overlay */}
+      {/* Mobile filter overlay */}
       {showFilters && (
         <div className="fixed inset-0 z-50 bg-white">
           <div className="h-12 flex items-center justify-between border-b px-4">
@@ -249,7 +293,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* MOBILE map overlay */}
+      {/* Mobile map overlay */}
       {showMap && (
         <div className="fixed inset-0 z-50 bg-white">
           <div className="h-12 flex items-center justify-between border-b px-4">
