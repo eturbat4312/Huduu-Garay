@@ -12,7 +12,7 @@ COPY .env.local .env.local
 # install dependencies including lightningcss binary
 RUN npm install
 
-COPY frontend/. .
+COPY . .
 
 # build
 RUN npm run build
