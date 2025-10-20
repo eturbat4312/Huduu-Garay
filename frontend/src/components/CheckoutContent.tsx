@@ -149,9 +149,11 @@ export default function CheckoutContent() {
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
-      if (e) e.preventDefault();
+      if (e) {
+        e.preventDefault();
+      }
 
-      // ✅ ЯГ ИНГЭЖ бичсэнээр lint алдаа арилна
+      // ✅ илэрхийлэл биш, тодорхой if guard
       if (submitting) {
         return;
       }
@@ -165,13 +167,14 @@ export default function CheckoutContent() {
 
       setSubmitting(true);
 
-      // prepare abort controller & idempotency key (one per attempt)
+      // ✅ өмнөх хүсэлтийг цуцлахыг ч бас ил тод if
       if (abortRef.current) {
-        abortRef.current.abort(); // cancel any prior (safety)
+        abortRef.current.abort();
       }
       abortRef.current = new AbortController();
+
+      // ✅ “||” трюк биш, тодорхой if
       if (!attemptKeyRef.current) {
-        // NOTE: Хэрэв CORS-оо зөв тохируулаагүй бол custom header-аа түр хасч болно
         attemptKeyRef.current = crypto.randomUUID();
       }
 
@@ -189,22 +192,20 @@ export default function CheckoutContent() {
         const res = await api.post("/bookings/", payload, {
           signal: abortRef.current.signal as AbortSignal,
           headers: {
-            "X-Idempotency-Key": attemptKeyRef.current,
+            "X-Idempotency-Key": attemptKeyRef.current!,
           },
         });
         const newId: number = res.data.id;
         router.push(`/${locale}/booking-success?booking=${newId}`);
       } catch (err) {
         if (axios.isCancel(err)) {
-          // silently ignore if user navigated away / unmounted
           return;
         }
         const msg = axios.isAxiosError(err)
           ? err.response?.data?.error || t(locale, "error.booking_failed")
           : t(locale, "error.booking_failed");
         setBannerError(msg);
-        // allow a NEW attempt to generate a NEW idempotency key
-        attemptKeyRef.current = null;
+        attemptKeyRef.current = null; // дараагийн оролдлогод шинэ key
       } finally {
         setSubmitting(false);
       }
