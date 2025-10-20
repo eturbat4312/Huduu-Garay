@@ -276,7 +276,13 @@
     "become_host.submitting": "Envoi en cours...",
     "logging_in": "Connexion en cours...",
     "signing_up": "Inscription en cours…",
-    "all": "Toute"
+    "all": "Toute",
+    "checkout.summary": "Récapitulatif",
+"price.per_night": "Prix par nuit",
+"info.max_guests": "Nombre maximal d’hôtes",
+"form.view_terms": "Voir les conditions générales",
+"info.fee_disclaimer": "Le total comprend le prix par nuit et les frais de service. Vous ne serez débité(e) qu’après la confirmation de la réservation.",
+"info.single_day_bumps_checkout": "Vous avez sélectionné une seule journée ; la date de départ a été automatiquement fixée au lendemain."
 
 
 

@@ -273,7 +273,13 @@
     "become_host.submitting": "Submitting...",
     "logging_in": "Logging in...",
     "signing_up": "Signing up…",
-    "all": "All"
+    "all": "All",
+    "checkout.summary": "Booking Summary",
+"price.per_night": "Price per night",
+"info.max_guests": "Max guests",
+"form.view_terms": "View terms & conditions",
+"info.fee_disclaimer": "Total includes nightly price and service fee. You’ll only be charged after the booking is confirmed.",
+"info.single_day_bumps_checkout": "You selected a single day; checkout has been set to the next day automatically."
 
   }
   

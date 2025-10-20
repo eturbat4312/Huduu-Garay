@@ -14,6 +14,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from datetime import timedelta
+from corsheaders.defaults import default_headers  # ⬅️ нэмнэ
 
 
 load_dotenv()
@@ -176,6 +177,13 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "x-idempotency-key",  # custom header-аа зөвшөөрнө (жижиг үсгээр)
+    "authorization",  # JWT ашигладаг тул тодорхой зааж өгвөл сайн
+    "content-type",
+]
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
