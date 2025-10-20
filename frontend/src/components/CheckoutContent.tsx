@@ -149,10 +149,12 @@ export default function CheckoutContent() {
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
-      e?.preventDefault();
+      if (e) e.preventDefault();
 
-      // HARD GUARD: if already submitting, ignore subsequent clicks/presses
-      if (submitting) return;
+      // ✅ ЯГ ИНГЭЖ бичсэнээр lint алдаа арилна
+      if (submitting) {
+        return;
+      }
 
       setBannerError("");
       if (!validate()) return;
@@ -164,9 +166,14 @@ export default function CheckoutContent() {
       setSubmitting(true);
 
       // prepare abort controller & idempotency key (one per attempt)
-      abortRef.current?.abort(); // cancel any prior (safety)
+      if (abortRef.current) {
+        abortRef.current.abort(); // cancel any prior (safety)
+      }
       abortRef.current = new AbortController();
-      attemptKeyRef.current = attemptKeyRef.current || crypto.randomUUID();
+      if (!attemptKeyRef.current) {
+        // NOTE: Хэрэв CORS-оо зөв тохируулаагүй бол custom header-аа түр хасч болно
+        attemptKeyRef.current = crypto.randomUUID();
+      }
 
       const payload = {
         listing_id: listingId,
@@ -427,7 +434,6 @@ export default function CheckoutContent() {
 
               <button
                 type="submit"
-                onClick={handleSubmit}
                 disabled={submitting}
                 aria-disabled={submitting}
                 aria-busy={submitting}
