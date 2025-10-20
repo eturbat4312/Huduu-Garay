@@ -104,7 +104,9 @@ export default function CheckoutContent() {
           : t(locale, "error.listing_not_found");
         setBannerError(msg);
       } finally {
-        mounted && setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
     fetchListing();
