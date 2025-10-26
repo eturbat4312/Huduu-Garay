@@ -7,7 +7,7 @@ import { useNotification } from "@/context/NotificationContext";
 import UserDropdownMenu from "./UserDropdownMenu";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { Bell } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
 import Image from "next/image";
 
@@ -25,6 +25,32 @@ export default function Navbar() {
   const pathname = usePathname();
   const basePath = pathname.replace(/^\/(mn|en|fr)/, "");
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+
+  // 🧩 Click outside хаах
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node) &&
+        !buttonRef.current?.contains(event.target as Node)
+      ) {
+        setMenuOpen(false);
+      }
+    }
+
+    if (menuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      document.removeEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [menuOpen]);
 
   return (
     <nav className="bg-white shadow-md px-4 py-2 flex justify-between items-center relative">
@@ -143,6 +169,7 @@ export default function Navbar() {
 
       {/* ✅ Mobile menu button */}
       <button
+        ref={buttonRef}
         onClick={() => setMenuOpen(!menuOpen)}
         className="md:hidden text-2xl"
       >
@@ -151,36 +178,65 @@ export default function Navbar() {
 
       {/* ✅ Mobile dropdown */}
       {menuOpen && (
-        <div className="absolute top-14 right-4 bg-white shadow-lg rounded p-4 flex flex-col gap-3 md:hidden z-50">
-          {supportedLocales.map((lang) => (
-            <Link
-              key={lang.code}
-              href={`/${lang.code}${basePath}`}
-              className={`${
-                lang.code === locale
-                  ? "font-bold text-green-700"
-                  : "text-gray-400 hover:text-green-600"
-              }`}
-            >
-              {lang.label}
-            </Link>
-          ))}
+        <div
+          ref={menuRef}
+          className="absolute top-14 right-4 bg-white shadow-lg rounded p-4 flex flex-col gap-3 md:hidden z-50"
+        >
+          {/* 🌍 Languages in one line */}
+          <div className="flex justify-center gap-3 border-b pb-2">
+            {supportedLocales.map((lang) => (
+              <Link
+                key={lang.code}
+                href={`/${lang.code}${basePath}`}
+                className={`text-xl ${
+                  lang.code === locale
+                    ? "font-bold text-green-700"
+                    : "text-gray-400 hover:text-green-600"
+                }`}
+              >
+                {lang.label}
+              </Link>
+            ))}
+          </div>
 
           {!loading ? (
             user ? (
               <>
-                <Link
-                  href={`/${locale}/listings/new`}
-                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-center"
-                >
-                  {t(locale as string, "add_listing")}
-                </Link>
-                <Link
-                  href={`/${locale}/notifications`}
-                  className="text-gray-700 text-center"
-                >
-                  🔔 {t(locale as string, "notifications")}
-                </Link>
+                {/* Username always visible */}
+                <div className="flex justify-center items-center text-gray-700 text-sm font-medium mt-1">
+                  {t(locale as string, "greeting")},{" "}
+                  <b className="ml-1">{user.username}</b>
+                </div>
+
+                {user.is_host ? (
+                  <Link
+                    href={`/${locale}/listings/new`}
+                    className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-center mt-2"
+                  >
+                    {t(locale as string, "add_listing")}
+                  </Link>
+                ) : user.host_application_status === "pending" ? (
+                  <span className="bg-gray-300 text-gray-700 px-3 py-1 rounded cursor-not-allowed text-sm text-center mt-2">
+                    ⏳ {t(locale as string, "host_application_pending")}
+                  </span>
+                ) : (
+                  <Link
+                    href={`/${locale}/become-host`}
+                    className="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 text-center mt-2"
+                  >
+                    {t(locale as string, "become_host")}
+                  </Link>
+                )}
+
+                {user.is_host && (
+                  <Link
+                    href={`/${locale}/notifications`}
+                    className="text-gray-700 text-center mt-1"
+                  >
+                    🔔 {t(locale as string, "notifications")}
+                  </Link>
+                )}
+
                 <UserDropdownMenu />
               </>
             ) : (
