@@ -18,7 +18,8 @@ services:
       context: ./backend
     volumes:
       - ./backend/media:/app/media
-    # порт нээхгүй — Nginx дотроос л холбогдоно
+    ports:
+      - "127.0.0.1:8010:8010"
     env_file:
       - ./backend/.env
     depends_on:
@@ -29,7 +30,8 @@ services:
     build:
       context: ./frontend
     command: sh -c "npm run build && npm start"
-    # порт нээхгүй — Nginx дотроос л холбогдоно
+    ports:
+      - "127.0.0.1:3000:3000"
     depends_on:
       - backend
     environment:
