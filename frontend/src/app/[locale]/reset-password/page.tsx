@@ -1,13 +1,11 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import api from "@/lib/axios";
 import Link from "next/link";
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const { locale } = useParams() as { locale: string };
   const searchParams = useSearchParams();
   const uid = searchParams.get("uid");
@@ -118,5 +116,13 @@ export default function ResetPasswordPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Уншиж байна...</div>}>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
