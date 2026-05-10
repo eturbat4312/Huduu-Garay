@@ -78,7 +78,12 @@ class Listing(models.Model):
 
     amenities = models.ManyToManyField(Amenity, blank=True)
 
-    location_text = models.CharField(max_length=255)
+    location_city = models.CharField(max_length=100, default="")           # Хот/Аймаг — public
+    location_district = models.CharField(max_length=100, default="")       # Дүүрэг/Сум — public
+    location_khoroo = models.CharField(max_length=100, blank=True, default="")  # Хороо/Баг — public
+    location_extra = models.CharField(max_length=200, blank=True, default="")   # Хороолол/Нэмэлт — public
+    location_building = models.CharField(max_length=100, blank=True, default="")  # Байр — public
+    location_apartment = models.CharField(max_length=50, blank=True, default="")  # Тоот — private
     location_lat = models.FloatField(blank=True, null=True)
     location_lng = models.FloatField(blank=True, null=True)
 

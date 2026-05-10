@@ -10,37 +10,33 @@ services:
       POSTGRES_DB: huduu
       POSTGRES_USER: huduu_user
       POSTGRES_PASSWORD: markhoyor
-    ports:
-      - "5432:5432"
-    restart: always                # 🟢 нэмсэн
+    # порт нээхгүй — зөвхөн internal network дотор
+    restart: always
 
   backend:
     build:
       context: ./backend
     volumes:
-      - ./backend:/app
       - ./backend/media:/app/media
-    ports:
-      - "8010:8010"
+    # порт нээхгүй — Nginx дотроос л холбогдоно
     env_file:
       - ./backend/.env
     depends_on:
       - db
-    restart: always                # 🟢 нэмсэн
+    restart: always
 
   frontend:
     build:
       context: ./frontend
-    command: sh -c "npm install && npm run build && npm start"
-    ports:
-      - "3000:3000"
+    command: sh -c "npm run build && npm start"
+    # порт нээхгүй — Nginx дотроос л холбогдоно
     depends_on:
       - backend
     environment:
       - INTERNAL_API_URL=http://backend:8010/api
     env_file:
       - ./frontend/.env.local
-    restart: always                # 🟢 нэмсэн
+    restart: always
 
 volumes:
   postgres_data:

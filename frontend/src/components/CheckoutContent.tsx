@@ -280,7 +280,7 @@ export default function CheckoutContent() {
 
               <div className="text-sm space-y-1 text-gray-700">
                 <div>
-                  📍 {t(locale, "location")}: {listing.location_text}
+                  📍 {t(locale, "location")}: {listing.location_city}, {listing.location_district}
                 </div>
                 <div>
                   📅 {df.format(checkInDate!)} →{" "}

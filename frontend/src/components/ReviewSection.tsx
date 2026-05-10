@@ -33,6 +33,8 @@ export default function ReviewSection({ listingId }: { listingId: number }) {
   const [error, setError] = useState("");
   const [hasBooking, setHasBooking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Claude: hover state for interactive star rating UI
+  const [hoverRating, setHoverRating] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -99,8 +101,13 @@ export default function ReviewSection({ listingId }: { listingId: number }) {
         <ul className="space-y-4">
           {reviews.map((r) => (
             <li key={r.id} className="border-b pb-3">
-              <p className="text-sm text-gray-800">
-                ⭐ {r.rating} – <strong>{r.guest_username}</strong>
+              {/* Claude: display stars as filled/empty characters instead of emoji + number */}
+              <p className="text-sm text-gray-800 flex items-center gap-1">
+                <span className="text-yellow-400 text-base">
+                  {"★".repeat(r.rating)}
+                  <span className="text-gray-300">{"★".repeat(5 - r.rating)}</span>
+                </span>
+                <strong className="ml-1">{r.guest_username}</strong>
               </p>
               <p className="text-sm text-gray-600">{r.comment}</p>
               <p className="text-xs text-gray-400">
@@ -116,21 +123,30 @@ export default function ReviewSection({ listingId }: { listingId: number }) {
           <h4 className="font-semibold mb-2">
             {t(locale, "review.leave_review")}
           </h4>
-          <div className="flex items-center gap-2 mb-2">
-            <label htmlFor="rating">⭐ {t(locale, "review.rating")}:</label>
-            <select
-              id="rating"
-              value={rating}
-              onChange={(e) => setRating(Number(e.target.value))}
-              className="border p-1 rounded"
-            >
-              <option value={0}>--</option>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
+          {/* Claude: replaced <select> with interactive star buttons; rating state stays number 0-5, no other logic changed */}
+          <div className="flex items-center gap-1 mb-2">
+            <span className="text-sm mr-1">{t(locale, "review.rating")}:</span>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setRating(n)}
+                onMouseEnter={() => setHoverRating(n)}
+                onMouseLeave={() => setHoverRating(0)}
+                className="text-2xl transition-colors focus:outline-none"
+                aria-label={`${n} star`}
+              >
+                <span
+                  className={
+                    n <= (hoverRating || rating)
+                      ? "text-yellow-400"
+                      : "text-gray-300"
+                  }
+                >
+                  ★
+                </span>
+              </button>
+            ))}
           </div>
           <textarea
             value={comment}

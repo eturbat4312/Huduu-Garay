@@ -27,7 +27,12 @@ export type Category = {
     price_per_night: number;
     beds: number;
     max_guests: number;
-    location_text: string;
+    location_city: string;
+    location_district: string;
+    location_khoroo?: string;
+    location_extra?: string;
+    location_building?: string;
+    location_apartment?: string;
     location_lat?: number;
     location_lng?: number;
     category?: Category | null;
@@ -38,7 +43,8 @@ export type Category = {
     is_favorited?: boolean;
     favorite_id?: number | null;
     host_username?: string;
-    average_rating?: number;
+    // Claude: null means no reviews yet
+    average_rating?: number | null;
     host?: Host;
 
     

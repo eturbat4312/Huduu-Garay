@@ -19,7 +19,11 @@ type Category = {
 type Listing = {
   id: number;
   title: string;
-  location_text: string;
+  location_city: string;
+  location_district: string;
+  location_khoroo?: string;
+  location_extra?: string;
+  location_building?: string;
   price_per_night: number;
   images: { image: string }[];
   category?: Category;
@@ -94,7 +98,7 @@ export default function ListingsPage() {
 
                   <h2 className="font-semibold text-lg">{listing.title}</h2>
                   <p className="text-sm text-gray-600">
-                    {listing.location_text}
+                    {listing.location_city}, {listing.location_district}
                   </p>
                   <p className="mt-2 font-bold text-green-700">
                     {Number(listing.price_per_night).toLocaleString()}₮{" "}

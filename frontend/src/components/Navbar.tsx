@@ -14,7 +14,7 @@ import Image from "next/image";
 const supportedLocales = [
   { code: "mn", label: "🇲🇳" },
   { code: "en", label: "🇬🇧" },
-  { code: "fr", label: "🇫🇷" },
+  // { code: "fr", label: "🇫🇷" },
 ];
 
 export default function Navbar() {
@@ -228,12 +228,18 @@ export default function Navbar() {
                   </Link>
                 )}
 
+                {/* Claude: added unread badge to mobile notification link */}
                 {user.is_host && (
                   <Link
                     href={`/${locale}/notifications`}
-                    className="text-gray-700 text-center mt-1"
+                    className="text-gray-700 text-center mt-1 flex items-center justify-center gap-2"
                   >
                     🔔 {t(locale as string, "notifications")}
+                    {totalUnread > 0 && (
+                      <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                        {totalUnread}
+                      </span>
+                    )}
                   </Link>
                 )}
 

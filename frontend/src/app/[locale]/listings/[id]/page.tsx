@@ -242,7 +242,9 @@ export default function ListingDetailPage() {
           </div>
         </div>
 
-        <p className="text-gray-600">{listing.location_text}</p>
+        <p className="text-gray-600">
+          📍 {[listing.location_city, listing.location_district, listing.location_khoroo, listing.location_extra, listing.location_building].filter(Boolean).join(", ")}
+        </p>
 
         <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-thin scrollbar-thumb-gray-400">
           {listing.images?.map((img, i) => (
@@ -418,7 +420,13 @@ export default function ListingDetailPage() {
           <ul className="mt-4 space-y-1">
             <li>
               📍 <strong>{t(locale as string, "location")}:</strong>{" "}
-              {listing.location_text}
+              {[listing.location_city, listing.location_district, listing.location_khoroo, listing.location_extra, listing.location_building].filter(Boolean).join(", ")}
+              {isOwner && listing.location_apartment && (
+                <span className="ml-1 text-gray-700">, {listing.location_apartment} тоот</span>
+              )}
+              {!isOwner && (
+                <span className="ml-1 text-gray-400 italic text-sm">(тоот — захиалсны дараа харагдана)</span>
+              )}
             </li>
             <li>
               🛏️ <strong>{t(locale as string, "beds")}:</strong> {listing.beds}

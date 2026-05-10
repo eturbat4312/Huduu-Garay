@@ -24,10 +24,16 @@ export default function CreateListingPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
 
-  // 🆕 Байршлын state: текст + координат
-  const [locationText, setLocationText] = useState("");
-  const [locationLat, setLocationLat] = useState<number | null>(null);
-  const [locationLng, setLocationLng] = useState<number | null>(null);
+  const [location, setLocation] = useState({
+    location_city: "",
+    location_district: "",
+    location_khoroo: "",
+    location_extra: "",
+    location_building: "",
+    location_apartment: "",
+    location_lat: null as number | null,
+    location_lng: null as number | null,
+  });
 
   const [price, setPrice] = useState("");
   const [beds, setBeds] = useState(1);
@@ -80,8 +86,13 @@ export default function CreateListingPage() {
 
     const plainPrice = Number(price.replace(/,/g, ""));
 
-    // Байршлын pin заавал (текст нь optional, reverse geocode автоматаар бөглөнө)
-    if (locationLat == null || locationLng == null) {
+    if (!location.location_city.trim() || !location.location_district.trim()) {
+      alert("Хот/Аймаг болон Дүүрэг/Сум заавал бөглөнө үү.");
+      setSubmitting(false);
+      return;
+    }
+
+    if (location.location_lat == null || location.location_lng == null) {
       alert(
         t(locale as string, "please_drop_pin") ||
           "Газрын зураг дээр байршлаа pin-ээр зааж өгнө үү."
@@ -101,13 +112,14 @@ export default function CreateListingPage() {
       formData.append("title", title);
       formData.append("description", description);
 
-      // Хаяг: текст (optional, хоосон бол координат fallback) + координат
-      const textFallback =
-        locationText?.trim() ||
-        `${locationLat.toFixed(5)}, ${locationLng.toFixed(5)}`;
-      formData.append("location_text", textFallback);
-      formData.append("location_lat", String(locationLat));
-      formData.append("location_lng", String(locationLng));
+      formData.append("location_city", location.location_city);
+      formData.append("location_district", location.location_district);
+      formData.append("location_khoroo", location.location_khoroo);
+      formData.append("location_extra", location.location_extra);
+      formData.append("location_building", location.location_building);
+      formData.append("location_apartment", location.location_apartment);
+      formData.append("location_lat", String(location.location_lat));
+      formData.append("location_lng", String(location.location_lng));
 
       formData.append("price_per_night", String(plainPrice));
       formData.append("beds", String(beds));
@@ -193,18 +205,9 @@ export default function CreateListingPage() {
 
             {/* 🆕 Байршил: зөвхөн map pin (+ optional текст) */}
             <LocationField
-              value={{
-                location_text: locationText,
-                location_lat: locationLat,
-                location_lng: locationLng,
-              }}
-              onChange={(v) => {
-                setLocationText(v.location_text);
-                setLocationLat(v.location_lat);
-                setLocationLng(v.location_lng);
-              }}
-              label={t(locale as string, "location_label")}
-              placeholder={t(locale as string, "location_placeholder")}
+              value={location}
+              onChange={setLocation}
+              language={locale as string}
             />
 
             {/* Үнэ */}

@@ -16,6 +16,7 @@ export async function markAllNotificationsAsRead(): Promise<void> {
 }
 
 // 📥 Зөвхөн booking төрлийн мэдэгдлийг уншсан гэж тэмдэглэх
+// Claude: was "booking" but backend stores "booking_created" — fixed to match
 export async function markBookingNotificationsAsRead(): Promise<void> {
-  await api.post("/notifications/mark-read/", { type: "booking" });
+  await api.post("/notifications/mark-read/", { type: "booking_created" });
 }

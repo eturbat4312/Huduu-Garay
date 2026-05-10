@@ -23,9 +23,6 @@ load_dotenv()
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
-print("google info:", GOOGLE_CLIENT_ID)
-print("SK: ", GOOGLE_CLIENT_SECRET)
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -33,15 +30,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure--ua!&czs90bsyojt8@&v*@oyb$1vfeews7fe8_!&-3fl@8-+ub"
+SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-local-dev-only")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
-# ALLOWED_HOSTS = []
-ALLOWED_HOSTS = ["tanaid-honoy.mn", "www.tanaid-honoy.mn", "localhost", "127.0.0.1"]
-CSRF_TRUSTED_ORIGINS = ["https://tanaid-honoy.mn", "https://www.tanaid-honoy.mn"]
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+CSRF_TRUSTED_ORIGINS = os.getenv(
+    "CSRF_TRUSTED_ORIGINS", "https://tanaid-honoy.mn,https://www.tanaid-honoy.mn"
+).split(",")
 
 
 # Application definition
@@ -70,6 +66,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -82,7 +79,7 @@ MIDDLEWARE = [
 ROOT_URLCONF = "huduu_garay.urls"
 
 AUTHENTICATION_BACKENDS = [
-    "django.contrib.auth.backends.ModelBackend",
+    "core.backends.EmailOrUsernameBackend",
     "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
@@ -170,11 +167,10 @@ AUTH_USER_MODEL = "core.CustomUser"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://54.64.78.102",  # таны deployment server
-    "https://54.64.78.102",  # хэрэв HTTPS ашиглаж байвал
-]
+CORS_ALLOWED_ORIGINS = os.getenv(
+    "CORS_ALLOWED_ORIGINS",
+    "http://localhost:3000,https://tanaid-honoy.mn,https://www.tanaid-honoy.mn",
+).split(",")
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -203,12 +199,11 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# settings.py
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = "tanaid.honoy1@gmail.com"  # таны Gmail хаяг
-EMAIL_HOST_PASSWORD = "cgah tioc ylzy fcbb"  # таны App password (шугамгүйгээр)
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 
 
 # Internationalization
@@ -229,7 +224,6 @@ USE_TZ = True
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 STATIC_URL = "static/"
-ALLOWED_HOSTS = ["*"]
 
 
 SITE_ID = 1  # 🔹 заавал байх ёстой

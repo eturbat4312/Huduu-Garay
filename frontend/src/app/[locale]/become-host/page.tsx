@@ -116,6 +116,29 @@ export default function BecomeHostPage() {
       <h1 className="text-3xl font-bold mb-6 text-center">
         {t(locale, "become_host.title")}
       </h1>
+
+      {/* Platform fee info */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 space-y-3">
+        <h2 className="font-bold text-blue-800 text-base">💰 Платформын шимтгэлийн талаар</h2>
+        <p className="text-sm text-gray-700">
+          Манай платформ таны захиалга бүрийн нийт дүнгийн <strong>10%</strong>-ийг үйлчилгээний хөлс болгон авна.
+        </p>
+        <div className="bg-white rounded-lg p-3 border border-blue-100 text-sm space-y-1">
+          <p className="font-medium text-gray-700">📊 Жишээ:</p>
+          <p className="text-gray-600">Байрны үнэ: <strong>100,000₮</strong> / хоног</p>
+          <p className="text-gray-600">Платформын шимтгэл (10%): <strong>10,000₮</strong></p>
+          <p className="text-green-700 font-semibold">Таны авах мөнгө: <strong>90,000₮</strong></p>
+        </div>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+          <p className="font-medium text-yellow-800 mb-1">💡 Зөвлөгөө</p>
+          <p className="text-gray-700">
+            Шимтгэлийг үнэдээ шингээхийг хүсвэл байрны үнийг арай өндөр тохируулж болно.
+            Жишээ нь <strong>100,000₮</strong>-ийн оронд <strong>112,000₮</strong> тавивал
+            шимтгэлийн дараа та <strong>~100,800₮</strong> авна.
+          </p>
+        </div>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <input
           name="full_name"

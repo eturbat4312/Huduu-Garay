@@ -34,6 +34,8 @@ from .views import (
     HostApplicationMeView,
     BookingRetrieveView,
     GoogleLogin,
+    PasswordResetRequestView,
+    PasswordResetConfirmView,
 )
 
 # from core.adapters import GoogleOneTapLoginView
@@ -103,6 +105,9 @@ urlpatterns = [
     path("host/apply/", HostApplicationCreateView.as_view(), name="host-apply"),
     path("host/application/me/", HostApplicationMeView.as_view()),
     path("auth/google/", GoogleLogin.as_view(), name="google_login"),
+    # Claude: password reset
+    path("password-reset/", PasswordResetRequestView.as_view(), name="password-reset"),
+    path("password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
     # path("auth/google/", GoogleOneTapLoginView.as_view(), name="google-login"),
     # path("auth/google/", GoogleOneTapLoginView.as_view(), name="google-login"),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

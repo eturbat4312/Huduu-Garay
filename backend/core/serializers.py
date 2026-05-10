@@ -169,23 +169,28 @@ class ListingSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "description",
-            "location_text",
+            "location_city",
+            "location_district",
+            "location_khoroo",
+            "location_extra",
+            "location_building",
+            "location_apartment",
             "price_per_night",
             "max_guests",
             "beds",
-            "host_username",  # 🟢 Host info
+            "host_username",
             "category",
-            "category_id",  # 🟢 POST/PUT үед
+            "category_id",
             "amenities",
-            "amenity_ids",  # 🟢 POST/PUT үед
+            "amenity_ids",
             "images",
             "is_favorited",
             "favorite_id",
             "thumbnail",
             "host",
             "average_rating",
-            "location_lat",  # ✅ нэмэв
-            "location_lng",  # ✅ нэмэв
+            "location_lat",
+            "location_lng",
         ]
         read_only_fields = ("host",)
 
@@ -228,10 +233,11 @@ class ListingSerializer(serializers.ModelSerializer):
         return instance
 
     def get_average_rating(self, obj):
+        # Claude: return None when no reviews, float with 1 decimal when reviews exist
         reviews = obj.reviews.all()
         if not reviews.exists():
-            return 0
-        return round(sum([r.rating for r in reviews]) / reviews.count())
+            return None
+        return round(sum([r.rating for r in reviews]) / reviews.count(), 1)
 
 
 # -------------------- FAVORITE --------------------
@@ -332,7 +338,8 @@ class BookingSerializer(serializers.ModelSerializer):
         return {
             "id": obj.listing.id,
             "title": obj.listing.title,
-            "location": obj.listing.location_text,
+            "location_city": obj.listing.location_city,
+            "location_district": obj.listing.location_district,
             "thumbnail": thumbnail,
             "price_per_night": obj.listing.price_per_night,
         }

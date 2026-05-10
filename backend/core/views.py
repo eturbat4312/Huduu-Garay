@@ -17,6 +17,11 @@ from decimal import Decimal
 from google.oauth2 import id_token
 import uuid
 from django.db import IntegrityError
+# Claude: password reset imports
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.conf import settings
 
 # from dj_rest_auth.jwt_auth import get_refresh_view
 
@@ -188,7 +193,10 @@ class ListingListCreateView(generics.ListCreateAPIView):
             queryset = queryset.filter(title__icontains=search)
 
         if location:
-            queryset = queryset.filter(location_text__icontains=location)
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(location_city__icontains=location) | Q(location_district__icontains=location)
+            )
 
         if price_min:
             queryset = queryset.filter(price_per_night__gte=price_min)
@@ -384,30 +392,95 @@ class BookingCreateView(APIView):
                     listing=listing, date__in=requested_dates
                 ).delete()
 
-                # ✅ Notification
+                # Guest: нийт үнэ + 10% шимтгэл төлнө
+                guest_fee = service_fee
+                guest_total = int(total_price + guest_fee)
+                # Host: нийт үнээс 10% шимтгэл хасагдана
+                host_fee = (total_price * Decimal("0.10")).quantize(Decimal("1"))
+                host_payout = int(total_price - host_fee)
+
+                host_app = getattr(listing.host, "hostapplication", None)
+                host_name = host_app.full_name if host_app else listing.host.username
+                host_phone = host_app.phone_number if host_app else getattr(listing.host, "phone", "") or "—"
+
+                # Host-д notification
                 Notification.objects.create(
                     user=listing.host,
-                    message=f"{guest.username} таны '{listing.title}' байранд захиалга хийлээ.",
+                    message=(
+                        f"Шинэ захиалга #{booking.id} — {full_name} таны '{listing.title}' байранд "
+                        f"{check_in.strftime('%Y-%m-%d')} – {check_out.strftime('%Y-%m-%d')} "
+                        f"({total_nights} хонох), {guest_count} зочин. Таны авах мөнгө: ₮{host_payout:,}"
+                    ),
                     type="booking_created",
                     related_booking=booking,
                 )
 
+                # Guest-д notification
+                Notification.objects.create(
+                    user=guest,
+                    message=(
+                        f"Захиалга #{booking.id} баталгаажлаа — '{listing.title}', "
+                        f"{check_in.strftime('%Y-%m-%d')} – {check_out.strftime('%Y-%m-%d')} "
+                        f"({total_nights} хонох). Нийт төлөх дүн: ₮{guest_total:,}"
+                    ),
+                    type="booking_confirmed",
+                    related_booking=booking,
+                )
+
+                # Host-д email
                 try:
                     send_notification_email(
                         user=listing.host,
                         notif_type="booking_created",
                         context={
+                            "booking_id": booking.id,
                             "listing_title": listing.title,
                             "guest_name": guest.username,
                             "full_name": full_name,
                             "phone_number": phone_number,
                             "check_in": check_in.strftime("%Y-%m-%d"),
                             "check_out": check_out.strftime("%Y-%m-%d"),
+                            "total_nights": total_nights,
                             "guest_count": guest_count,
+                            "total_price": int(total_price),
+                            "host_fee": int(host_fee),
+                            "host_payout": host_payout,
                         },
                     )
                 except Exception as e:
-                    print(f"❌ Email илгээхэд алдаа гарлаа: {e}")
+                    print(f"❌ Host email илгээхэд алдаа гарлаа: {e}")
+
+                # ✅ Guest-д email — бүрэн мэдээлэлтэй
+                try:
+                    send_notification_email(
+                        user=guest,
+                        notif_type="booking_confirmed",
+                        context={
+                            "booking_id": booking.id,
+                            "listing_title": listing.title,
+                            "location_city": listing.location_city,
+                            "location_district": listing.location_district,
+                            "location_khoroo": listing.location_khoroo,
+                            "location_extra": listing.location_extra,
+                            "location_building": listing.location_building,
+                            "location_apartment": listing.location_apartment,
+                            "location_lat": listing.location_lat,
+                            "location_lng": listing.location_lng,
+                            "check_in": check_in.strftime("%Y-%m-%d"),
+                            "check_out": check_out.strftime("%Y-%m-%d"),
+                            "total_nights": total_nights,
+                            "guest_count": guest_count,
+                            "full_name": full_name,
+                            "phone_number": phone_number,
+                            "host_name": host_name,
+                            "host_phone": host_phone or "—",
+                            "total_price": int(total_price),
+                            "guest_fee": int(guest_fee),
+                            "guest_total": guest_total,
+                        },
+                    )
+                except Exception as e:
+                    print(f"❌ Guest email илгээхэд алдаа гарлаа: {e}")
 
                 return Response(
                     BookingSerializer(booking, context={"request": request}).data,
@@ -770,3 +843,66 @@ class HostApplicationMeView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+
+
+# Claude: password reset — request reset link
+class PasswordResetRequestView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email", "").strip()
+        if not email:
+            return Response({"error": "Email шаардлагатай."}, status=400)
+
+        User = get_user_model()
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            # Security: always return 200 so attackers can't enumerate emails
+            return Response({"detail": "ok"})
+
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+        reset_link = f"{frontend_url}/mn/reset-password?uid={uid}&token={token}"
+
+        try:
+            send_notification_email(
+                user=user,
+                notif_type="password_reset",
+                context={"reset_link": reset_link, "username": user.username},
+            )
+        except Exception as e:
+            print(f"❌ Password reset email error: {e}")
+
+        return Response({"detail": "ok"})
+
+
+# Claude: password reset — set new password
+class PasswordResetConfirmView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        uid = request.data.get("uid", "")
+        token = request.data.get("token", "")
+        new_password = request.data.get("new_password", "")
+
+        if not uid or not token or not new_password:
+            return Response({"error": "Бүх талбарыг бөглөнө үү."}, status=400)
+
+        if len(new_password) < 8:
+            return Response({"error": "Нууц үг хамгийн багадаа 8 тэмдэгт байх ёстой."}, status=400)
+
+        User = get_user_model()
+        try:
+            pk = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=pk)
+        except (User.DoesNotExist, ValueError, TypeError):
+            return Response({"error": "Холбоос буруу байна."}, status=400)
+
+        if not default_token_generator.check_token(user, token):
+            return Response({"error": "Холбоос хүчингүй болсон байна. Дахин хүсэлт илгээнэ үү."}, status=400)
+
+        user.set_password(new_password)
+        user.save()
+        return Response({"detail": "Нууц үг амжилттай шинэчлэгдлээ."})

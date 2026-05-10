@@ -8,6 +8,8 @@ backend/__pycache__/
 backend/*.pyc
 backend/db.sqlite3
 backend/.env
+backend/media/
+backend/staticfiles/
 
 # OS & editor
 .DS_Store

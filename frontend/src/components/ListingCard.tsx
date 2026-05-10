@@ -24,13 +24,14 @@ export default function ListingCard({
 
   const images = listing.images ?? [];
   const title = listing.title ?? "Гарчиггүй";
-  const location = listing.location_text ?? "Байршил байхгүй";
+  const location = [listing.location_city, listing.location_district, listing.location_khoroo, listing.location_extra].filter(Boolean).join(", ") || "Байршил байхгүй";
   const categoryName = listing.category?.name ?? "Ангилалгүй";
   const categoryIcon = listing.category?.icon ?? "❓";
   const categoryTranslationKey = listing.category?.translation_key ?? "";
   const hostUsername = listing.host_username ?? "Тодорхойгүй хэрэглэгч";
   const price = Number(listing.price_per_night ?? 0);
-  const averageRating = listing.average_rating ?? 0;
+  // Claude: null = no reviews yet, number = avg rating with 1 decimal
+  const averageRating = listing.average_rating ?? null;
 
   const handleFavoriteToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -153,15 +154,22 @@ export default function ListingCard({
                 {t(locale, "per_night")}
               </span>
             </div>
-            {/* ⭐ Rating */}
-            <div className="flex items-center gap-0.5 sm:gap-1 text-xs sm:text-sm">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <span key={n} className="text-yellow-400">
-                  {n <= averageRating ? "⭐" : "☆"}
-                </span>
-              ))}
-              {averageRating > 0 && (
-                <span className="ml-1 text-gray-500">({averageRating})</span>
+            {/* Claude: star rating using ★ chars consistent with ReviewSection; null = no reviews */}
+            <div className="flex items-center gap-0.5 text-sm">
+              {averageRating !== null ? (
+                <>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <span
+                      key={n}
+                      className={n <= Math.round(averageRating) ? "text-yellow-400" : "text-gray-300"}
+                    >
+                      ★
+                    </span>
+                  ))}
+                  <span className="ml-1 text-gray-500 text-xs">{averageRating}</span>
+                </>
+              ) : (
+                <span className="text-gray-400 text-xs">Үнэлгээгүй</span>
               )}
             </div>
           </div>

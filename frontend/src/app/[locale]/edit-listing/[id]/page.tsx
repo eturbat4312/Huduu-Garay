@@ -20,7 +20,12 @@ type FormState = {
   title: string;
   description: string;
   price_per_night: string;
-  location_text: string;
+  location_city: string;
+  location_district: string;
+  location_khoroo: string;
+  location_extra: string;
+  location_building: string;
+  location_apartment: string;
   location_lat: number | null;
   location_lng: number | null;
   beds: number;
@@ -37,7 +42,12 @@ export default function EditListingPage() {
     title: "",
     description: "",
     price_per_night: "",
-    location_text: "",
+    location_city: "",
+    location_district: "",
+    location_khoroo: "",
+    location_extra: "",
+    location_building: "",
+    location_apartment: "",
     location_lat: null,
     location_lng: null,
     beds: 1,
@@ -83,7 +93,12 @@ export default function EditListingPage() {
         title: listing.title,
         description: listing.description,
         price_per_night: listing.price_per_night.toString(),
-        location_text: listing.location_text,
+        location_city: listing.location_city || "",
+        location_district: listing.location_district || "",
+        location_khoroo: listing.location_khoroo || "",
+        location_extra: listing.location_extra || "",
+        location_building: listing.location_building || "",
+        location_apartment: listing.location_apartment || "",
         location_lat: listing.location_lat,
         location_lng: listing.location_lng,
         beds: listing.beds,
@@ -259,35 +274,33 @@ export default function EditListingPage() {
                 className="border p-2 rounded w-full"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium">
-                {t(locale, "form_location")}
-              </label>
-              <input
-                name="location_text"
-                value={form.location_text}
-                onChange={handleInputChange}
-                className="border p-2 rounded w-full"
-              />
-            </div>
           </div>
 
-          {/* Map */}
+          {/* Map + address fields */}
           <LocationField
             value={{
-              location_text: form.location_text,
+              location_city: form.location_city,
+              location_district: form.location_district,
+              location_khoroo: form.location_khoroo,
+              location_extra: form.location_extra,
+              location_building: form.location_building,
+              location_apartment: form.location_apartment,
               location_lat: form.location_lat,
               location_lng: form.location_lng,
             }}
             onChange={(v) =>
               setForm((prev) => ({
                 ...prev,
-                location_text: v.location_text,
+                location_city: v.location_city,
+                location_district: v.location_district,
+                location_khoroo: v.location_khoroo,
+                location_extra: v.location_extra,
+                location_building: v.location_building,
+                location_apartment: v.location_apartment,
                 location_lat: v.location_lat,
                 location_lng: v.location_lng,
               }))
             }
-            placeholder="Жишээ: Архангай, Цэнхэр"
             language={locale}
           />
 

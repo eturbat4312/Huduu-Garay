@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib.admin.views.decorators import staff_member_required
+from core.admin import stats_view
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -9,6 +11,7 @@ from rest_framework_simplejwt.views import (
 )
 
 urlpatterns = [
+    path("admin/stats/", staff_member_required(stats_view), name="admin-stats"),
     path("admin/", admin.site.urls),
     path("api/", include("core.urls")),  # core app API-ууд
     # JWT

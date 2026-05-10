@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import {
   fetchUnreadNotifications,
   markAllNotificationsAsRead,
@@ -28,6 +29,9 @@ export function NotificationProvider({
 }: {
   children: React.ReactNode;
 }) {
+  // Claude: only poll when user is logged in — avoids 401 loops for anonymous visitors
+  const { user } = useAuth();
+
   const [totalUnread, setTotalUnread] = useState(0);
   const [bookingUnread, setBookingUnread] = useState(0);
 
@@ -36,8 +40,8 @@ export function NotificationProvider({
       const res = await fetchUnreadNotifications();
       setTotalUnread(res.total_unread);
       setBookingUnread(res.booking_unread);
-    } catch (err) {
-      console.error("🔁 Notification fetch error", err);
+    } catch {
+      // silent — 401 is expected when logged out
     }
   };
 
@@ -46,26 +50,33 @@ export function NotificationProvider({
       await markAllNotificationsAsRead();
       setTotalUnread(0);
       setBookingUnread(0);
-    } catch (err) {
-      console.error("❌ Failed to mark all notifications as read", err);
+    } catch {
+      // ignore
     }
   };
 
   const markBookingAsRead = async () => {
     try {
       await markBookingNotificationsAsRead();
-      setTotalUnread((prev) => prev - bookingUnread); // нийтээс booking тоог хасна
+      // Claude: clamp to 0 to prevent negative count on race conditions
+      setTotalUnread((prev) => Math.max(0, prev - bookingUnread));
       setBookingUnread(0);
-    } catch (err) {
-      console.error("❌ Failed to mark booking notifications as read", err);
+    } catch {
+      // ignore
     }
   };
 
+  // Claude: only start polling when user is authenticated
   useEffect(() => {
-    refresh(); // эхэнд 1 удаа
-    const interval = setInterval(refresh, 60000); // 60 секунд тутам
+    if (!user) {
+      setTotalUnread(0);
+      setBookingUnread(0);
+      return;
+    }
+    refresh();
+    const interval = setInterval(refresh, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   return (
     <NotificationContext.Provider

@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import { t } from "@/lib/i18n";
 import LoadingButton from "@/components/LoadingButton"; // ⭐ CHANGE: импорт нэмсэн
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -60,13 +61,14 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin}>
           <label className="block text-gray-700 text-sm font-bold mb-2">
-            {t(locale, "username_label")}
+            {t(locale, "username_or_email_label")}
           </label>
           <input
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             className="w-full border border-gray-300 rounded px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-green-500"
+            placeholder={t(locale, "username_or_email_placeholder")}
             required
           />
 
@@ -90,6 +92,12 @@ export default function LoginPage() {
             className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
           />
         </form>
+
+        <div className="mt-3 text-center">
+          <Link href={`/${locale}/forgot-password`} className="text-sm text-gray-500 hover:text-green-600 hover:underline">
+            Нууц үгээ мартсан уу?
+          </Link>
+        </div>
 
         <div className="my-6 flex items-center justify-between">
           <hr className="w-2/5 border-gray-300" />

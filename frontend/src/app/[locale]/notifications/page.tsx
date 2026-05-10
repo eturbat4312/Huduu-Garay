@@ -18,13 +18,15 @@ type Notification = {
 };
 
 function getNotificationLink(n: Notification, locale: string): string {
-  if (
-    (n.type === "booking" ||
-      n.type === "booking_created" ||
-      n.type === "booking_cancelled") &&
-    n.related_booking
-  ) {
-    return `/${locale}/host-bookings/${n.related_booking}`;
+  if (n.related_booking) {
+    if (n.type === "booking_created" || n.type === "booking_cancelled") {
+      // Host-ийн notification
+      return `/${locale}/host-bookings/${n.related_booking}`;
+    }
+    if (n.type === "booking_confirmed") {
+      // Guest-ийн notification
+      return `/${locale}/bookings/${n.related_booking}`;
+    }
   }
   if ((n.type === "review" || n.type === "comment") && n.related_listing) {
     return `/${locale}/listings/${n.related_listing}`;
@@ -66,20 +68,26 @@ export default function NotificationsPage() {
         <p>{t(locale, "notifications.empty")}</p>
       ) : (
         <ul className="space-y-4">
+          {/* Claude: unread items have blue left border + bold text + light bg */}
           {notifications.map((n) => {
             const href = getNotificationLink(n, locale);
+            const isUnread = !n.is_read;
             return (
               <li
                 key={n.id}
-                className="border p-4 rounded bg-white shadow hover:bg-gray-50 transition cursor-pointer"
+                className={`border rounded shadow hover:bg-gray-50 transition cursor-pointer flex items-start gap-3 p-4 ${
+                  isUnread ? "bg-blue-50 border-l-4 border-l-blue-500" : "bg-white"
+                }`}
               >
-                <Link href={href}>
-                  <span className="block">
-                    <p className="text-sm text-gray-800">{n.message}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {new Date(n.created_at).toLocaleString()}
-                    </p>
-                  </span>
+                {/* Claude: unread dot indicator */}
+                <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${isUnread ? "bg-blue-500" : "bg-transparent"}`} />
+                <Link href={href} className="flex-1">
+                  <p className={`text-sm ${isUnread ? "font-semibold text-gray-900" : "text-gray-700"}`}>
+                    {n.message}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {new Date(n.created_at).toLocaleString()}
+                  </p>
                 </Link>
               </li>
             );

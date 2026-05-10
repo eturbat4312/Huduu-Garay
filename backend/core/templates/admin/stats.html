@@ -1,0 +1,154 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<style>
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; }
+  .stat-card .label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+  .stat-card .sub { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .green { color: #16a34a; }
+  .blue { color: #2563eb; }
+  .purple { color: #7c3aed; }
+  .orange { color: #ea580c; }
+  .section-title { font-size: 16px; font-weight: 600; margin: 24px 0 12px; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
+  th { background: #f8fafc; padding: 10px 14px; text-align: left; font-size: 12px; text-transform: uppercase; color: #64748b; }
+  td { padding: 10px 14px; border-top: 1px solid #f1f5f9; font-size: 14px; }
+  .bar-wrap { background: #f1f5f9; border-radius: 4px; height: 8px; margin-top: 4px; }
+  .bar { background: #16a34a; height: 8px; border-radius: 4px; }
+</style>
+
+<h1 style="margin-bottom:8px">📊 Статистик тайлан</h1>
+<p style="color:#64748b;margin-bottom:24px">Бүх цагийн нийт болон энэ сарын мэдээлэл</p>
+
+<p class="section-title">💰 Санхүүгийн тайлан — нийт</p>
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="label">Нийт захиалгын дүн</div>
+    <div class="value green">₮{{ total_revenue|floatformat:0 }}</div>
+    <div class="sub">Цуцлагдаагүй захиалга</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Guest-ийн шимтгэл</div>
+    <div class="value blue">₮{{ total_guest_fees|floatformat:0 }}</div>
+    <div class="sub">Guest-ээс авсан 10%</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Host-ийн шимтгэл</div>
+    <div class="value purple">₮{{ total_host_fees|floatformat:0 }}</div>
+    <div class="sub">Host-оос авсан 10%</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Платформын нийт орлого</div>
+    <div class="value orange">₮{{ platform_total|floatformat:0 }}</div>
+    <div class="sub">Guest + Host шимтгэл</div>
+  </div>
+</div>
+
+<p class="section-title">📅 Энэ сарын тайлан</p>
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="label">Захиалгын дүн</div>
+    <div class="value green">₮{{ month_revenue|floatformat:0 }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Guest шимтгэл</div>
+    <div class="value blue">₮{{ month_guest_fees|floatformat:0 }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Host шимтгэл</div>
+    <div class="value purple">₮{{ month_host_fees|floatformat:0 }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Платформын орлого</div>
+    <div class="value orange">₮{{ month_platform|floatformat:0 }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Захиалгын тоо</div>
+    <div class="value blue">{{ month_booking_count }}</div>
+  </div>
+</div>
+
+<p class="section-title">👥 Хэрэглэгч</p>
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="label">Нийт хэрэглэгч</div>
+    <div class="value blue">{{ total_users }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Host</div>
+    <div class="value green">{{ total_hosts }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Guest</div>
+    <div class="value purple">{{ total_guests }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Энэ сарын шинэ бүртгэл</div>
+    <div class="value orange">{{ new_users_month }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Хүлээгдэж буй host хүсэлт</div>
+    <div class="value orange">{{ pending_applications }}</div>
+    {% if pending_applications > 0 %}
+    <div class="sub"><a href="/admin/core/hostapplication/?status__exact=pending">Харах →</a></div>
+    {% endif %}
+  </div>
+</div>
+
+<p class="section-title">📋 Захиалга</p>
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="label">Нийт захиалга</div>
+    <div class="value blue">{{ total_bookings }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Идэвхтэй</div>
+    <div class="value green">{{ active_bookings }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Цуцлагдсан</div>
+    <div class="value" style="color:#dc2626">{{ cancelled_bookings }}</div>
+  </div>
+</div>
+
+<p class="section-title">📈 Сүүлийн 6 сарын захиалга</p>
+<table>
+  <thead>
+    <tr>
+      <th>Сар</th>
+      <th>Захиалгын тоо</th>
+      <th>Нийт дүн</th>
+      <th>Платформын орлого (20%)</th>
+      <th>График</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in monthly_data %}
+    {% with max_revenue=monthly_data.0.revenue %}
+    <tr>
+      <td>{{ row.month }}</td>
+      <td>{{ row.count }}</td>
+      <td>₮{{ row.revenue|floatformat:0 }}</td>
+      <td>₮{{ row.platform|floatformat:0 }}</td>
+      <td style="min-width:120px">
+        <div class="bar-wrap">
+          {% if row.revenue > 0 %}
+          <div class="bar" style="width:{{ row.count|default:0 }}0%"></div>
+          {% endif %}
+        </div>
+      </td>
+    </tr>
+    {% endwith %}
+    {% empty %}
+    <tr><td colspan="5" style="color:#94a3b8;text-align:center">Мэдээлэл байхгүй</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div style="margin-top:24px">
+  <a href="/admin/core/booking/" style="margin-right:12px; color:#2563eb">→ Бүх захиалга харах</a>
+  <a href="/admin/core/customuser/" style="margin-right:12px; color:#2563eb">→ Хэрэглэгчид</a>
+  <a href="/admin/core/hostapplication/" style="color:#2563eb">→ Host хүсэлтүүд</a>
+</div>
+{% endblock %}
