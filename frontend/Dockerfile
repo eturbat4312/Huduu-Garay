@@ -1,23 +1,33 @@
-FROM node:18
+FROM node:18-alpine AS builder
 
-# Optional: Fix for lightningcss
-RUN apt-get update && apt-get install -y libc6
+RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
 COPY package*.json ./
 COPY .env.local .env.local
 
-
-# install dependencies including lightningcss binary
-RUN npm install
+RUN npm ci
 
 COPY . .
 
-# build
 RUN npm run build
+
+# Production image
+FROM node:18-alpine AS runner
+
+WORKDIR /app
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/.env.local .env.local
+
+USER nextjs
 
 EXPOSE 3000
 
-# change to production mode if needed:
-CMD ["npm", "run", "start"]
+CMD ["node", "server.js"]

@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const isDev = process.env.NODE_ENV !== "production";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   reactStrictMode: true,
   images: {
     domains: ["localhost", "127.0.0.1", "tanaid-honoy.mn", "www.tanaid-honoy.mn"],
