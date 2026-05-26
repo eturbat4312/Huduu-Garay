@@ -26,7 +26,7 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/.env.local .env.local
 
-RUN mkdir -p .next/cache && chown -R nextjs:nodejs .next
+RUN mkdir -p .next/cache && chown -R nextjs:nodejs .next .env.local
 
 USER nextjs
 
