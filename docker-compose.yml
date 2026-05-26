@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: huduu
       POSTGRES_USER: huduu_user
-      POSTGRES_PASSWORD: markhoyor
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     # порт нээхгүй — зөвхөн internal network дотор
     restart: always
 
