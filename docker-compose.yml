@@ -29,7 +29,6 @@ services:
   frontend:
     build:
       context: ./frontend
-    command: sh -c "npm run build && npm start"
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
