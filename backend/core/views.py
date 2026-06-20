@@ -761,7 +761,11 @@ class ListingDeleteView(APIView):
 
 class ReviewCreateListView(generics.ListCreateAPIView):
     serializer_class = ReviewSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
         listing_id = self.kwargs.get("listing_id")

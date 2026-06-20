@@ -43,6 +43,7 @@ export default function ListingDetailPage() {
   );
   const [isFavorited, setIsFavorited] = useState(false);
   const [bookedDates, setBookedDates] = useState<BookingDay[]>([]);
+  const [mapUnavailable, setMapUnavailable] = useState(false);
 
   const isOwner = user && listing?.host?.id === user.id;
 
@@ -96,16 +97,27 @@ export default function ListingDetailPage() {
     if (!listing || !mapRef.current || map.current) return;
     if (!listing.location_lat || !listing.location_lng) return;
 
-    map.current = new maplibregl.Map({
-      container: mapRef.current,
-      style: `https://api.maptiler.com/maps/streets/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`,
-      center: [listing.location_lng, listing.location_lat],
-      zoom: 10,
-    });
+    try {
+      map.current = new maplibregl.Map({
+        container: mapRef.current,
+        style: `https://api.maptiler.com/maps/streets/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`,
+        center: [listing.location_lng, listing.location_lat],
+        zoom: 10,
+      });
 
-    new maplibregl.Marker()
-      .setLngLat([listing.location_lng, listing.location_lat])
-      .addTo(map.current);
+      new maplibregl.Marker()
+        .setLngLat([listing.location_lng, listing.location_lat])
+        .addTo(map.current);
+    } catch (error) {
+      console.warn("Map is unavailable in this browser.", error);
+      setMapUnavailable(true);
+      map.current = null;
+    }
+
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
   }, [listing]);
 
   // ---------- Helpers ----------
@@ -405,10 +417,16 @@ export default function ListingDetailPage() {
             <h3 className="text-lg font-bold mb-2">
               {t(locale as string, "location_map") || "Байршил"}
             </h3>
-            <div
-              className="h-72 w-full rounded-xl overflow-hidden shadow"
-              ref={mapRef}
-            />
+            {mapUnavailable ? (
+              <div className="flex h-72 w-full items-center justify-center rounded-xl bg-gray-100 px-4 text-center text-sm text-gray-600 shadow">
+                Газрын зураг таны browser дээр ачаалж чадсангүй.
+              </div>
+            ) : (
+              <div
+                className="h-72 w-full rounded-xl overflow-hidden shadow"
+                ref={mapRef}
+              />
+            )}
           </div>
         )}
 

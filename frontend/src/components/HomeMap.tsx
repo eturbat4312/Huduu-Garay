@@ -1,7 +1,7 @@
 // filename: src/components/HomeMap.tsx
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Listing } from "@/types";
@@ -11,6 +11,7 @@ type Props = { listings: Listing[]; locale?: string };
 export default function HomeMap({ listings, locale = "mn" }: Props) {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const map = useRef<maplibregl.Map | null>(null);
+  const [mapUnavailable, setMapUnavailable] = useState(false);
   const refs = useRef<
     Record<number, { marker: maplibregl.Marker; popup: maplibregl.Popup }>
   >({});
@@ -21,16 +22,23 @@ export default function HomeMap({ listings, locale = "mn" }: Props) {
   // Init map
   useEffect(() => {
     if (map.current || !mapRef.current) return;
-    map.current = new maplibregl.Map({
-      container: mapRef.current,
-      style: `https://api.maptiler.com/maps/streets/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`,
-      center: [106.917, 47.918],
-      zoom: 7,
-    });
-    map.current.addControl(
-      new maplibregl.NavigationControl({ showZoom: true }),
-      "bottom-right"
-    );
+    try {
+      map.current = new maplibregl.Map({
+        container: mapRef.current,
+        style: `https://api.maptiler.com/maps/streets/style.json?key=${process.env.NEXT_PUBLIC_MAPTILER_KEY}`,
+        center: [106.917, 47.918],
+        zoom: 7,
+      });
+      map.current.addControl(
+        new maplibregl.NavigationControl({ showZoom: true }),
+        "bottom-right"
+      );
+    } catch (error) {
+      console.warn("Map is unavailable in this browser.", error);
+      setMapUnavailable(true);
+      map.current = null;
+      return;
+    }
 
     // Card -> open popup on map
     const openFromCard = (e: Event) => {
@@ -46,7 +54,11 @@ export default function HomeMap({ listings, locale = "mn" }: Props) {
       pair.popup.addTo(map.current);
     };
     window.addEventListener("listing:card-click", openFromCard);
-    return () => window.removeEventListener("listing:card-click", openFromCard);
+    return () => {
+      window.removeEventListener("listing:card-click", openFromCard);
+      map.current?.remove();
+      map.current = null;
+    };
   }, []);
 
   // Draw markers whenever listings change
@@ -135,6 +147,15 @@ export default function HomeMap({ listings, locale = "mn" }: Props) {
       refs.current[l.id] = { marker, popup };
     });
   }, [listings, locale]);
+
+  if (mapUnavailable) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-gray-100 px-4 text-center text-sm text-gray-600">
+        Газрын зураг таны browser дээр ачаалж чадсангүй. Заруудаа жагсаалтаас
+        сонгоно уу.
+      </div>
+    );
+  }
 
   return <div ref={mapRef} className="w-full h-full" />;
 }
