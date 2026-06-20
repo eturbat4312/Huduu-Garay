@@ -75,7 +75,7 @@ export default function ListingsPage() {
                       ? listing.images[0].image.startsWith("http")
                         ? listing.images[0].image
                         : `${MEDIA_URL}${listing.images[0].image}`
-                      : "/placeholder.jpg"
+                      : "/images/hero.png"
                   }
                   alt={listing.title}
                   width={400}
