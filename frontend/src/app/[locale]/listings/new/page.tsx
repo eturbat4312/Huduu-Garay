@@ -16,6 +16,31 @@ import LocationField from "@/components/LocationField"; // 🆕 MAP-PIN КОМП
 type Category = { id: number; name: string };
 type Amenity = { id: number; name: string };
 
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const IMAGE_TYPE_ERROR =
+  "JPG, PNG, WebP эсвэл GIF форматтай зураг оруулна уу. SVG файл дэмжигдэхгүй.";
+
+const getApiErrorMessage = (err: unknown, fallback: string) => {
+  if (typeof err !== "object" || err === null || !("response" in err)) {
+    return fallback;
+  }
+
+  const response = (err as { response?: { data?: unknown } }).response;
+  const data = response?.data;
+
+  if (typeof data === "string") return data;
+  if (typeof data === "object" && data !== null && "error" in data) {
+    const message = (data as { error?: unknown }).error;
+    if (typeof message === "string") return message;
+  }
+  if (typeof data === "object" && data !== null && "detail" in data) {
+    const message = (data as { detail?: unknown }).detail;
+    if (typeof message === "string") return message;
+  }
+
+  return fallback;
+};
+
 export default function CreateListingPage() {
   const router = useRouter();
   const { locale } = useParams();
@@ -45,6 +70,8 @@ export default function CreateListingPage() {
   const [images, setImages] = useState<File[]>([]);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [bannerError, setBannerError] = useState("");
+  const [imageError, setImageError] = useState("");
 
   // ─── Load options ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -54,14 +81,28 @@ export default function CreateListingPage() {
 
   // ─── Images ─────────────────────────────────────────────────────────────────
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setBannerError("");
+    setImageError("");
     const files = e.target.files;
     if (!files) return;
     const newFiles = Array.from(files);
+
+    const invalidFile = newFiles.find(
+      (file) => !ALLOWED_IMAGE_TYPES.includes(file.type)
+    );
+    if (invalidFile) {
+      setImageError(IMAGE_TYPE_ERROR);
+      e.target.value = "";
+      return;
+    }
+
     if (images.length + newFiles.length > 6) {
-      alert(t(locale as string, "max_images_warning"));
+      setImageError(t(locale as string, "max_images_warning"));
+      e.target.value = "";
       return;
     }
     setImages((prev) => [...prev, ...newFiles]);
+    e.target.value = "";
   };
 
   const removeImage = (index: number) => {
@@ -82,6 +123,8 @@ export default function CreateListingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
+    setBannerError("");
+    setImageError("");
     setSubmitting(true);
 
     const plainPrice = Number(price.replace(/,/g, ""));
@@ -144,10 +187,16 @@ export default function CreateListingPage() {
 
       router.push(`/${locale}/listings/${listingId}`);
     } catch (err: unknown) {
-      const error = err as { response?: { data?: unknown }; message?: string };
+      const message = getApiErrorMessage(
+        err,
+        "Зар үүсгэх үед алдаа гарлаа. Мэдээллээ шалгаад дахин оролдоно уу."
+      );
+      setBannerError(message);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       console.error(
         "Зар үүсгэж чадсангүй",
-        error.response?.data || error.message
+        (err as { response?: { data?: unknown }; message?: string }).response
+          ?.data || (err as { message?: string }).message
       );
     } finally {
       setSubmitting(false);
@@ -163,6 +212,11 @@ export default function CreateListingPage() {
       <h1 className="text-2xl font-bold mb-6">
         {t(locale as string, "create_listing_title")}
       </h1>
+      {bannerError && (
+        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {bannerError}
+        </div>
+      )}
 
       <form
         onSubmit={handleSubmit}
@@ -321,11 +375,14 @@ export default function CreateListingPage() {
             </h2>
             <input
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               multiple
               className="block text-sm text-gray-700 border border-dashed border-gray-300 rounded-lg w-full p-4 cursor-pointer hover:bg-gray-50"
               onChange={handleImageChange}
             />
+            {imageError && (
+              <p className="mt-2 text-sm text-red-600">{imageError}</p>
+            )}
             {!!images.length && (
               <div className="grid grid-cols-3 gap-2 mt-3">
                 {images.map((file, i) => (

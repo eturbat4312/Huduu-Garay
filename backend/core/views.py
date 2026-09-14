@@ -7,7 +7,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
 from datetime import timedelta
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from io import BytesIO
 from django.core.files.base import ContentFile
 from rest_framework.exceptions import ValidationError
@@ -70,6 +70,12 @@ from .serializers import (
 
 User = get_user_model()
 PAYMENT_HOLD_MINUTES = 15
+ALLOWED_LISTING_IMAGE_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+}
 
 # ---------------------- AUTH ----------------------
 
@@ -259,12 +265,38 @@ class ListingImageUploadView(APIView):
         try:
             from .models import Listing
 
-            listing = Listing.objects.get(id=listing_id)
+            listing = Listing.objects.get(id=listing_id, host=request.user)
 
-            created_images = []
+            processed_images = []
 
             for uploaded_image in images:
-                image = Image.open(uploaded_image)
+                if uploaded_image.content_type not in ALLOWED_LISTING_IMAGE_TYPES:
+                    return Response(
+                        {
+                            "error": (
+                                "Зөвхөн JPG, PNG, WebP эсвэл GIF зураг оруулна уу. "
+                                "SVG файл дэмжигдэхгүй."
+                            )
+                        },
+                        status=400,
+                    )
+
+                try:
+                    image = Image.open(uploaded_image)
+                    image.verify()
+                    uploaded_image.seek(0)
+                    image = Image.open(uploaded_image)
+                except (UnidentifiedImageError, OSError):
+                    return Response(
+                        {
+                            "error": (
+                                "Зураг унших боломжгүй байна. JPG, PNG, WebP эсвэл GIF "
+                                "форматтай зураг оруулна уу."
+                            )
+                        },
+                        status=400,
+                    )
+
                 max_size = (1024, 768)
                 image.thumbnail(max_size)
 
@@ -273,7 +305,10 @@ class ListingImageUploadView(APIView):
                 buffer.seek(0)
 
                 final_image_file = ContentFile(buffer.read(), name="listing.jpg")
+                processed_images.append(final_image_file)
 
+            created_images = []
+            for final_image_file in processed_images:
                 new_image = ListingImage.objects.create(
                     listing=listing, image=final_image_file
                 )
@@ -284,6 +319,10 @@ class ListingImageUploadView(APIView):
             )
             return Response(serializer.data, status=201)
 
+        except Listing.DoesNotExist:
+            return Response(
+                {"error": "Зар олдсонгүй эсвэл таны зар биш байна."}, status=404
+            )
         except Exception as e:
             return Response(
                 {"error": f"Зураг боловсруулахад алдаа гарлаа: {str(e)}"},
@@ -637,6 +676,172 @@ def _payment_check_is_paid(check_response):
     return bool(rows)
 
 
+def _get_booking_party_details(booking, requested_dates):
+    listing = booking.listing
+    total_nights = len(requested_dates)
+    total_price = int(booking.total_price or 0)
+    service_fee = int(booking.service_fee or 0)
+    guest_total = total_price + service_fee
+    host_fee = int((Decimal(total_price) * Decimal("0.10")).quantize(Decimal("1")))
+    host_payout = total_price - host_fee
+    host_app = getattr(listing.host, "hostapplication", None)
+
+    return {
+        "listing": listing,
+        "total_nights": total_nights,
+        "total_price": total_price,
+        "service_fee": service_fee,
+        "guest_total": guest_total,
+        "host_fee": host_fee,
+        "host_payout": host_payout,
+        "host_name": host_app.full_name if host_app else listing.host.username,
+        "host_phone": host_app.phone_number
+        if host_app
+        else getattr(listing.host, "phone", "") or "—",
+    }
+
+
+def _create_notification_once(user, notif_type, related_booking, message):
+    if Notification.objects.filter(
+        user=user, type=notif_type, related_booking=related_booking
+    ).exists():
+        return
+
+    Notification.objects.create(
+        user=user,
+        type=notif_type,
+        related_booking=related_booking,
+        message=message,
+    )
+
+
+def _notify_confirmed_booking(booking, payment, requested_dates):
+    details = _get_booking_party_details(booking, requested_dates)
+    listing = details["listing"]
+    check_in = booking.check_in.strftime("%Y-%m-%d")
+    check_out = booking.check_out.strftime("%Y-%m-%d")
+
+    _create_notification_once(
+        user=listing.host,
+        notif_type="booking_created",
+        related_booking=booking,
+        message=(
+            f"Шинэ захиалга #{booking.id} — {booking.full_name} таны '{listing.title}' "
+            f"байранд {check_in} – {check_out} ({details['total_nights']} хонох), "
+            f"{booking.guest_count} зочин. Таны авах мөнгө: ₮{details['host_payout']:,}"
+        ),
+    )
+
+    _create_notification_once(
+        user=booking.guest,
+        notif_type="booking_confirmed",
+        related_booking=booking,
+        message=(
+            f"Захиалга #{booking.id} баталгаажлаа — '{listing.title}', "
+            f"{check_in} – {check_out} ({details['total_nights']} хонох). "
+            f"Нийт төлсөн дүн: ₮{details['guest_total']:,}"
+        ),
+    )
+
+    admin_message = (
+        f"Шинэ төлбөртэй захиалга #{booking.id} баталгаажлаа. "
+        f"Зар: '{listing.title}' #{listing.id}. "
+        f"Host: {details['host_name']} ({listing.host.username}), утас: {details['host_phone']}. "
+        f"Guest: {booking.full_name} ({booking.guest.username}), утас: {booking.phone_number}. "
+        f"Огноо: {check_in} – {check_out}, {details['total_nights']} хонох, "
+        f"{booking.guest_count} зочин. Байршил: {listing.location_city}, "
+        f"{listing.location_district}, {listing.location_khoroo}. "
+        f"Үндсэн үнэ: ₮{details['total_price']:,}, service fee: ₮{details['service_fee']:,}, "
+        f"нийт төлсөн: ₮{details['guest_total']:,}, host авах: ₮{details['host_payout']:,}. "
+        f"Payment #{payment.id}, invoice: {payment.invoice_id or payment.sender_invoice_no}."
+    )
+    admin_users = User.objects.filter(is_staff=True, is_active=True)
+    for admin_user in admin_users:
+        _create_notification_once(
+            user=admin_user,
+            notif_type="admin_booking",
+            related_booking=booking,
+            message=admin_message,
+        )
+
+    email_context = {
+        "booking_id": booking.id,
+        "payment_id": payment.id,
+        "invoice_id": payment.invoice_id or payment.sender_invoice_no,
+        "listing_id": listing.id,
+        "listing_title": listing.title,
+        "location_city": listing.location_city,
+        "location_district": listing.location_district,
+        "location_khoroo": listing.location_khoroo,
+        "location_extra": listing.location_extra,
+        "location_building": listing.location_building,
+        "location_apartment": listing.location_apartment,
+        "location_lat": listing.location_lat,
+        "location_lng": listing.location_lng,
+        "location": ", ".join(
+            filter(
+                None,
+                [
+                    listing.location_city,
+                    listing.location_district,
+                    listing.location_khoroo,
+                    listing.location_extra,
+                    listing.location_building,
+                    listing.location_apartment,
+                ],
+            )
+        ),
+        "check_in": check_in,
+        "check_out": check_out,
+        "total_nights": details["total_nights"],
+        "guest_count": booking.guest_count,
+        "full_name": booking.full_name,
+        "guest_full_name": booking.full_name,
+        "guest_username": booking.guest.username,
+        "guest_phone": booking.phone_number,
+        "phone_number": booking.phone_number,
+        "host_name": details["host_name"],
+        "host_username": listing.host.username,
+        "host_phone": details["host_phone"],
+        "total_price": details["total_price"],
+        "guest_fee": details["service_fee"],
+        "service_fee": details["service_fee"],
+        "guest_total": details["guest_total"],
+        "host_fee": details["host_fee"],
+        "host_payout": details["host_payout"],
+    }
+
+    try:
+        send_notification_email(
+            user=listing.host,
+            notif_type="booking_created",
+            context=email_context,
+        )
+    except Exception as e:
+        print(f"❌ Host email илгээхэд алдаа гарлаа: {e}")
+
+    try:
+        send_notification_email(
+            user=booking.guest,
+            notif_type="booking_confirmed",
+            context=email_context,
+        )
+    except Exception as e:
+        print(f"❌ Guest email илгээхэд алдаа гарлаа: {e}")
+
+    for admin_user in admin_users:
+        if not admin_user.email:
+            continue
+        try:
+            send_notification_email(
+                user=admin_user,
+                notif_type="admin_booking_confirmed",
+                context=email_context,
+            )
+        except Exception as e:
+            print(f"❌ Admin email илгээхэд алдаа гарлаа: {e}")
+
+
 def _confirm_paid_payment(payment, raw_response, request=None):
     booking = Booking.objects.select_for_update().get(id=payment.booking_id)
 
@@ -684,6 +889,7 @@ def _confirm_paid_payment(payment, raw_response, request=None):
     BookingHold.objects.filter(
         booking=booking, listing=booking.listing, date__in=requested_dates
     ).delete()
+    _notify_confirmed_booking(booking, payment, requested_dates)
     return payment, None
 
 

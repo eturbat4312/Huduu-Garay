@@ -19,7 +19,11 @@ type Notification = {
 
 function getNotificationLink(n: Notification, locale: string): string {
   if (n.related_booking) {
-    if (n.type === "booking_created" || n.type === "booking_cancelled") {
+    if (
+      n.type === "booking_created" ||
+      n.type === "booking_cancelled" ||
+      n.type === "admin_booking"
+    ) {
       // Host-ийн notification
       return `/${locale}/host-bookings/${n.related_booking}`;
     }

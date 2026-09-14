@@ -284,6 +284,7 @@ class Notification(models.Model):
     NOTIFICATION_TYPES = [
         ("booking_created", "Шинэ захиалга (хост)"),
         ("booking_confirmed", "Захиалга баталгаажсан (зочин)"),
+        ("admin_booking", "Шинэ захиалга (админ)"),
         ("booking_cancelled", "Захиалга цуцлагдсан"),
         ("host_approved", "Хост эрх батлагдсан"),
         ("host_rejected", "Хост эрх татгалзагдсан"),

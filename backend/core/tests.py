@@ -1,13 +1,25 @@
 from datetime import date, timedelta
+from io import BytesIO
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.test import TestCase, override_settings
 from django.utils import timezone
+from PIL import Image
 from rest_framework.test import APIClient
 
-from .models import Availability, Booking, BookingHold, Category, Listing, Payment
+from .models import (
+    Availability,
+    Booking,
+    BookingHold,
+    Category,
+    Listing,
+    ListingImage,
+    Notification,
+    Payment,
+)
 from .services.qpay import QPayClient, QPayConfig, QPayConfigurationError
 
 
@@ -153,6 +165,85 @@ class QPayClientTests(TestCase):
         )
         self.assertEqual(session.calls[1]["json"]["object_type"], "INVOICE")
         self.assertEqual(session.calls[1]["json"]["object_id"], "qpay-invoice-1")
+
+
+class ListingImageUploadTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.host = User.objects.create_user(
+            username="imagehost",
+            email="imagehost@example.com",
+            password="pass12345",
+            is_host=True,
+        )
+        self.other_host = User.objects.create_user(
+            username="otherimagehost",
+            email="otherimagehost@example.com",
+            password="pass12345",
+            is_host=True,
+        )
+        self.category = Category.objects.create(name="Image test")
+        self.listing = Listing.objects.create(
+            host=self.host,
+            category=self.category,
+            title="Image upload listing",
+            description="A listing used for image upload tests",
+            price_per_night=100000,
+            max_guests=2,
+            beds=1,
+            location_city="Ulaanbaatar",
+            location_district="Sukhbaatar",
+        )
+        self.other_listing = Listing.objects.create(
+            host=self.other_host,
+            category=self.category,
+            title="Other host listing",
+            description="A listing owned by another host",
+            price_per_night=100000,
+            max_guests=2,
+            beds=1,
+            location_city="Ulaanbaatar",
+            location_district="Sukhbaatar",
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.host)
+
+    def _jpeg_file(self):
+        buffer = BytesIO()
+        Image.new("RGB", (16, 16), color="white").save(buffer, format="JPEG")
+        buffer.seek(0)
+        return SimpleUploadedFile(
+            "test.jpg",
+            buffer.read(),
+            content_type="image/jpeg",
+        )
+
+    def test_upload_rejects_svg_with_friendly_error(self):
+        svg = SimpleUploadedFile(
+            "bad.svg",
+            b"<svg xmlns='http://www.w3.org/2000/svg'></svg>",
+            content_type="image/svg+xml",
+        )
+
+        response = self.client.post(
+            "/api/listing-images/",
+            {"listing": self.listing.id, "images": [svg]},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("SVG", response.data["error"])
+        self.assertEqual(ListingImage.objects.count(), 0)
+
+    def test_upload_requires_listing_owner(self):
+        response = self.client.post(
+            "/api/listing-images/",
+            {"listing": self.other_listing.id, "images": [self._jpeg_file()]},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(ListingImage.objects.count(), 0)
 
 
 class PaymentFoundationTests(TestCase):
@@ -313,6 +404,12 @@ class PaymentApiSkeletonTests(TestCase):
             username="otherpayguest",
             email="otherpayguest@example.com",
             password="pass12345",
+        )
+        self.admin_user = User.objects.create_user(
+            username="payadmin",
+            email="payadmin@example.com",
+            password="pass12345",
+            is_staff=True,
         )
         self.category = Category.objects.create(name="Payment cabin")
         self.listing = Listing.objects.create(
@@ -514,7 +611,9 @@ class PaymentApiSkeletonTests(TestCase):
             amount=booking.total_price + booking.service_fee,
         )
 
-        with patch("core.views.QPayClient") as qpay_client_class:
+        with patch("core.views.QPayClient") as qpay_client_class, patch(
+            "core.views.send_notification_email"
+        ) as send_email:
             qpay_client_class.return_value.check_payment.return_value = {
                 "count": 1,
                 "rows": [{"payment_id": "payment-manual"}],
@@ -528,6 +627,49 @@ class PaymentApiSkeletonTests(TestCase):
         payment.refresh_from_db()
         self.assertEqual(booking.status, "confirmed")
         self.assertEqual(payment.status, Payment.STATUS_PAID)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.host,
+                type="booking_created",
+                related_booking=booking,
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.guest,
+                type="booking_confirmed",
+                related_booking=booking,
+            ).exists()
+        )
+        admin_notification = Notification.objects.get(
+            user=self.admin_user,
+            type="admin_booking",
+            related_booking=booking,
+        )
+        self.assertIn(str(booking.id), admin_notification.message)
+        self.assertIn(self.listing.title, admin_notification.message)
+        self.assertIn("Payment", admin_notification.message)
+        host_notification = Notification.objects.get(
+            user=self.host,
+            type="booking_created",
+            related_booking=booking,
+        )
+        guest_notification = Notification.objects.get(
+            user=self.guest,
+            type="booking_confirmed",
+            related_booking=booking,
+        )
+        self.assertNotEqual(host_notification.message, guest_notification.message)
+        self.assertNotEqual(host_notification.message, admin_notification.message)
+        self.assertNotEqual(guest_notification.message, admin_notification.message)
+        self.assertEqual(send_email.call_count, 3)
+        sent_users = {call.kwargs["user"] for call in send_email.call_args_list}
+        self.assertEqual(sent_users, {self.host, self.guest, self.admin_user})
+        notif_types = {call.kwargs["notif_type"] for call in send_email.call_args_list}
+        self.assertEqual(
+            notif_types,
+            {"booking_created", "booking_confirmed", "admin_booking_confirmed"},
+        )
         self.assertEqual(BookingHold.objects.filter(booking=booking).count(), 0)
 
     @override_settings(QPAY_ENABLED=True)

@@ -33,6 +33,22 @@ export default function PaymentContent() {
   const [checking, setChecking] = useState(false);
   const [mockConfirming, setMockConfirming] = useState(false);
   const [error, setError] = useState("");
+  const [redirecting, setRedirecting] = useState(false);
+
+  const redirectIfPaid = useCallback(
+    (nextPayment: Payment) => {
+      if (
+        nextPayment.status === "paid" &&
+        nextPayment.booking_status === "confirmed"
+      ) {
+        setRedirecting(true);
+        router.push(`/${locale}/booking-success?booking=${nextPayment.booking_id}`);
+        return true;
+      }
+      return false;
+    },
+    [locale, router]
+  );
 
   const fetchPayment = useCallback(async () => {
     if (!paymentId) {
@@ -44,9 +60,7 @@ export default function PaymentContent() {
     try {
       const res = await api.get<Payment>(`/payments/${paymentId}/`);
       setPayment(res.data);
-      if (res.data.status === "paid" && res.data.booking_status === "confirmed") {
-        router.push(`/${locale}/booking-success?booking=${res.data.booking_id}`);
-      }
+      redirectIfPaid(res.data);
     } catch (err) {
       const msg = axios.isAxiosError(err)
         ? err.response?.data?.error || "Төлбөрийн мэдээлэл авахад алдаа гарлаа."
@@ -55,31 +69,44 @@ export default function PaymentContent() {
     } finally {
       setLoading(false);
     }
-  }, [locale, paymentId, router]);
+  }, [paymentId, redirectIfPaid]);
 
   useEffect(() => {
     fetchPayment();
   }, [fetchPayment]);
 
-  const checkPayment = useCallback(async () => {
+  const checkPayment = useCallback(async (silent = false) => {
     if (!paymentId) return;
-    setChecking(true);
-    setError("");
+    if (!silent) {
+      setChecking(true);
+      setError("");
+    }
     try {
       const res = await api.post<Payment>(`/payments/${paymentId}/check/`);
       setPayment(res.data);
-      if (res.data.status === "paid" && res.data.booking_status === "confirmed") {
-        router.push(`/${locale}/booking-success?booking=${res.data.booking_id}`);
-      }
+      redirectIfPaid(res.data);
     } catch (err) {
+      if (silent) return;
       const msg = axios.isAxiosError(err)
         ? err.response?.data?.error || "Төлбөр шалгахад алдаа гарлаа."
         : "Төлбөр шалгахад алдаа гарлаа.";
       setError(msg);
     } finally {
-      setChecking(false);
+      if (!silent) {
+        setChecking(false);
+      }
     }
-  }, [locale, paymentId, router]);
+  }, [paymentId, redirectIfPaid]);
+
+  useEffect(() => {
+    if (!paymentId || payment?.status !== "pending") return undefined;
+
+    const intervalId = window.setInterval(() => {
+      void checkPayment(true);
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [checkPayment, payment?.status, paymentId]);
 
   const mockConfirm = useCallback(async () => {
     if (!paymentId) return;
@@ -125,6 +152,20 @@ export default function PaymentContent() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
       <h1 className="mb-4 text-2xl font-bold text-green-700">Төлбөр төлөх</h1>
+
+      {redirecting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-5 text-center shadow-xl">
+            <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-4 border-green-200 border-t-green-600" />
+            <div className="text-base font-semibold text-gray-900">
+              Төлбөр баталгаажлаа
+            </div>
+            <div className="mt-1 text-sm text-gray-600">
+              Захиалгын амжилтын хуудас руу шилжүүлж байна...
+            </div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -192,7 +233,7 @@ export default function PaymentContent() {
             <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 type="button"
-                onClick={checkPayment}
+                onClick={() => checkPayment()}
                 disabled={checking || payment.status !== "pending"}
                 className="rounded bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -211,9 +252,16 @@ export default function PaymentContent() {
               )}
             </div>
 
+            {payment.status === "pending" && (
+              <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-green-200 border-t-green-700" />
+                <span>Төлбөр автоматаар шалгаж байна...</span>
+              </div>
+            )}
+
             <p className="text-sm leading-6 text-gray-600">
-              Төлбөр төлөгдсөний дараа QPay callback эсвэл энэ шалгах товчоор
-              баталгаажиж, захиалга confirmed болно.
+              Төлбөр төлөгдсөний дараа автоматаар шалгаж, баталгаажмагц захиалгын
+              амжилтын хуудас руу шилжинэ.
             </p>
           </div>
         </div>

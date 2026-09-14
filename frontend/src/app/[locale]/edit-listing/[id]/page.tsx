@@ -16,6 +16,31 @@ type Amenity = { id: number; name: string; translation_key?: string };
 type Category = { id: number; name: string };
 type ListingImage = { id: number; image: string };
 
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const IMAGE_TYPE_ERROR =
+  "JPG, PNG, WebP эсвэл GIF форматтай зураг оруулна уу. SVG файл дэмжигдэхгүй.";
+
+const getApiErrorMessage = (err: unknown, fallback: string) => {
+  if (typeof err !== "object" || err === null || !("response" in err)) {
+    return fallback;
+  }
+
+  const response = (err as { response?: { data?: unknown } }).response;
+  const data = response?.data;
+
+  if (typeof data === "string") return data;
+  if (typeof data === "object" && data !== null && "error" in data) {
+    const message = (data as { error?: unknown }).error;
+    if (typeof message === "string") return message;
+  }
+  if (typeof data === "object" && data !== null && "detail" in data) {
+    const message = (data as { detail?: unknown }).detail;
+    if (typeof message === "string") return message;
+  }
+
+  return fallback;
+};
+
 type FormState = {
   title: string;
   description: string;
@@ -66,6 +91,8 @@ export default function EditListingPage() {
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [bannerError, setBannerError] = useState("");
+  const [imageError, setImageError] = useState("");
 
   const formatDate = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -160,8 +187,29 @@ export default function EditListingPage() {
   };
 
   const handleImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).slice(0, 6 - images.length);
+    setBannerError("");
+    setImageError("");
+    const selectedFiles = Array.from(e.target.files || []);
+
+    const invalidFile = selectedFiles.find(
+      (file) => !ALLOWED_IMAGE_TYPES.includes(file.type)
+    );
+    if (invalidFile) {
+      setImageError(IMAGE_TYPE_ERROR);
+      e.target.value = "";
+      return;
+    }
+
+    const remainingSlots = 6 - images.length - newImages.length;
+    if (selectedFiles.length > remainingSlots) {
+      setImageError(t(locale, "max_images_warning"));
+      e.target.value = "";
+      return;
+    }
+
+    const files = selectedFiles.slice(0, remainingSlots);
     setNewImages((prev) => [...prev, ...files]);
+    e.target.value = "";
   };
 
   const handleImageRemove = async (index: number) => {
@@ -175,6 +223,7 @@ export default function EditListingPage() {
         await api.delete(`/listing-images/${imageToDelete.id}/delete/`);
         setImages((prev) => prev.filter((_, i) => i !== index));
       } catch (err: unknown) {
+        setBannerError("Зураг устгах үед алдаа гарлаа. Дахин оролдоно уу.");
         console.error("Зураг устгах үед алдаа:", err);
       }
     }
@@ -205,6 +254,8 @@ export default function EditListingPage() {
 
   const handleSubmit = async () => {
     try {
+      setBannerError("");
+      setImageError("");
       setSaving(true);
 
       const payload = {
@@ -246,6 +297,12 @@ export default function EditListingPage() {
       alert(t(locale, "alert_saved_successfully"));
       router.push(`/${locale}/listings/${id}`);
     } catch (err: unknown) {
+      const message = getApiErrorMessage(
+        err,
+        "Зар хадгалах үед алдаа гарлаа. Мэдээллээ шалгаад дахин оролдоно уу."
+      );
+      setBannerError(message);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       console.error("Хадгалах үед алдаа:", err);
     } finally {
       setSaving(false);
@@ -257,6 +314,11 @@ export default function EditListingPage() {
       <h1 className="text-2xl font-bold mb-6">
         {t(locale, "edit_listing_title")}
       </h1>
+      {bannerError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {bannerError}
+        </div>
+      )}
 
       <div className="grid md:grid-cols-3 gap-8">
         {/* Зүүн талын үндсэн мэдээлэл */}
@@ -339,9 +401,12 @@ export default function EditListingPage() {
             <input
               type="file"
               multiple
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/gif"
               onChange={handleImageAdd}
             />
+            {imageError && (
+              <p className="mt-2 text-sm text-red-600">{imageError}</p>
+            )}
             <div className="flex flex-wrap gap-2 mt-2">
               {images.map((img, i) => (
                 <div key={i} className="relative">

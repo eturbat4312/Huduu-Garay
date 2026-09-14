@@ -79,6 +79,33 @@ def send_notification_email(user, notif_type, context):
             f"Асуулт байвал эзэнтэй шууд холбоо барина уу."
         )
 
+    elif notif_type == "admin_booking_confirmed":
+        subject = f"Шинэ төлбөртэй захиалга #{context['booking_id']} баталгаажлаа"
+        message = (
+            f"Шинэ төлбөртэй захиалга баталгаажлаа.\n\n"
+            f"{'─' * 40}\n"
+            f"Захиалгын дугаар: #{context['booking_id']}\n"
+            f"Payment ID: #{context['payment_id']}\n"
+            f"Invoice: {context['invoice_id']}\n"
+            f"Зар: {context['listing_title']} (#{context['listing_id']})\n"
+            f"Огноо: {context['check_in']} → {context['check_out']}\n"
+            f"Хоног: {context['total_nights']}\n"
+            f"Зочны тоо: {context['guest_count']}\n"
+            f"{'─' * 40}\n"
+            f"Guest: {context['guest_full_name']} ({context['guest_username']})\n"
+            f"Guest утас: {context['guest_phone']}\n"
+            f"Host: {context['host_name']} ({context['host_username']})\n"
+            f"Host утас: {context['host_phone']}\n"
+            f"{'─' * 40}\n"
+            f"Байршил: {context['location']}\n"
+            f"Байрны үнэ: ₮{context['total_price']:,}\n"
+            f"Service fee: ₮{context['service_fee']:,}\n"
+            f"Нийт төлсөн: ₮{context['guest_total']:,}\n"
+            f"Host авах: ₮{context['host_payout']:,}\n"
+            f"{'─' * 40}\n\n"
+            f"Admin dashboard дээр захиалгын дэлгэрэнгүйг шалгана уу."
+        )
+
     elif notif_type == "review":
         subject = "⭐ Шинэ сэтгэгдэл ирлээ"
         message = f"{context['guest_name']} таны '{context['listing_title']}' зар дээр сэтгэгдэл үлдээсэн байна."
