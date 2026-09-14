@@ -14,6 +14,12 @@ const toYMD = (d: Date) =>
     d.getDate()
   ).padStart(2, "0")}`;
 
+const calendarDayNumber = (d: Date) =>
+  Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000;
+
+const calendarNightDiff = (start: Date, end: Date) =>
+  Math.max(1, calendarDayNumber(end) - calendarDayNumber(start));
+
 const localeMap: Record<string, string> = {
   mn: "mn-MN",
   en: "en-US",
@@ -119,10 +125,7 @@ export default function CheckoutContent() {
 
   const totalNights = useMemo(() => {
     if (!checkInDate || !displayCheckOutDate) return 0;
-    const diff = Math.ceil(
-      (displayCheckOutDate.getTime() - checkInDate.getTime()) / 86400000
-    );
-    return Math.max(1, diff);
+    return calendarNightDiff(checkInDate, displayCheckOutDate);
   }, [checkInDate, displayCheckOutDate]);
 
   const priceBase = listing ? totalNights * (listing.price_per_night || 0) : 0;
@@ -191,14 +194,24 @@ export default function CheckoutContent() {
       };
 
       try {
-        const res = await api.post("/bookings/", payload, {
+        const intent = await api.post("/bookings/payment-intent/", payload, {
           signal: abortRef.current.signal as AbortSignal,
           headers: {
             "X-Idempotency-Key": attemptKeyRef.current!,
           },
         });
-        const newId: number = res.data.id;
-        router.push(`/${locale}/booking-success?booking=${newId}`);
+        const bookingId: number = intent.data.booking.id;
+        const payment = await api.post(
+          "/payments/",
+          { booking_id: bookingId },
+          {
+            signal: abortRef.current.signal as AbortSignal,
+            headers: {
+              "X-Idempotency-Key": `${attemptKeyRef.current!}:payment`,
+            },
+          }
+        );
+        router.push(`/${locale}/payment?payment=${payment.data.id}`);
       } catch (err) {
         if (axios.isCancel(err)) {
           return;
@@ -443,7 +456,7 @@ export default function CheckoutContent() {
                 className="w-full rounded bg-green-600 py-2 text-white hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {submitting ? "⏳ " : "✅ "}
-                {t(locale, "form.confirm")}
+                {submitting ? "Төлбөр үүсгэж байна..." : "Төлбөр рүү шилжих"}
               </button>
             </form>
           </section>

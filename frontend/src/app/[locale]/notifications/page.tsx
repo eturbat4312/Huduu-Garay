@@ -28,8 +28,19 @@ function getNotificationLink(n: Notification, locale: string): string {
       return `/${locale}/bookings/${n.related_booking}`;
     }
   }
+  if (n.type === "listing_published" && n.related_listing) {
+    return `/${locale}/listings/${n.related_listing}`;
+  }
   if ((n.type === "review" || n.type === "comment") && n.related_listing) {
     return `/${locale}/listings/${n.related_listing}`;
+  }
+  if (n.type === "host_approved") {
+    // Хост эрх батлагдсан → зар нийтлэх хуудас руу
+    return `/${locale}/my-listings`;
+  }
+  if (n.type === "host_rejected") {
+    // Хост эрх татгалзагдсан → дахин өргөдөл гаргах хуудас руу
+    return `/${locale}/become-host`;
   }
   return `/${locale}/notifications`;
 }

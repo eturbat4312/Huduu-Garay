@@ -7,6 +7,7 @@ from .models import (
     ListingImage,
     Availability,
     Booking,
+    Payment,
     Amenity,
     Favorite,
     Notification,
@@ -358,7 +359,7 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def get_is_unread(self, obj):
         request = self.context.get("request")
-        if not request:
+        if not request or not request.user.is_authenticated:
             return False
         return Notification.objects.filter(
             user=request.user,
@@ -375,6 +376,69 @@ class BookingSerializer(serializers.ModelSerializer):
     def get_host_phone(self, obj):
         host_app = getattr(obj.listing.host, "hostapplication", None)
         return host_app.phone_number if host_app else None
+
+
+class PendingBookingCreateSerializer(serializers.Serializer):
+    listing_id = serializers.PrimaryKeyRelatedField(
+        queryset=Listing.objects.all(), source="listing"
+    )
+    check_in = serializers.DateField()
+    check_out = serializers.DateField()
+    full_name = serializers.CharField(max_length=100)
+    phone_number = serializers.CharField(max_length=20)
+    guest_count = serializers.IntegerField(min_value=1)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        listing = attrs["listing"]
+        check_in = attrs["check_in"]
+        check_out = attrs["check_out"]
+        guest_count = attrs["guest_count"]
+
+        if check_out < check_in:
+            raise serializers.ValidationError(
+                {"check_out": "Гарах өдөр орох өдрөөс өмнө байж болохгүй."}
+            )
+
+        if guest_count > listing.max_guests:
+            raise serializers.ValidationError(
+                {"guest_count": "Зочны тоо зөвшөөрөгдөх дээд хэмжээнээс их байна."}
+            )
+
+        return attrs
+
+
+class PaymentCreateSerializer(serializers.Serializer):
+    booking_id = serializers.PrimaryKeyRelatedField(
+        queryset=Booking.objects.all(), source="booking"
+    )
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    booking = BookingSerializer(read_only=True)
+    booking_id = serializers.IntegerField(source="booking.id", read_only=True)
+    booking_status = serializers.CharField(source="booking.status", read_only=True)
+
+    class Meta:
+        model = Payment
+        fields = [
+            "id",
+            "booking",
+            "booking_id",
+            "booking_status",
+            "provider",
+            "invoice_id",
+            "sender_invoice_no",
+            "idempotency_key",
+            "amount",
+            "currency",
+            "status",
+            "raw_response",
+            "paid_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
 
 
 class NotificationSerializer(serializers.ModelSerializer):

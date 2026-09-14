@@ -23,9 +23,9 @@ const nextConfig: NextConfig = {
     if (!isDev) return []; // ← PROD-д НӨЛӨӨЛӨХГҮЙ
     return [
       // DEV backend рүү дамжуулна
-      { source: "/api/:path*",   destination: "http://localhost:8010/api/:path*" },
-      { source: "/media/:path*", destination: "http://localhost:8010/media/:path*" },
-      { source: "/static/:path*", destination: "http://localhost:8010/static/:path*" },
+      { source: "/api/:path*",   destination: "http://backend:8010/api/:path*" },
+      { source: "/media/:path*", destination: "http://backend:8010/media/:path*" },
+      { source: "/static/:path*", destination: "http://backend:8010/static/:path*" },
 
       // Хэрвээ зарим зураг DB-д "filename.jpg" шиг үндсэн root-т хадгалагдсан бол:
       // root-ын зураг файлуудыг /media руу чиглүүлж өгнө

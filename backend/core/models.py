@@ -136,6 +136,14 @@ class Availability(models.Model):
     )
     date = models.DateField()
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["listing", "date"],
+                name="unique_availability_listing_date",
+            )
+        ]
+
     def __str__(self):
         return f"{self.listing.title} - {self.date}"
 
@@ -146,9 +154,11 @@ class Availability(models.Model):
 class Booking(models.Model):
 
     STATUS_CHOICES = [
+        ("pending_payment", "Pending payment"),
         ("confirmed", "Confirmed"),
         ("cancelled", "Cancelled"),
-        ("pending", "Pending"),
+        ("expired", "Expired"),
+        ("payment_failed", "Payment failed"),
     ]
     listing = models.ForeignKey(
         Listing, on_delete=models.CASCADE, related_name="bookings"
@@ -166,21 +176,123 @@ class Booking(models.Model):
     guest_count = models.PositiveIntegerField(default=1)
     total_price = models.PositiveIntegerField(default=0)
     service_fee = models.PositiveIntegerField(default=0)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default="confirmed", db_index=True
+    )
+    payment_intent_key = models.CharField(
+        max_length=120, blank=True, null=True, db_index=True
+    )
+    hold_expires_at = models.DateTimeField(blank=True, null=True, db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["guest", "payment_intent_key"],
+                name="unique_booking_guest_payment_intent_key",
+            )
+        ]
 
     def __str__(self):
         return f"{self.listing.title} booked by {self.guest.username} ({self.check_in} → {self.check_out})"
 
 
+class BookingHold(models.Model):
+    booking = models.ForeignKey(
+        Booking, on_delete=models.CASCADE, related_name="held_dates"
+    )
+    listing = models.ForeignKey(
+        Listing, on_delete=models.CASCADE, related_name="booking_holds"
+    )
+    date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["listing", "date"],
+                name="unique_booking_hold_listing_date",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.listing.title} held for booking {self.booking_id} - {self.date}"
+
+
 User = get_user_model()
+
+
+class Payment(models.Model):
+    PROVIDER_QPAY = "qpay"
+    PROVIDER_CHOICES = [
+        (PROVIDER_QPAY, "QPay"),
+    ]
+
+    STATUS_PENDING = "pending"
+    STATUS_PAID = "paid"
+    STATUS_FAILED = "failed"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_EXPIRED = "expired"
+    STATUS_REFUNDED = "refunded"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Pending"),
+        (STATUS_PAID, "Paid"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_CANCELLED, "Cancelled"),
+        (STATUS_EXPIRED, "Expired"),
+        (STATUS_REFUNDED, "Refunded"),
+    ]
+
+    booking = models.ForeignKey(
+        Booking, on_delete=models.CASCADE, related_name="payments"
+    )
+    provider = models.CharField(
+        max_length=30, choices=PROVIDER_CHOICES, default=PROVIDER_QPAY
+    )
+    invoice_id = models.CharField(max_length=120, blank=True, db_index=True)
+    sender_invoice_no = models.CharField(max_length=120, unique=True)
+    idempotency_key = models.CharField(
+        max_length=120, blank=True, null=True, db_index=True
+    )
+    amount = models.PositiveIntegerField()
+    currency = models.CharField(max_length=3, default="MNT")
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True
+    )
+    raw_response = models.JSONField(default=dict, blank=True)
+    paid_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["booking", "idempotency_key"],
+                name="unique_payment_booking_idempotency_key",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["provider", "invoice_id"]),
+            models.Index(fields=["booking", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.provider} {self.sender_invoice_no} ({self.status})"
 
 
 class Notification(models.Model):
     NOTIFICATION_TYPES = [
-        ("booking", "Захиалга"),
-        ("booking_cancelled", "Цуцлагдсан захиалга"),
+        ("booking_created", "Шинэ захиалга (хост)"),
+        ("booking_confirmed", "Захиалга баталгаажсан (зочин)"),
+        ("booking_cancelled", "Захиалга цуцлагдсан"),
+        ("host_approved", "Хост эрх батлагдсан"),
+        ("host_rejected", "Хост эрх татгалзагдсан"),
         ("review", "Сэтгэгдэл"),
-        ("comment", "Сэтгэгдэл"),
+        ("listing_published", "Зар нийтлэгдсэн"),
         ("payment", "Төлбөр"),
+        # legacy aliases
+        ("booking", "Захиалга"),
+        ("comment", "Сэтгэгдэл"),
         ("rating", "Үнэлгээ"),
     ]
 
@@ -287,7 +399,7 @@ class HostApplication(models.Model):
 
         super().save(*args, **kwargs)
 
-        # 📬 Имэйл илгээх логик
+        # 📬 Имэйл + Notification үүсгэх логик
         if is_new:
             send_notification_email(
                 self.user,
@@ -301,9 +413,19 @@ class HostApplication(models.Model):
                     notif_type="host_application_approved",
                     context={"full_name": self.full_name},
                 )
+                Notification.objects.create(
+                    user=self.user,
+                    message="🎉 Таны түрээслүүлэгч болох өргөдөл батлагдлаа! Та одоо зар нийтлэх боломжтой.",
+                    type="host_approved",
+                )
             elif self.status == "rejected":
                 send_notification_email(
                     self.user,
                     notif_type="host_application_rejected",
                     context={"full_name": self.full_name},
+                )
+                Notification.objects.create(
+                    user=self.user,
+                    message="Таны түрээслүүлэгч болох өргөдөл татгалзагдлаа. Дэлгэрэнгүйг имэйлээс харна уу.",
+                    type="host_rejected",
                 )

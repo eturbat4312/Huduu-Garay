@@ -13,6 +13,7 @@ from .models import (
     Amenity,
     HostApplication,
     Notification,
+    Payment,
 )
 from django.contrib.auth import get_user_model
 
@@ -35,9 +36,9 @@ class BookingAdmin(admin.ModelAdmin):
     list_display = (
         "id", "guest_name_display", "listing_title", "check_in", "check_out",
         "guest_count", "total_price_display", "host_payout_display", "platform_fee_display",
-        "is_cancelled_by_host", "created_at",
+        "status", "is_cancelled_by_host", "created_at",
     )
-    list_filter = ("is_cancelled_by_host", "check_in")
+    list_filter = ("status", "is_cancelled_by_host", "check_in")
     search_fields = ("id", "full_name", "phone_number", "guest__username", "listing__title")
     ordering = ("-created_at",)
     readonly_fields = ("created_at",)
@@ -63,6 +64,18 @@ class BookingAdmin(admin.ModelAdmin):
         fee = int(obj.total_price * 0.1) + obj.service_fee
         return f"₮{fee:,}"
     platform_fee_display.short_description = "Платформ орлого"
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = (
+        "id", "booking", "provider", "sender_invoice_no", "invoice_id",
+        "amount", "currency", "status", "paid_at", "created_at",
+    )
+    list_filter = ("provider", "status", "currency", "created_at")
+    search_fields = ("sender_invoice_no", "invoice_id", "booking__id", "booking__full_name")
+    ordering = ("-created_at",)
+    readonly_fields = ("created_at", "updated_at")
 
 
 # ── Listing ───────────────────────────────────────────────────────────────────
@@ -122,7 +135,7 @@ def stats_view(request):
     this_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     bookings = Booking.objects.all()
-    active = bookings.filter(is_cancelled_by_host=False)
+    active = bookings.filter(is_cancelled_by_host=False, status="confirmed")
 
     total_revenue = active.aggregate(s=Sum("total_price"))["s"] or 0
     total_guest_fees = active.aggregate(s=Sum("service_fee"))["s"] or 0

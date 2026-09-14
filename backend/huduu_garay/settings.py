@@ -175,6 +175,12 @@ CORS_ALLOWED_ORIGINS = os.getenv(
     "CORS_ALLOWED_ORIGINS",
     "http://localhost:3000,https://tanaid-honoy.mn,https://www.tanaid-honoy.mn",
 ).split(",")
+CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "False").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -184,6 +190,21 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
     "authorization",  # JWT ашигладаг тул тодорхой зааж өгвөл сайн
     "content-type",
 ]
+
+QPAY_ENABLED = os.getenv("QPAY_ENABLED", "False").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+QPAY_BASE_URL = os.getenv("QPAY_BASE_URL", "https://merchant.qpay.mn")
+QPAY_AUTH_URL = os.getenv("QPAY_AUTH_URL", f"{QPAY_BASE_URL}/v2/auth/token")
+QPAY_CLIENT_ID = os.getenv("QPAY_CLIENT_ID", "")
+QPAY_CLIENT_SECRET = os.getenv("QPAY_CLIENT_SECRET", "")
+QPAY_INVOICE_CODE = os.getenv("QPAY_INVOICE_CODE", "")
+QPAY_CALLBACK_URL = os.getenv("QPAY_CALLBACK_URL", "")
+QPAY_TIMEOUT_SECONDS = int(os.getenv("QPAY_TIMEOUT_SECONDS", "30"))
+QPAY_TOKEN_LEEWAY_SECONDS = int(os.getenv("QPAY_TOKEN_LEEWAY_SECONDS", "60"))
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

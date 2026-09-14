@@ -13,10 +13,11 @@ from django.core.files.base import ContentFile
 from rest_framework.exceptions import ValidationError
 from django.utils import timezone
 from core.utils.email_notifications import send_notification_email
+from core.services.qpay import QPayAPIError, QPayClient, QPayConfigurationError
 from decimal import Decimal
 from google.oauth2 import id_token
 import uuid
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 # Claude: password reset imports
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -42,6 +43,8 @@ from .models import (
     Amenity,
     Favorite,
     Booking,
+    BookingHold,
+    Payment,
     Notification,
     Review,
     HostApplication,
@@ -54,6 +57,9 @@ from .serializers import (
     AvailabilityBulkSerializer,
     SignupSerializer,
     BookingSerializer,
+    PendingBookingCreateSerializer,
+    PaymentCreateSerializer,
+    PaymentSerializer,
     UserSerializer,
     AmenitySerializer,
     FavoriteSerializer,
@@ -63,6 +69,7 @@ from .serializers import (
 )
 
 User = get_user_model()
+PAYMENT_HOLD_MINUTES = 15
 
 # ---------------------- AUTH ----------------------
 
@@ -216,7 +223,13 @@ class ListingListCreateView(generics.ListCreateAPIView):
             raise serializers.ValidationError(
                 {"detail": "Танд зар үүсгэх эрх байхгүй. Та эхлээд host бол. 🤷‍♂️"}
             )
-        serializer.save(host=self.request.user)
+        listing = serializer.save(host=self.request.user)
+        Notification.objects.create(
+            user=self.request.user,
+            message=f"🎉 Таны '{listing.title}' зар амжилттай нийтлэгдлээ!",
+            type="listing_published",
+            related_listing=listing,
+        )
 
 
 class ListingRetrieveView(RetrieveAPIView):
@@ -297,6 +310,7 @@ class AvailabilityListCreateView(generics.ListCreateAPIView):
     serializer_class = AvailabilitySerializer
 
     def get_queryset(self):
+        _release_expired_booking_holds()
         queryset = Availability.objects.all()
         listing_id = self.request.query_params.get("listing")
         if listing_id:
@@ -493,6 +507,568 @@ class BookingCreateView(APIView):
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _get_requested_dates(check_in, check_out):
+    if check_in == check_out:
+        check_out += timedelta(days=1)
+
+    date = check_in
+    requested_dates = []
+    while date < check_out:
+        requested_dates.append(date)
+        date += timedelta(days=1)
+    return requested_dates, check_out
+
+
+def _calculate_booking_amounts(listing, total_nights):
+    total_price = Decimal(total_nights * (listing.price_per_night or 0))
+    service_fee = (total_price * Decimal("0.10")).quantize(Decimal("1"))
+    return int(total_price), int(service_fee)
+
+
+def _availability_is_available(listing, requested_dates, lock=False):
+    queryset = Availability.objects
+    if lock:
+        queryset = queryset.select_for_update()
+    available_dates = queryset.filter(listing=listing, date__in=requested_dates).values_list(
+        "date", flat=True
+    )
+    return set(requested_dates).issubset(set(available_dates))
+
+
+def _hold_availability_for_booking(booking, requested_dates):
+    available_rows = list(
+        Availability.objects.select_for_update().filter(
+            listing=booking.listing, date__in=requested_dates
+        )
+    )
+    available_dates = {row.date for row in available_rows}
+    if not set(requested_dates).issubset(available_dates):
+        return False
+
+    holds = [
+        BookingHold(booking=booking, listing=booking.listing, date=target_date)
+        for target_date in requested_dates
+    ]
+    BookingHold.objects.bulk_create(holds)
+    Availability.objects.filter(
+        listing=booking.listing, date__in=requested_dates
+    ).delete()
+    return True
+
+
+def _booking_has_hold(booking, requested_dates, lock=False):
+    queryset = BookingHold.objects
+    if lock:
+        queryset = queryset.select_for_update()
+    held_dates = queryset.filter(
+        booking=booking, listing=booking.listing, date__in=requested_dates
+    ).values_list("date", flat=True)
+    return set(requested_dates).issubset(set(held_dates))
+
+
+def _release_booking_hold(booking, now=None):
+    hold_rows = list(
+        BookingHold.objects.select_for_update().filter(
+            booking=booking, listing=booking.listing
+        )
+    )
+    if not hold_rows:
+        return 0
+
+    for hold in hold_rows:
+        Availability.objects.get_or_create(listing=booking.listing, date=hold.date)
+
+    BookingHold.objects.filter(id__in=[hold.id for hold in hold_rows]).delete()
+
+    booking.status = "expired"
+    booking.save(update_fields=["status"])
+
+    Payment.objects.filter(booking=booking, status=Payment.STATUS_PENDING).update(
+        status=Payment.STATUS_EXPIRED,
+        updated_at=now or timezone.now(),
+        raw_response={
+            "expired_reason": "payment_hold_expired",
+            "expired_at": (now or timezone.now()).isoformat(),
+        },
+    )
+    return len(hold_rows)
+
+
+def _release_expired_booking_holds(now=None):
+    now = now or timezone.now()
+    expired_bookings = (
+        Booking.objects.select_for_update()
+        .filter(status="pending_payment", hold_expires_at__isnull=False)
+        .filter(hold_expires_at__lte=now)
+        .select_related("listing")
+    )
+    released = 0
+    with transaction.atomic():
+        for booking in expired_bookings:
+            released += _release_booking_hold(booking, now=now)
+    return released
+
+
+def _booking_hold_is_expired(booking, now=None):
+    return (
+        booking.status == "pending_payment"
+        and booking.hold_expires_at is not None
+        and booking.hold_expires_at <= (now or timezone.now())
+    )
+
+
+def _payment_check_is_paid(check_response):
+    if not isinstance(check_response, dict):
+        return False
+    count = check_response.get("count")
+    if count is not None:
+        try:
+            return int(count) > 0
+        except (TypeError, ValueError):
+            return False
+    rows = (
+        check_response.get("rows")
+        or check_response.get("items")
+        or check_response.get("payments")
+        or []
+    )
+    return bool(rows)
+
+
+def _confirm_paid_payment(payment, raw_response, request=None):
+    booking = Booking.objects.select_for_update().get(id=payment.booking_id)
+
+    if payment.status == Payment.STATUS_PAID and booking.status == "confirmed":
+        return payment, None
+
+    if payment.status != Payment.STATUS_PENDING:
+        return payment, "Зөвхөн pending төлбөрийг баталгаажуулна."
+
+    if _booking_hold_is_expired(booking):
+        _release_booking_hold(booking)
+        payment.status = Payment.STATUS_EXPIRED
+        payment.raw_response = {
+            **payment.raw_response,
+            "qpay_check": raw_response,
+            "confirm_error": "hold_expired",
+        }
+        payment.save(update_fields=["status", "raw_response", "updated_at"])
+        return payment, "Төлбөрийн хугацаа дууссан байна."
+
+    requested_dates, _ = _get_requested_dates(booking.check_in, booking.check_out)
+    if not _booking_has_hold(booking, requested_dates, lock=True):
+        payment.status = Payment.STATUS_FAILED
+        payment.raw_response = {
+            **payment.raw_response,
+            "qpay_check": raw_response,
+            "confirm_error": "hold_missing",
+        }
+        payment.save(update_fields=["status", "raw_response", "updated_at"])
+        booking.status = "payment_failed"
+        booking.save(update_fields=["status"])
+        return payment, "Сонгосон огноо өөр захиалгад орсон байна."
+
+    payment.status = Payment.STATUS_PAID
+    payment.paid_at = timezone.now()
+    payment.raw_response = {
+        **payment.raw_response,
+        "qpay_check": raw_response,
+    }
+    payment.save(update_fields=["status", "paid_at", "raw_response", "updated_at"])
+
+    booking.status = "confirmed"
+    booking.save(update_fields=["status"])
+    payment.booking = booking
+    BookingHold.objects.filter(
+        booking=booking, listing=booking.listing, date__in=requested_dates
+    ).delete()
+    return payment, None
+
+
+class BookingPaymentIntentCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        _release_expired_booking_holds()
+        serializer = PendingBookingCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        idempotency_key = request.headers.get("X-Idempotency-Key") or None
+        if idempotency_key:
+            existing = Booking.objects.filter(
+                guest=request.user, payment_intent_key=idempotency_key
+            ).first()
+            if existing:
+                return Response(
+                    {
+                        "booking": BookingSerializer(
+                            existing, context={"request": request}
+                        ).data,
+                        "service_fee": existing.service_fee,
+                        "payment_required_amount": existing.total_price
+                        + existing.service_fee,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+        listing = serializer.validated_data["listing"]
+        check_in = serializer.validated_data["check_in"]
+        check_out = serializer.validated_data["check_out"]
+        requested_dates, check_out = _get_requested_dates(check_in, check_out)
+
+        total_price, service_fee = _calculate_booking_amounts(
+            listing, len(requested_dates)
+        )
+
+        try:
+            with transaction.atomic():
+                booking = Booking.objects.create(
+                    listing=listing,
+                    guest=request.user,
+                    check_in=check_in,
+                    check_out=check_out,
+                    full_name=serializer.validated_data["full_name"],
+                    phone_number=serializer.validated_data["phone_number"],
+                    notes=serializer.validated_data.get("notes", ""),
+                    guest_count=serializer.validated_data["guest_count"],
+                    total_price=total_price,
+                    service_fee=service_fee,
+                    status="pending_payment",
+                    payment_intent_key=idempotency_key,
+                    hold_expires_at=timezone.now()
+                    + timedelta(minutes=PAYMENT_HOLD_MINUTES),
+                )
+
+                if not _hold_availability_for_booking(booking, requested_dates):
+                    raise ValidationError(
+                        {"error": "Сонгосон огнооны зарим нь боломжгүй байна."}
+                    )
+        except IntegrityError:
+            if not idempotency_key:
+                raise
+            booking = Booking.objects.get(
+                guest=request.user, payment_intent_key=idempotency_key
+            )
+            return Response(
+                {
+                    "booking": BookingSerializer(
+                        booking, context={"request": request}
+                    ).data,
+                    "service_fee": booking.service_fee,
+                    "payment_required_amount": booking.total_price
+                    + booking.service_fee,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {
+                "booking": BookingSerializer(booking, context={"request": request}).data,
+                "service_fee": booking.service_fee,
+                "payment_required_amount": booking.total_price + booking.service_fee,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PaymentCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        _release_expired_booking_holds()
+        serializer = PaymentCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        booking = serializer.validated_data["booking"]
+        if booking.guest_id != request.user.id:
+            return Response({"error": "Захиалга олдсонгүй."}, status=404)
+
+        if _booking_hold_is_expired(booking):
+            with transaction.atomic():
+                booking = (
+                    Booking.objects.select_for_update()
+                    .select_related("listing")
+                    .get(id=booking.id)
+                )
+                if _booking_hold_is_expired(booking):
+                    _release_booking_hold(booking)
+            return Response(
+                {"error": "Төлбөрийн хугацаа дууссан байна."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if booking.status != "pending_payment":
+            return Response(
+                {"error": "Зөвхөн төлбөр хүлээгдэж буй захиалгад invoice үүсгэнэ."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        idempotency_key = request.headers.get("X-Idempotency-Key") or None
+        if idempotency_key:
+            existing = Payment.objects.filter(
+                booking=booking, idempotency_key=idempotency_key
+            ).first()
+            if existing:
+                return Response(
+                    PaymentSerializer(existing, context={"request": request}).data,
+                    status=status.HTTP_200_OK,
+                )
+
+        existing_pending = Payment.objects.filter(
+            booking=booking, status=Payment.STATUS_PENDING
+        ).first()
+        if existing_pending:
+            return Response(
+                PaymentSerializer(existing_pending, context={"request": request}).data,
+                status=status.HTTP_200_OK,
+            )
+
+        sender_invoice_no = f"booking-{booking.id}-{uuid.uuid4().hex[:12]}"
+        amount = booking.total_price + booking.service_fee
+        invoice_id = f"mock-{sender_invoice_no}"
+        raw_response = {
+            "provider": Payment.PROVIDER_QPAY,
+            "mode": "mock",
+            "message": "QPay adapter will replace this mock invoice in Phase 3.",
+        }
+
+        if settings.QPAY_ENABLED:
+            try:
+                invoice_response = QPayClient().create_invoice(
+                    sender_invoice_no=sender_invoice_no,
+                    amount=amount,
+                    description=f"Танайд Хоной захиалга #{booking.id}",
+                )
+            except QPayConfigurationError as exc:
+                return Response(
+                    {"error": str(exc)},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+            except QPayAPIError:
+                return Response(
+                    {"error": "QPay invoice үүсгэхэд алдаа гарлаа."},
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+
+            invoice_id = invoice_response["invoice_id"]
+            raw_response = invoice_response
+
+        try:
+            payment = Payment.objects.create(
+                booking=booking,
+                provider=Payment.PROVIDER_QPAY,
+                sender_invoice_no=sender_invoice_no,
+                invoice_id=invoice_id,
+                idempotency_key=idempotency_key,
+                amount=amount,
+                raw_response=raw_response,
+            )
+        except IntegrityError:
+            if not idempotency_key:
+                raise
+            payment = Payment.objects.get(
+                booking=booking, idempotency_key=idempotency_key
+            )
+            return Response(
+                PaymentSerializer(payment, context={"request": request}).data,
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            PaymentSerializer(payment, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PaymentRetrieveView(RetrieveAPIView):
+    serializer_class = PaymentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Payment.objects.filter(booking__guest=self.request.user).select_related(
+            "booking", "booking__listing", "booking__guest", "booking__listing__host"
+        )
+
+
+class PaymentCheckView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, payment_id, format=None):
+        _release_expired_booking_holds()
+
+        try:
+            payment = (
+                Payment.objects.select_related("booking", "booking__listing")
+                .get(id=payment_id, booking__guest=request.user)
+            )
+        except Payment.DoesNotExist:
+            return Response({"error": "Төлбөр олдсонгүй."}, status=404)
+
+        if payment.status == Payment.STATUS_PAID:
+            return Response(
+                PaymentSerializer(payment, context={"request": request}).data,
+                status=status.HTTP_200_OK,
+            )
+
+        if payment.status != Payment.STATUS_PENDING:
+            return Response(
+                {"error": "Зөвхөн pending төлбөрийг шалгана."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not settings.QPAY_ENABLED:
+            return Response(
+                PaymentSerializer(payment, context={"request": request}).data,
+                status=status.HTTP_200_OK,
+            )
+
+        try:
+            check_response = QPayClient().check_payment(invoice_id=payment.invoice_id)
+        except (QPayConfigurationError, QPayAPIError):
+            return Response(
+                {"error": "QPay төлбөр шалгахад алдаа гарлаа."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if not _payment_check_is_paid(check_response):
+            payment.raw_response = {
+                **payment.raw_response,
+                "last_qpay_check": check_response,
+            }
+            payment.save(update_fields=["raw_response", "updated_at"])
+            return Response(
+                PaymentSerializer(payment, context={"request": request}).data,
+                status=status.HTTP_200_OK,
+            )
+
+        with transaction.atomic():
+            payment = (
+                Payment.objects.select_for_update()
+                .select_related("booking", "booking__listing")
+                .get(id=payment_id, booking__guest=request.user)
+            )
+            payment, error_message = _confirm_paid_payment(
+                payment,
+                {
+                    "manual_check": True,
+                    "payment_check": check_response,
+                },
+                request=request,
+            )
+            if error_message:
+                return Response({"error": error_message}, status=status.HTTP_409_CONFLICT)
+
+        return Response(
+            PaymentSerializer(payment, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class PaymentMockConfirmView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, payment_id, format=None):
+        if not settings.DEBUG:
+            return Response({"error": "Not found."}, status=404)
+
+        _release_expired_booking_holds()
+        with transaction.atomic():
+            try:
+                payment = (
+                    Payment.objects.select_for_update()
+                    .select_related("booking", "booking__listing")
+                    .get(id=payment_id, booking__guest=request.user)
+                )
+            except Payment.DoesNotExist:
+                return Response({"error": "Төлбөр олдсонгүй."}, status=404)
+
+            booking = Booking.objects.select_for_update().get(id=payment.booking_id)
+
+            if payment.status == Payment.STATUS_PAID and booking.status == "confirmed":
+                return Response(
+                    PaymentSerializer(payment, context={"request": request}).data,
+                    status=status.HTTP_200_OK,
+                )
+
+            if payment.status != Payment.STATUS_PENDING:
+                return Response(
+                    {"error": "Зөвхөн pending төлбөрийг баталгаажуулна."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            payment, error_message = _confirm_paid_payment(
+                payment,
+                {
+                    "mock_confirmed": True,
+                    "confirmed_at": timezone.now().isoformat(),
+                },
+                request=request,
+            )
+            if error_message:
+                return Response(
+                    {"error": error_message},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+        return Response(
+            PaymentSerializer(payment, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class QPayCallbackView(APIView):
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request, format=None):
+        invoice_id = (
+            request.data.get("invoice_id")
+            or request.data.get("object_id")
+            or request.data.get("payment_id")
+        )
+        if not invoice_id:
+            return Response({"error": "invoice_id дутуу байна."}, status=400)
+
+        _release_expired_booking_holds()
+
+        try:
+            check_response = QPayClient().check_payment(invoice_id=invoice_id)
+        except (QPayConfigurationError, QPayAPIError):
+            return Response(
+                {"error": "QPay төлбөр шалгахад алдаа гарлаа."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        if not _payment_check_is_paid(check_response):
+            return Response({"status": "pending"}, status=status.HTTP_202_ACCEPTED)
+
+        with transaction.atomic():
+            try:
+                payment = (
+                    Payment.objects.select_for_update()
+                    .select_related("booking", "booking__listing")
+                    .get(invoice_id=invoice_id, provider=Payment.PROVIDER_QPAY)
+                )
+            except Payment.DoesNotExist:
+                return Response({"error": "Төлбөр олдсонгүй."}, status=404)
+
+            payment, error_message = _confirm_paid_payment(
+                payment,
+                {
+                    "callback": request.data,
+                    "payment_check": check_response,
+                },
+                request=request,
+            )
+            if error_message:
+                return Response({"error": error_message}, status=status.HTTP_409_CONFLICT)
+
+        return Response(
+            PaymentSerializer(payment, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
 
 
 class BookingRetrieveView(RetrieveAPIView):

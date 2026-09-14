@@ -86,6 +86,43 @@ export type Category = {
     host_phone?: string | null;
   };
 
+  export type PaymentStatus =
+    | "pending"
+    | "paid"
+    | "failed"
+    | "cancelled"
+    | "expired"
+    | "refunded";
+
+  export type Payment = {
+    id: number;
+    booking: Booking;
+    booking_id: number;
+    booking_status: string;
+    provider: string;
+    invoice_id: string;
+    sender_invoice_no: string;
+    idempotency_key?: string | null;
+    amount: number;
+    currency: string;
+    status: PaymentStatus;
+    raw_response: {
+      qr_text?: string;
+      qr_image?: string;
+      urls?: Array<{
+        name?: string;
+        description?: string;
+        link?: string;
+      }>;
+      mode?: string;
+      message?: string;
+      [key: string]: unknown;
+    };
+    paid_at?: string | null;
+    created_at: string;
+    updated_at: string;
+  };
+
 
   export type HostApplication = {
     id: number;
@@ -95,4 +132,3 @@ export type Category = {
     full_name?: string;
     phone_number?: string;
   };
-  
