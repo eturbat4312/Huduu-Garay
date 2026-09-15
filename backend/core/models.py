@@ -286,6 +286,7 @@ class Notification(models.Model):
         ("booking_confirmed", "Захиалга баталгаажсан (зочин)"),
         ("admin_booking", "Шинэ захиалга (админ)"),
         ("booking_cancelled", "Захиалга цуцлагдсан"),
+        ("host_application", "Шинэ түрээслүүлэгч хүсэлт"),
         ("host_approved", "Хост эрх батлагдсан"),
         ("host_rejected", "Хост эрх татгалзагдсан"),
         ("review", "Сэтгэгдэл"),
@@ -414,6 +415,39 @@ class HostApplication(models.Model):
                 notif_type="host_application_created",
                 context={"full_name": self.full_name},
             )
+            admin_users = get_user_model().objects.filter(is_staff=True, is_active=True)
+            admin_message = (
+                f"Шинэ түрээслүүлэгч болох хүсэлт ирлээ. "
+                f"Хүсэлт #{self.id}. Нэр: {self.full_name}. "
+                f"Хэрэглэгч: {self.user.username}. Утас: {self.phone_number}. "
+                f"Банк: {self.bank_name}. Данс: {self.account_number}. "
+                f"Нөхцөлийн хувилбар: {self.host_terms_version}. "
+                f"Шимтгэл: {self.host_commission_rate}%."
+            )
+            admin_context = {
+                "application_id": self.id,
+                "full_name": self.full_name,
+                "username": self.user.username,
+                "email": self.user.email,
+                "phone_number": self.phone_number,
+                "bank_name": self.bank_name,
+                "account_number": self.account_number,
+                "submitted_at": self.submitted_at.strftime("%Y-%m-%d %H:%M"),
+                "host_terms_version": self.host_terms_version,
+                "host_commission_rate": self.host_commission_rate,
+            }
+            for admin_user in admin_users:
+                Notification.objects.create(
+                    user=admin_user,
+                    message=admin_message,
+                    type="host_application",
+                )
+                if admin_user.email:
+                    send_notification_email(
+                        admin_user,
+                        notif_type="admin_host_application_created",
+                        context=admin_context,
+                    )
         elif old_status != self.status:
             if self.status == "approved":
                 send_notification_email(

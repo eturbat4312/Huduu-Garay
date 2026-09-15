@@ -1,6 +1,7 @@
 """huduu_garay backend — бүрэн тест"""
 
 from datetime import date, timedelta
+from unittest.mock import patch
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
@@ -536,6 +537,46 @@ class HostApplicationTests(TestCase):
         self.assertIsNotNone(app.host_terms_accepted_at)
         self.assertEqual(app.host_terms_version, "2026-09-15")
         self.assertEqual(str(app.host_commission_rate), "10.00")
+
+    def test_apply_notifies_staff_users(self):
+        admin = User.objects.create_user(
+            username="hostadmin",
+            email="hostadmin@example.com",
+            password="pass1234!",
+            is_staff=True,
+        )
+        staff_without_email = User.objects.create_user(
+            username="staffnoemail",
+            email="",
+            password="pass1234!",
+            is_staff=True,
+        )
+
+        with patch("core.models.send_notification_email") as send_email:
+            r = self._apply()
+
+        self.assertEqual(r.status_code, 201)
+        app = HostApplication.objects.get(user=self.user)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=admin,
+                type="host_application",
+                message__contains=str(app.id),
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                user=staff_without_email,
+                type="host_application",
+                message__contains=str(app.id),
+            ).exists()
+        )
+        sent_types = [call.kwargs["notif_type"] for call in send_email.call_args_list]
+        self.assertEqual(
+            sent_types,
+            ["host_application_created", "admin_host_application_created"],
+        )
+        self.assertEqual(send_email.call_args_list[1].args[0], admin)
 
     def test_apply_requires_host_terms_acceptance(self):
         img = self._make_valid_image()

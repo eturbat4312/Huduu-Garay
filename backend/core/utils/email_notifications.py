@@ -111,10 +111,29 @@ def send_notification_email(user, notif_type, context):
         message = f"{context['guest_name']} таны '{context['listing_title']}' зар дээр сэтгэгдэл үлдээсэн байна."
 
     elif notif_type == "host_application_created":
-        subject = "📝 Таны хост хүсэлт амжилттай илгээгдлээ"
+        subject = "📝 Таны түрээслүүлэгч болох хүсэлт амжилттай илгээгдлээ"
         message = (
             f"Сайн байна уу {context['full_name']}!\n\n"
-            f"Таны хост эрхийн хүсэлт амжилттай илгээгдлээ. Бид тун удахгүй хянаж хариу өгөх болно."
+            f"Таны түрээслүүлэгч болох хүсэлт амжилттай илгээгдлээ. Бид тун удахгүй хянаж хариу өгөх болно."
+        )
+
+    elif notif_type == "admin_host_application_created":
+        subject = f"Шинэ түрээслүүлэгч болох хүсэлт #{context['application_id']} ирлээ"
+        message = (
+            f"Шинэ түрээслүүлэгч болох хүсэлт ирлээ.\n\n"
+            f"{'─' * 40}\n"
+            f"Хүсэлтийн дугаар: #{context['application_id']}\n"
+            f"Нэр: {context['full_name']}\n"
+            f"Хэрэглэгчийн нэр: {context['username']}\n"
+            f"Цахим шуудан: {context.get('email') or 'Байхгүй'}\n"
+            f"Утас: {context['phone_number']}\n"
+            f"Банк: {context['bank_name']}\n"
+            f"Данс: {context['account_number']}\n"
+            f"Илгээсэн огноо: {context['submitted_at']}\n"
+            f"Нөхцөлийн хувилбар: {context['host_terms_version']}\n"
+            f"Зөвшөөрсөн шимтгэл: {context['host_commission_rate']}%\n"
+            f"{'─' * 40}\n\n"
+            f"Admin хэсэгт нэвтэрч хүсэлтийг шалгана уу."
         )
 
     elif notif_type == "host_application_approved":
