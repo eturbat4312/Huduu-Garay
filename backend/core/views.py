@@ -1418,7 +1418,14 @@ class NotificationUnreadCountView(APIView):
         user = request.user
         total = Notification.objects.filter(user=user, is_read=False).count()
         booking = Notification.objects.filter(
-            user=user, is_read=False, type="booking_created"
+            user=user,
+            is_read=False,
+            type__in=[
+                "booking_created",
+                "booking_confirmed",
+                "booking_cancelled",
+                "admin_booking",
+            ],
         ).count()
         return Response(
             {

@@ -420,6 +420,19 @@ class NotificationTests(TestCase):
         r = self.c.get("/api/notifications/unread-count/")
         self.assertEqual(r.data["total_unread"], 2)
 
+    def test_booking_unread_count_includes_admin_booking(self):
+        self._make("booking_created")
+        self._make("booking_confirmed")
+        self._make("booking_cancelled")
+        self._make("admin_booking")
+        self._make("review")
+
+        r = self.c.get("/api/notifications/unread-count/")
+
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.data["total_unread"], 5)
+        self.assertEqual(r.data["booking_unread"], 4)
+
     def test_mark_all_read(self):
         self._make(); self._make()
         self.c.post("/api/notifications/mark-read/", format="json")
