@@ -117,7 +117,7 @@ export default function BookingSuccessPage({
       </div>
 
       <button
-        onClick={() => router.push(`/${locale}/my-bookings`)}
+        onClick={() => router.push(`/${locale}/bookings`)}
         className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded"
       >
         📂 {t(locale, "go_to_my_bookings")}
