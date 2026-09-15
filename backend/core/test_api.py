@@ -526,11 +526,27 @@ class HostApplicationTests(TestCase):
             "full_name": "Хэрэглэгч", "phone_number": "9900",
             "bank_name": "Хаан Банк", "account_number": "12345678",
             "id_card_image": img, "selfie_with_id": selfie,
+            "host_terms_accepted": "true",
         }, format="multipart")
 
     def test_apply(self):
         r = self._apply()
         self.assertEqual(r.status_code, 201)
+        app = HostApplication.objects.get(user=self.user)
+        self.assertIsNotNone(app.host_terms_accepted_at)
+        self.assertEqual(app.host_terms_version, "2026-09-15")
+        self.assertEqual(str(app.host_commission_rate), "10.00")
+
+    def test_apply_requires_host_terms_acceptance(self):
+        img = self._make_valid_image()
+        selfie = self._make_valid_image()
+        r = self.c.post("/api/host/apply/", {
+            "full_name": "Хэрэглэгч", "phone_number": "9900",
+            "bank_name": "Хаан Банк", "account_number": "12345678",
+            "id_card_image": img, "selfie_with_id": selfie,
+        }, format="multipart")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(HostApplication.objects.count(), 0)
 
     def test_double_apply_blocked(self):
         self._apply()

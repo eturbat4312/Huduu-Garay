@@ -98,10 +98,28 @@ class ListingAdmin(admin.ModelAdmin):
 # ── HostApplication ───────────────────────────────────────────────────────────
 @admin.register(HostApplication)
 class HostApplicationAdmin(admin.ModelAdmin):
-    list_display = ("user", "full_name", "phone_number", "bank_name", "status", "submitted_at")
-    list_filter = ("status",)
+    list_display = (
+        "user",
+        "full_name",
+        "phone_number",
+        "bank_name",
+        "status",
+        "host_terms_version",
+        "host_commission_rate",
+        "host_terms_accepted_at",
+        "submitted_at",
+    )
+    list_filter = ("status", "host_terms_version")
     search_fields = ("user__username", "full_name", "phone_number")
     ordering = ("-submitted_at",)
+    readonly_fields = (
+        "host_terms_accepted_at",
+        "host_terms_version",
+        "host_commission_rate",
+        "host_terms_accepted_ip",
+        "host_terms_accepted_user_agent",
+        "submitted_at",
+    )
 
 
 # ── Category ──────────────────────────────────────────────────────────────────

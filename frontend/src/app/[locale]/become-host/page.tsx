@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import api from "@/lib/axios";
 import { useAuth, useRefreshUser } from "@/context/AuthContext";
 import { t } from "@/lib/i18n";
@@ -33,6 +34,7 @@ export default function BecomeHostPage() {
 
   const [idCardImage, setIdCardImage] = useState<File | null>(null);
   const [selfieImage, setSelfieImage] = useState<File | null>(null);
+  const [hostTermsAccepted, setHostTermsAccepted] = useState(false);
 
   const [submitting, setSubmitting] = useState(false); // ⭐ CHANGE: state нэмсэн
 
@@ -53,6 +55,12 @@ export default function BecomeHostPage() {
       return;
     }
 
+    if (!hostTermsAccepted) {
+      alert("Түрээслүүлэгчийн нөхцөлийг уншиж, зөвшөөрнө үү.");
+      setSubmitting(false);
+      return;
+    }
+
     const data = new FormData();
     data.append("full_name", form.full_name);
     data.append("phone_number", form.phone_number);
@@ -60,6 +68,7 @@ export default function BecomeHostPage() {
     data.append("account_number", form.bank_account);
     data.append("id_card_image", idCardImage);
     data.append("selfie_with_id", selfieImage);
+    data.append("host_terms_accepted", "true");
 
     try {
       await api.post("/host/apply/", data);
@@ -119,22 +128,26 @@ export default function BecomeHostPage() {
 
       {/* Platform fee info */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6 space-y-3">
-        <h2 className="font-bold text-blue-800 text-base">💰 Платформын шимтгэлийн талаар</h2>
+        <h2 className="font-bold text-blue-800 text-base">Үйлчилгээний шимтгэлийн талаар</h2>
         <p className="text-sm text-gray-700">
-          Манай платформ таны захиалга бүрийн нийт дүнгийн <strong>10%</strong>-ийг үйлчилгээний хөлс болгон авна.
+          “Танайд Хоноё” нь таны байрыг зочдод хүргэх, захиалга үүсгэх,
+          QPay төлбөр баталгаажуулах, мэдэгдэл илгээх болон хэрэглэгчийн
+          дэмжлэг үзүүлэх үйлчилгээний хүрээнд баталгаажсан захиалга бүрээс{" "}
+          <strong>10%</strong> үйлчилгээний шимтгэл суутгана.
         </p>
         <div className="bg-white rounded-lg p-3 border border-blue-100 text-sm space-y-1">
-          <p className="font-medium text-gray-700">📊 Жишээ:</p>
+          <p className="font-medium text-gray-700">Жишээ:</p>
           <p className="text-gray-600">Байрны үнэ: <strong>100,000₮</strong> / хоног</p>
-          <p className="text-gray-600">Платформын шимтгэл (10%): <strong>10,000₮</strong></p>
-          <p className="text-green-700 font-semibold">Таны авах мөнгө: <strong>90,000₮</strong></p>
+          <p className="text-gray-600">Үйлчилгээний шимтгэл 10%: <strong>10,000₮</strong></p>
+          <p className="text-green-700 font-semibold">Түрээслүүлэгчид олгох дүн: <strong>90,000₮</strong></p>
         </div>
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
-          <p className="font-medium text-yellow-800 mb-1">💡 Зөвлөгөө</p>
+          <p className="font-medium text-yellow-800 mb-1">Төлбөр олголт</p>
           <p className="text-gray-700">
-            Шимтгэлийг үнэдээ шингээхийг хүсвэл байрны үнийг арай өндөр тохируулж болно.
-            Жишээ нь <strong>100,000₮</strong>-ийн оронд <strong>112,000₮</strong> тавивал
-            шимтгэлийн дараа та <strong>~100,800₮</strong> авна.
+            Зочин байрнаас гарсны дараа тухайн захиалгатай холбоотой маргаан,
+            буцаалт, нөхөн төлбөрийн хүсэлт, эсвэл аюулгүй байдлын асуудал
+            үүсээгүй бол түрээслүүлэгчид олгох төлбөрийг 72 цагийн дараа
+            бүртгэлд оруулсан банкны данс руу шилжүүлнэ.
           </p>
         </div>
       </div>
@@ -214,6 +227,29 @@ export default function BecomeHostPage() {
             />
           </div>
         </div>
+
+        <label className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={hostTermsAccepted}
+            onChange={(e) => setHostTermsAccepted(e.target.checked)}
+            className="mt-1 h-4 w-4"
+            required
+          />
+          <span>
+            Би{" "}
+            <Link
+              href={`/${locale}/host-terms`}
+              className="font-medium text-green-700 underline hover:text-green-900"
+              target="_blank"
+            >
+              Түрээслүүлэгчийн нөхцөл
+            </Link>
+            -ийг уншиж, 10% үйлчилгээний шимтгэл, төлбөр олголтын 72 цагийн
+            журам, захиалга цуцлах болон эвдрэл гэмтлийн маргаан зохицуулах
+            нөхцөлийг зөвшөөрч байна.
+          </span>
+        </label>
 
         <LoadingButton
           type="submit"

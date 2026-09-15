@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from datetime import timedelta
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from .models import (
     Category,
     Listing,
@@ -513,6 +514,8 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 
 class HostApplicationSerializer(serializers.ModelSerializer):
+    host_terms_accepted = serializers.BooleanField(write_only=True, required=True)
+
     class Meta:
         model = HostApplication
         fields = [
@@ -523,8 +526,46 @@ class HostApplicationSerializer(serializers.ModelSerializer):
             "selfie_with_id",
             "bank_name",
             "account_number",
+            "host_terms_accepted",
+            "host_terms_accepted_at",
+            "host_terms_version",
+            "host_commission_rate",
+            "host_terms_accepted_ip",
+            "host_terms_accepted_user_agent",
             # "bank_info",
             "status",
             "submitted_at",
         ]
-        read_only_fields = ["status", "submitted_at"]
+        read_only_fields = [
+            "status",
+            "submitted_at",
+            "host_terms_accepted_at",
+            "host_terms_version",
+            "host_commission_rate",
+            "host_terms_accepted_ip",
+            "host_terms_accepted_user_agent",
+        ]
+
+    def validate_host_terms_accepted(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                "Түрээслүүлэгчийн нөхцөлийг зөвшөөрнө үү."
+            )
+        return value
+
+    def create(self, validated_data):
+        validated_data.pop("host_terms_accepted", None)
+        request = self.context.get("request")
+        if request:
+            forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR", "")
+            accepted_ip = forwarded_for.split(",")[0].strip() or request.META.get(
+                "REMOTE_ADDR"
+            )
+            validated_data["host_terms_accepted_ip"] = accepted_ip
+            validated_data["host_terms_accepted_user_agent"] = request.META.get(
+                "HTTP_USER_AGENT", ""
+            )
+        validated_data["host_terms_accepted_at"] = timezone.now()
+        validated_data["host_terms_version"] = "2026-09-15"
+        validated_data["host_commission_rate"] = "10.00"
+        return super().create(validated_data)

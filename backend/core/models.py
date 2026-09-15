@@ -381,6 +381,13 @@ class HostApplication(models.Model):
     selfie_with_id = models.ImageField(upload_to="selfies/")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     submitted_at = models.DateTimeField(auto_now_add=True)
+    host_terms_accepted_at = models.DateTimeField(null=True, blank=True)
+    host_terms_version = models.CharField(max_length=20, default="2026-09-15")
+    host_commission_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=10.00
+    )
+    host_terms_accepted_ip = models.GenericIPAddressField(null=True, blank=True)
+    host_terms_accepted_user_agent = models.TextField(blank=True)
 
     def __str__(self):
         return f"Host Request by {self.user.username}"
