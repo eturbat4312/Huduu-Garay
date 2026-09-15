@@ -241,7 +241,6 @@ export default function BecomeHostPage() {
             <Link
               href={`/${locale}/host-terms`}
               className="font-medium text-green-700 underline hover:text-green-900"
-              target="_blank"
             >
               Түрээслүүлэгчийн нөхцөл
             </Link>

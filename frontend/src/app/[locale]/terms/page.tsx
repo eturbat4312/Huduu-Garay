@@ -1,7 +1,7 @@
 // filename: src/app/[locale]/terms/page.tsx
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 const sections = [
   {
@@ -132,6 +132,7 @@ const sections = [
 
 export default function TermsPage() {
   const router = useRouter();
+  const { locale } = useParams() as { locale: string };
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
@@ -164,7 +165,7 @@ export default function TermsPage() {
 
       <div className="mt-10 border-t pt-6">
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push(`/${locale || "mn"}`)}
           className="rounded bg-green-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-green-800"
         >
           ← Буцах
