@@ -53,6 +53,7 @@ export default function BecomeHostScreen() {
   const [submitting, setSubmitting]     = useState(false);
   const [submitted, setSubmitted]       = useState(false);
   const [error, setError]               = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // ── Зураг сонгох ────────────────────────────────────────────────────────
   async function pickImage(target: 'id' | 'selfie') {
@@ -87,6 +88,7 @@ export default function BecomeHostScreen() {
     if (!accountNumber.trim()) { setError('Дансны дугаар оруулна уу.'); return; }
     if (!idCardImage)          { setError('Иргэний үнэмлэхний зургийг оруулна уу.'); return; }
     if (!selfieImage)          { setError('Иргэний үнэмлэхтэй хамт зурсан зургийг оруулна уу.'); return; }
+    if (!termsAccepted)        { setError('Хостын үйлчилгээний нөхцөлийг зөвшөөрнө үү.'); return; }
 
     setSubmitting(true);
     try {
@@ -309,6 +311,24 @@ export default function BecomeHostScreen() {
 
             {/* Хостын нөхцөл */}
             <Pressable
+              onPress={() => setTermsAccepted((accepted) => !accepted)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: termsAccepted }}
+              style={styles.termsConsent}>
+              <View style={[
+                styles.checkbox,
+                { borderColor: termsAccepted ? '#16A34A' : C.backgroundSelected },
+                termsAccepted && styles.checkboxChecked,
+              ]}>
+                {termsAccepted ? <Text style={styles.checkmark}>✓</Text> : null}
+              </View>
+              <Text style={[styles.termsConsentText, { color: C.text }]}>
+                Би хостын үйлчилгээний нөхцөл болон захиалга бүрээс 10% үйлчилгээний
+                шимтгэл суутгахыг уншиж, зөвшөөрч байна.
+              </Text>
+            </Pressable>
+
+            <Pressable
               onPress={() => router.push('/host-terms' as never)}
               style={styles.termsLinkBtn}>
               <Text style={styles.termsLinkText}>📄 Хостын үйлчилгээний нөхцөлийг харах →</Text>
@@ -384,6 +404,24 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
   },
+  termsConsent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+    marginBottom: Spacing.one,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkboxChecked: { backgroundColor: '#16A34A' },
+  checkmark: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  termsConsentText: { flex: 1, fontSize: 13, lineHeight: 20 },
   termsLinkText: {
     color: '#16A34A',
     fontSize: 14,

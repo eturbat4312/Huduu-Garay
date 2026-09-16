@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, Colors, Spacing } from '@/constants/theme';
+import { BottomTabInset, Colors, Spacing, type ColorPalette } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 import { fetchHostBookings, fetchMyBookings, resolveMediaUrl } from '@/lib/api';
 import type { BookingSummary } from '@/types/api';
@@ -39,7 +39,7 @@ function BookingCard({
 }: {
   item: BookingSummary;
   onPress: () => void;
-  C: (typeof Colors)['light'];
+  C: ColorPalette;
 }) {
   const thumbUrl = resolveMediaUrl(item.listing.thumbnail);
   const statusInfo = STATUS_LABELS[item.status] ?? { label: item.status, color: '#6B7280' };
@@ -89,7 +89,7 @@ function BookingCard({
 }
 
 // ─── Empty state ─────────────────────────────────────────────────────────────
-function EmptyState({ isHost, C }: { isHost: boolean; C: (typeof Colors)['light'] }) {
+function EmptyState({ isHost, C }: { isHost: boolean; C: ColorPalette }) {
   return (
     <View style={[styles.emptyBox, { backgroundColor: C.backgroundElement }]}>
       <Text style={{ fontSize: 40 }}>{isHost ? '📋' : '🗓'}</Text>

@@ -1,7 +1,7 @@
 /**
  * Map tab — Бүх зарыг газрын зураг дээр харуулах
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Href } from 'expo-router';
 import {
   ActivityIndicator,
@@ -59,7 +59,6 @@ export default function MapScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    setIsLoading(true);
     fetchListings(filters)
       .then((data) => {
         if (isMounted) { setListings(data); setError(null); }
@@ -72,8 +71,9 @@ export default function MapScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appliedSearch]);
 
-  const mappableListings = listings.filter(
-    (l) => l.location_lat != null && l.location_lng != null,
+  const mappableListings = useMemo(
+    () => listings.filter((l) => l.location_lat != null && l.location_lng != null),
+    [listings],
   );
 
   // Зарууд ачаалагдсаны дараа тэдгээрт тохируулан zoom хийх
@@ -92,10 +92,17 @@ export default function MapScreen() {
       );
     }, 500); // map render хүлээх
     return () => clearTimeout(timer);
-  }, [mappableListings.length]);
+  }, [mappableListings]);
 
-  const handleSearch = () => setAppliedSearch(searchText.trim());
-  const handleClear = () => { setSearchText(''); setAppliedSearch(''); };
+  const handleSearch = () => {
+    setIsLoading(true);
+    setAppliedSearch(searchText.trim());
+  };
+  const handleClear = () => {
+    setIsLoading(true);
+    setSearchText('');
+    setAppliedSearch('');
+  };
 
   return (
     <ThemedView style={styles.container}>

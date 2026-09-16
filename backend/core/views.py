@@ -10,7 +10,7 @@ from datetime import timedelta
 from PIL import Image, UnidentifiedImageError
 from io import BytesIO
 from django.core.files.base import ContentFile
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.utils import timezone
 from core.utils.email_notifications import send_notification_email
 from core.services.qpay import QPayAPIError, QPayClient, QPayConfigurationError
@@ -165,6 +165,11 @@ class MeView(APIView):
 class CategoryListCreateView(generics.ListCreateAPIView):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+
+    def get_permissions(self):
+        if self.request.method in permissions.SAFE_METHODS:
+            return [permissions.AllowAny()]
+        return [permissions.IsAdminUser()]
 
     def get_serializer_context(self):
         return {"request": self.request}
@@ -347,6 +352,7 @@ class ListingImageDeleteView(APIView):
 
 class AvailabilityListCreateView(generics.ListCreateAPIView):
     serializer_class = AvailabilitySerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
         _release_expired_booking_holds()
@@ -356,11 +362,22 @@ class AvailabilityListCreateView(generics.ListCreateAPIView):
             queryset = queryset.filter(listing__id=listing_id)
         return queryset
 
+    def perform_create(self, serializer):
+        listing = serializer.validated_data["listing"]
+        if not self.request.user.is_host or listing.host_id != self.request.user.id:
+            raise PermissionDenied("Зөвхөн өөрийн зарын боломжит өдрийг нэмнэ.")
+        serializer.save()
+
 
 class AvailabilityBulkCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request, format=None):
         serializer = AvailabilityBulkSerializer(data=request.data)
         if serializer.is_valid():
+            listing = serializer.validated_data["listing"]
+            if not request.user.is_host or listing.host_id != request.user.id:
+                raise PermissionDenied("Зөвхөн өөрийн зарын боломжит өдрийг нэмнэ.")
             created = serializer.save()
             return Response(
                 {"message": f"{len(created)} availability entries created."}, status=201
@@ -371,6 +388,10 @@ class AvailabilityBulkCreateView(APIView):
 class AvailabilityDeleteView(generics.DestroyAPIView):
     queryset = Availability.objects.all()
     lookup_field = "id"
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return self.queryset.filter(listing__host=self.request.user)
 
 
 # ---------------------- BOOKING ----------------------
@@ -1278,8 +1299,11 @@ class QPayCallbackView(APIView):
 
 
 class BookingRetrieveView(RetrieveAPIView):
-    queryset = Booking.objects.all()
     serializer_class = BookingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Booking.objects.filter(guest=self.request.user)
 
 
 # ---------------------- FAVORITE ----------------------
@@ -1447,6 +1471,24 @@ class NotificationMarkAsReadView(APIView):
         return Response({"message": "Marked as read."})
 
 
+class NotificationMarkOneAsReadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, notification_id, format=None):
+        try:
+            notification = Notification.objects.get(
+                id=notification_id,
+                user=request.user,
+            )
+        except Notification.DoesNotExist:
+            return Response({"error": "Мэдэгдэл олдсонгүй."}, status=404)
+
+        if not notification.is_read:
+            notification.is_read = True
+            notification.save(update_fields=["is_read"])
+        return Response({"message": "Marked as read."})
+
+
 class HostBookingDetailView(RetrieveAPIView):
     serializer_class = BookingSerializer
     permission_classes = [IsAuthenticated]
@@ -1513,7 +1555,14 @@ class AvailabilityDeleteByListingView(APIView):
         listing_id = request.data.get("listing")
         if not listing_id:
             return Response({"error": "listing ID шаардлагатай"}, status=400)
-        deleted, _ = Availability.objects.filter(listing__id=listing_id).delete()
+        try:
+            listing = Listing.objects.get(id=listing_id, host=request.user)
+        except Listing.DoesNotExist:
+            return Response(
+                {"error": "Зар олдсонгүй эсвэл таных биш байна."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        deleted, _ = Availability.objects.filter(listing=listing).delete()
         return Response({"message": f"{deleted} огноо устгагдлаа."}, status=200)
 
 
@@ -1647,6 +1696,10 @@ class PasswordResetRequestView(APIView):
         if not email:
             return Response({"error": "Email шаардлагатай."}, status=400)
 
+        client = request.data.get("client", "web")
+        if client not in {"web", "mobile"}:
+            return Response({"error": "Client төрөл буруу байна."}, status=400)
+
         User = get_user_model()
         try:
             user = User.objects.get(email=email)
@@ -1656,8 +1709,11 @@ class PasswordResetRequestView(APIView):
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
-        reset_link = f"{frontend_url}/mn/reset-password?uid={uid}&token={token}"
+        if client == "mobile":
+            reset_link = f"tanaidhonoy://reset-password?uid={uid}&token={token}"
+        else:
+            frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
+            reset_link = f"{frontend_url}/mn/reset-password?uid={uid}&token={token}"
 
         try:
             send_notification_email(

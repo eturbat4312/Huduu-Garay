@@ -9,10 +9,12 @@
  */
 
 import { router, useLocalSearchParams } from 'expo-router';
+import { Image } from 'expo-image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -36,9 +38,10 @@ export default function PaymentScreen() {
   const C = Colors[scheme];
 
   const [payment, setPayment] = useState<Payment | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(Boolean(payment_id));
+  const [error, setError] = useState(payment_id ? '' : 'Төлбөрийн дугаар олдсонгүй.');
   const [confirming, setConfirming] = useState(false);
+  const [checking, setChecking] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = () => {
@@ -71,8 +74,6 @@ export default function PaymentScreen() {
 
   useEffect(() => {
     if (!payment_id) {
-      setError('Төлбөрийн дугаар олдсонгүй.');
-      setLoading(false);
       return;
     }
     fetchPayment(payment_id)
@@ -103,6 +104,39 @@ export default function PaymentScreen() {
       setConfirming(false);
     }
   };
+
+  const handleCheckNow = async () => {
+    if (!payment_id) return;
+    setChecking(true);
+    try {
+      const nextPayment = await checkPayment(payment_id);
+      setPayment(nextPayment);
+      if (nextPayment.status === 'paid') handlePaid(nextPayment);
+      else if (nextPayment.status !== 'pending') stopPolling();
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      Alert.alert('Алдаа', err.message ?? 'Төлбөр шалгахад алдаа гарлаа.');
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const openBankApp = async (link?: string) => {
+    if (!link) return;
+    try {
+      await Linking.openURL(link);
+    } catch {
+      Alert.alert('Апп нээх боломжгүй', 'Сонгосон банкны апп суусан эсэхийг шалгана уу.');
+    }
+  };
+
+  const qrImage = payment?.raw_response.qr_image
+    ? payment.raw_response.qr_image.startsWith('data:image')
+      ? payment.raw_response.qr_image
+      : `data:image/png;base64,${payment.raw_response.qr_image}`
+    : null;
+  const bankUrls = payment?.raw_response.urls ?? [];
+  const isMock = payment?.raw_response.mode === 'mock';
 
   return (
     <ThemedView style={{ flex: 1 }}>
@@ -168,6 +202,66 @@ export default function PaymentScreen() {
               </View>
             </View>
 
+            {payment.status === 'pending' && (
+              <View style={[styles.card, { backgroundColor: C.backgroundElement }]}>
+                <ThemedText type="smallBold">QPay-аар төлөх</ThemedText>
+                {qrImage ? (
+                  <Image
+                    source={{ uri: qrImage }}
+                    style={styles.qrImage}
+                    contentFit="contain"
+                    accessibilityLabel="QPay төлбөрийн QR код"
+                  />
+                ) : (
+                  <View style={[styles.qrPlaceholder, { borderColor: C.backgroundSelected }]}>
+                    <ThemedText themeColor="textSecondary" type="small" style={styles.centerText}>
+                      {isMock ? 'Local test invoice' : 'QR код ирээгүй байна.'}
+                    </ThemedText>
+                  </View>
+                )}
+
+                {bankUrls.length > 0 && (
+                  <View style={styles.bankGrid}>
+                    {bankUrls.map((item, index) => (
+                      <Pressable
+                        key={`${item.name ?? 'bank'}-${index}`}
+                        onPress={() => openBankApp(item.link)}
+                        disabled={!item.link}
+                        style={({ pressed }) => [
+                          styles.bankButton,
+                          { borderColor: C.backgroundSelected },
+                          (pressed || !item.link) && { opacity: 0.6 },
+                        ]}>
+                        <Text style={[styles.bankButtonText, { color: C.text }]}>
+                          {item.description || item.name || 'Банкны апп'}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+
+                {payment.raw_response.qr_text ? (
+                  <Text
+                    selectable
+                    style={[styles.qrText, { color: C.textSecondary, borderColor: C.backgroundSelected }]}>
+                    {payment.raw_response.qr_text}
+                  </Text>
+                ) : null}
+
+                <Pressable
+                  onPress={handleCheckNow}
+                  disabled={checking}
+                  style={({ pressed }) => [
+                    styles.checkButton,
+                    (pressed || checking) && { opacity: 0.7 },
+                  ]}>
+                  {checking
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={styles.checkButtonText}>Төлбөр шалгах</Text>}
+                </Pressable>
+              </View>
+            )}
+
             {/* Polling индикатор */}
             {payment.status === 'pending' && (
               <View style={styles.pollingRow}>
@@ -184,7 +278,7 @@ export default function PaymentScreen() {
                 <ThemedText type="smallBold">QPay-ээр төлөх заавар</ThemedText>
                 <ThemedText themeColor="textSecondary" type="small">
                   1. QPay апп-аа нээнэ үү.{'\n'}
-                  2. "QR уншуулах" эсвэл "Invoice" сонгоно уу.{'\n'}
+                  2. “QR уншуулах” эсвэл “Invoice” сонгоно уу.{'\n'}
                   3. Invoice дугаарыг оруулна уу.{'\n'}
                   4. Дүнг баталгаажуулан төлнө үү.
                 </ThemedText>
@@ -192,7 +286,7 @@ export default function PaymentScreen() {
             )}
 
             {/* Dev: Mock баталгаажуулах */}
-            {payment.status === 'pending' && (
+            {payment.status === 'pending' && isMock && (
               <Pressable
                 onPress={handleMockConfirm}
                 disabled={confirming}
@@ -231,6 +325,24 @@ const styles = StyleSheet.create({
   statusTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
   statusSub: { textAlign: 'center', fontSize: 14, lineHeight: 20 },
   card: { borderRadius: 16, padding: Spacing.three, gap: Spacing.two },
+  qrImage: { width: 220, height: 220, alignSelf: 'center', borderRadius: 12 },
+  qrPlaceholder: {
+    width: 220, height: 220, alignSelf: 'center', borderWidth: 1,
+    borderRadius: 12, alignItems: 'center', justifyContent: 'center', padding: Spacing.three,
+  },
+  centerText: { textAlign: 'center' },
+  bankGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  bankButton: {
+    minHeight: 44, minWidth: '47%', flexGrow: 1, borderWidth: 1,
+    borderRadius: 10, alignItems: 'center', justifyContent: 'center', padding: Spacing.two,
+  },
+  bankButtonText: { fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  qrText: { borderWidth: 1, borderRadius: 10, padding: Spacing.two, fontSize: 11 },
+  checkButton: {
+    minHeight: 48, borderRadius: 12, backgroundColor: '#16A34A',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  checkButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   amount: { fontSize: 20, fontWeight: '800' },
   mono: { fontSize: 12, maxWidth: 160, textAlign: 'right' },

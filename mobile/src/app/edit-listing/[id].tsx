@@ -28,6 +28,9 @@ import {
 } from '@/lib/api';
 import type { ListingAmenity, ListingCategory, ListingImage } from '@/types/api';
 
+const formatPrice = (value: string) =>
+  value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
 // ─── Stepper ─────────────────────────────────────────────────────────────────
 function Stepper({
   value, onChange, min = 1, max = 30, color,
@@ -136,8 +139,6 @@ export default function EditListingScreen() {
   }, [id]);
 
   // ── Helpers ──
-  const formatPrice = (val: string) =>
-    val.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const plainPrice = Number(price.replace(/,/g, ''));
 
   const toggleAmenity = (aid: number) =>

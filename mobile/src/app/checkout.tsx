@@ -20,7 +20,7 @@ import { datesBetweenNights, isDateString } from '@/lib/dates';
 import type { ListingDetail } from '@/types/api';
 
 export default function CheckoutScreen() {
-  const scheme = useColorScheme() ?? "light";
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const C = Colors[scheme];
   const params = useLocalSearchParams<{
     listing?: string;

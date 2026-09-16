@@ -15,8 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import MapView, { Callout, Marker, UrlTile } from 'react-native-maps';
 
-const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
-
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Colors, Spacing } from '@/constants/theme';
 import {
@@ -27,6 +25,8 @@ import {
   resolveMediaUrl,
 } from '@/lib/api';
 import type { ListingCategory, ListingFilters, ListingSummary } from '@/types/api';
+
+const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
 
 // Монгол улсын төв координат
 const INITIAL_REGION = {
@@ -61,7 +61,6 @@ export default function ExploreScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    setIsLoading(true);
     fetchListings(appliedFilters)
       .then((data) => {
         if (isMounted) { setListings(data); setError(null); }
@@ -79,16 +78,19 @@ export default function ExploreScreen() {
 
   const applyCategory = (category: string) => {
     const next = { ...filters, category };
+    setIsLoading(true);
     setFilters(next);
     setAppliedFilters(next);
   };
 
   const applyFilters = () => {
+    setIsLoading(true);
     setAppliedFilters({ ...filters });
     setSearchExpanded(false);
   };
 
   const clearFilters = () => {
+    setIsLoading(true);
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
     setSearchExpanded(false);

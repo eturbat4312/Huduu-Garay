@@ -15,9 +15,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Marker, UrlTile } from "react-native-maps";
-import type { MapView as MapViewRef } from "react-native-maps";
-
-const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
 import { router } from "expo-router";
 
 import { ThemedView } from "@/components/themed-view";
@@ -34,6 +31,8 @@ import type {
   ListingFilters,
   ListingSummary,
 } from "@/types/api";
+
+const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 // 2 карт + 3 дахийн ирмэг харагдахаар
@@ -60,8 +59,7 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchExpanded, setSearchExpanded] = useState(false);
-  const [mapScrollEnabled, setMapScrollEnabled] = useState(true);
-  const homeMapRef = useRef<MapViewRef>(null);
+  const homeMapRef = useRef<MapView>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -138,7 +136,7 @@ export default function HomeScreen() {
       );
     }, 600);
     return () => clearTimeout(timer);
-  }, [mappableListings.length]);
+  }, [mappableListings]);
 
   const applyCategory = (category: string) => {
     const next = { ...filters, category };
@@ -269,11 +267,7 @@ export default function HomeScreen() {
                 <Text style={styles.mapPreviewLink}>Бүгдийг харах →</Text>
               </Pressable>
             </View>
-            <View
-              style={styles.mapPreviewBox}
-              onTouchStart={() => setMapScrollEnabled(false)}
-              onTouchEnd={() => setMapScrollEnabled(true)}
-              onTouchCancel={() => setMapScrollEnabled(true)}>
+            <View style={styles.mapPreviewBox}>
               <MapView
                 ref={homeMapRef}
                 mapType="none"

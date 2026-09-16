@@ -24,7 +24,6 @@ export default function AppTabs() {
 
   useEffect(() => {
     if (state.status !== 'authenticated') {
-      setUnreadCount(0);
       return;
     }
 
@@ -74,7 +73,7 @@ export default function AppTabs() {
             <TabButton>Хадгалсан</TabButton>
           </TabTrigger>
           <TabTrigger name="notifications" href="/notifications" asChild>
-            <TabButton badgeCount={unreadCount}>Мэдэгдэл</TabButton>
+            <TabButton badgeCount={state.status === 'authenticated' ? unreadCount : 0}>Мэдэгдэл</TabButton>
           </TabTrigger>
           <TabTrigger name="profile" href="/profile" asChild>
             <TabButton>Профайл</TabButton>

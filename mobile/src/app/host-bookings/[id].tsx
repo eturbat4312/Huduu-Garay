@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams , useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,10 +13,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Spacing } from '@/constants/theme';
+import { Colors, Spacing, type ColorPalette } from '@/constants/theme';
 import { fetchHostBookingDetail, hostCancelBooking } from '@/lib/api';
 import type { BookingDetail } from '@/types/api';
-import { useFocusEffect } from 'expo-router';
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending:   { label: 'Хүлээгдэж байна', color: '#D97706' },
@@ -29,7 +28,7 @@ function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('mn-MN', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
-function InfoRow({ label, value, C }: { label: string; value: string; C: (typeof Colors)['light'] }) {
+function InfoRow({ label, value, C }: { label: string; value: string; C: ColorPalette }) {
   return (
     <View style={styles.infoRow}>
       <Text style={[styles.infoLabel, { color: C.textSecondary }]}>{label}</Text>

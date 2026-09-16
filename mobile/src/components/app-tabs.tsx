@@ -18,7 +18,6 @@ export default function AppTabs() {
 
   useEffect(() => {
     if (!isAuthenticated) {
-      setUnreadCount(0);
       return;
     }
 
@@ -91,14 +90,15 @@ export default function AppTabs() {
 
       {/* Нэвтрээгүй үед: Хадгалсан | Нэвтэрсэн үед: Мэдэгдэл — 4-р байр үргэлж 5 tab л байна */}
       {isAuthenticated ? (
-        <NativeTabs.Trigger
-          name="notifications"
-          badge={unreadCount > 0 ? (unreadCount > 99 ? '99+' : String(unreadCount)) : undefined}>
+        <NativeTabs.Trigger name="notifications">
           <NativeTabs.Trigger.Label>Мэдэгдэл</NativeTabs.Trigger.Label>
           <NativeTabs.Trigger.Icon
             src={require('@/assets/images/tabIcons/home.png')}
             renderingMode="template"
           />
+          <NativeTabs.Trigger.Badge hidden={unreadCount === 0}>
+            {unreadCount > 99 ? '99+' : String(unreadCount)}
+          </NativeTabs.Trigger.Badge>
         </NativeTabs.Trigger>
       ) : (
         <NativeTabs.Trigger name="favorites">

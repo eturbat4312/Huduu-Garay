@@ -15,9 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Colors, Spacing, BottomTabInset } from '@/constants/theme';
+import { Colors, Spacing, BottomTabInset, type ColorPalette } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
-import { fetchNotifications, markNotificationsRead } from '@/lib/api';
+import { fetchNotifications, markNotificationRead } from '@/lib/api';
 import type { NotificationItem } from '@/types/api';
 
 // ─── Notification icon by type ──────────────────────────────────────────────
@@ -36,15 +36,15 @@ function notifIcon(type: string): string {
 }
 
 // ─── Navigate on tap ────────────────────────────────────────────────────────
-function handleNotifPress(item: NotificationItem) {
+function navigateForNotification(item: NotificationItem) {
   if (item.related_booking) {
     if (item.type === 'booking_created' || item.type === 'admin_booking') {
-      router.push('/host-bookings' as never);
+      router.push(`/host-bookings/${item.related_booking}` as never);
     } else {
-      router.push('/bookings' as never);
+      router.push(`/booking/${item.related_booking}` as never);
     }
   } else if (item.related_listing) {
-    router.push(`/listings/${item.related_listing}` as never);
+    router.push(`/listing/${item.related_listing}` as never);
   }
 }
 
@@ -54,18 +54,24 @@ function formatDate(iso: string): string {
 }
 
 // ─── Row ────────────────────────────────────────────────────────────────────
-function NotifRow({ item, C }: { item: NotificationItem; C: (typeof Colors)['light'] }) {
+function NotifRow({
+  item,
+  C,
+  onPress,
+}: {
+  item: NotificationItem;
+  C: ColorPalette;
+  onPress: (item: NotificationItem) => void;
+}) {
   const unread = !item.is_read;
-  const tappable = !!(item.related_booking || item.related_listing);
   return (
     <Pressable
-      onPress={() => handleNotifPress(item)}
-      disabled={!tappable}
+      onPress={() => onPress(item)}
       style={({ pressed }) => [
         styles.row,
         { backgroundColor: unread ? '#EFF6FF' : C.backgroundElement },
         unread && styles.rowUnread,
-        pressed && tappable && { opacity: 0.75 },
+        pressed && { opacity: 0.75 },
       ]}
     >
       <Text style={styles.icon}>{notifIcon(item.type)}</Text>
@@ -98,9 +104,6 @@ export default function NotificationsScreen() {
     try {
       const data = await fetchNotifications();
       setItems(data);
-      // Бүгдийг уншсан гэж тэмдэглэнэ
-      await markNotificationsRead().catch(() => {});
-      DeviceEventEmitter.emit('notifications:marked-read');
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Мэдэгдэл ачаалахад алдаа гарлаа';
       setError(msg);
@@ -115,12 +118,28 @@ export default function NotificationsScreen() {
     load();
   }, [load]));
 
+  const handlePress = useCallback((item: NotificationItem) => {
+    if (!item.is_read) {
+      setItems((current) => current.map((entry) => (
+        entry.id === item.id ? { ...entry, is_read: true } : entry
+      )));
+      markNotificationRead(item.id)
+        .then(() => DeviceEventEmitter.emit('notifications:marked-read'))
+        .catch(() => {
+          setItems((current) => current.map((entry) => (
+            entry.id === item.id ? { ...entry, is_read: false } : entry
+          )));
+        });
+    }
+    navigateForNotification(item);
+  }, []);
+
   if (!isAuthenticated) {
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView style={[styles.safe, styles.center]}>
           <Text style={{ fontSize: 40 }}>🔔</Text>
-          <ThemedText type="defaultSemiBold">Нэвтэрсний дараа мэдэгдлүүд харагдана</ThemedText>
+          <ThemedText type="smallBold">Нэвтэрсний дараа мэдэгдлүүд харагдана</ThemedText>
           <Pressable
             onPress={() => router.push('/login' as never)}
             style={styles.loginBtn}
@@ -157,7 +176,7 @@ export default function NotificationsScreen() {
           <FlatList
             data={items}
             keyExtractor={(i) => String(i.id)}
-            renderItem={({ item }) => <NotifRow item={item} C={C} />}
+            renderItem={({ item }) => <NotifRow item={item} C={C} onPress={handlePress} />}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />
             }

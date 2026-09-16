@@ -128,6 +128,11 @@ class CategoryTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(len(r.data), 2)
 
+    def test_non_admin_cannot_create(self):
+        user = make_user("category-user", email="category-user@x.com")
+        r = auth_client(user).post("/api/categories/", {"name": "Шинэ"}, format="json")
+        self.assertEqual(r.status_code, 403)
+
 
 # ── 4. LISTINGS ───────────────────────────────────────────────
 
@@ -255,6 +260,39 @@ class AvailabilityTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(Availability.objects.filter(listing=self.listing).count(), 0)
 
+    def test_unauthenticated_cannot_create(self):
+        today = date.today()
+        r = APIClient().post("/api/availability/bulk/", {
+            "listing": self.listing.id,
+            "dates": [(today + timedelta(days=1)).isoformat()],
+        }, format="json")
+        self.assertEqual(r.status_code, 401)
+
+    def test_other_host_cannot_create_or_delete(self):
+        other_host = make_user("other-avh", email="other-avh@x.com", is_host=True)
+        other_client = auth_client(other_host)
+        today = date.today()
+        create_response = other_client.post("/api/availability/bulk/", {
+            "listing": self.listing.id,
+            "dates": [(today + timedelta(days=1)).isoformat()],
+        }, format="json")
+        self.assertEqual(create_response.status_code, 403)
+
+        availability = Availability.objects.create(
+            listing=self.listing,
+            date=today + timedelta(days=2),
+        )
+        delete_response = other_client.delete(f"/api/availability/{availability.id}/")
+        self.assertEqual(delete_response.status_code, 404)
+        self.assertTrue(Availability.objects.filter(id=availability.id).exists())
+
+        delete_all_response = other_client.post(
+            "/api/availability/delete-by-listing/",
+            {"listing": self.listing.id},
+            format="json",
+        )
+        self.assertEqual(delete_all_response.status_code, 404)
+
 
 # ── 6. BOOKING ────────────────────────────────────────────────
 
@@ -316,6 +354,18 @@ class BookingTests(TestCase):
         r = self.gc.get("/api/bookings/my/")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(len(r.data), 1)
+
+    def test_booking_detail_only_visible_to_guest(self):
+        self._book()
+        booking = Booking.objects.first()
+        own_response = self.gc.get(f"/api/bookings/{booking.id}/")
+        self.assertEqual(own_response.status_code, 200)
+
+        host_response = self.hc.get(f"/api/bookings/{booking.id}/")
+        self.assertEqual(host_response.status_code, 404)
+
+        anonymous_response = APIClient().get(f"/api/bookings/{booking.id}/")
+        self.assertEqual(anonymous_response.status_code, 401)
 
     def test_host_cancel(self):
         self._book()
@@ -445,6 +495,28 @@ class NotificationTests(TestCase):
         self.c.post("/api/notifications/mark-read/", {"type": "booking_created"}, format="json")
         self.assertEqual(Notification.objects.filter(user=self.user, is_read=False, type="booking_created").count(), 0)
         self.assertEqual(Notification.objects.filter(user=self.user, is_read=False, type="review").count(), 1)
+
+    def test_mark_single_read(self):
+        first = self._make()
+        second = self._make()
+
+        r = self.c.post(f"/api/notifications/{first.id}/read/", format="json")
+
+        self.assertEqual(r.status_code, 200)
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertTrue(first.is_read)
+        self.assertFalse(second.is_read)
+
+    def test_cannot_mark_other_users_notification(self):
+        other = make_user("notification-other", email="notification-other@x.com")
+        notification = Notification.objects.create(user=other, message="private", type="booking")
+
+        r = self.c.post(f"/api/notifications/{notification.id}/read/", format="json")
+
+        self.assertEqual(r.status_code, 404)
+        notification.refresh_from_db()
+        self.assertFalse(notification.is_read)
 
 
 # ── 9. REVIEWS ────────────────────────────────────────────────
@@ -634,6 +706,19 @@ class PasswordResetTests(TestCase):
     def test_request_unknown_email_still_200(self):
         r = APIClient().post("/api/password-reset/", {"email": "nobody@x.com"}, format="json")
         self.assertEqual(r.status_code, 200)
+
+    @patch("core.views.send_notification_email")
+    def test_mobile_request_sends_app_deep_link(self, send_email):
+        r = APIClient().post("/api/password-reset/", {
+            "email": "pr@x.com",
+            "client": "mobile",
+        }, format="json")
+
+        self.assertEqual(r.status_code, 200)
+        reset_link = send_email.call_args.kwargs["context"]["reset_link"]
+        self.assertTrue(reset_link.startswith("tanaidhonoy://reset-password?"))
+        self.assertIn("uid=", reset_link)
+        self.assertIn("token=", reset_link)
 
     def test_confirm_invalid_token(self):
         r = APIClient().post("/api/password-reset/confirm/", {

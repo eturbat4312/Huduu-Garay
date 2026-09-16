@@ -174,7 +174,18 @@ export type Payment = {
   amount: number | string;
   currency: string;
   status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'expired' | 'refunded';
-  raw_response: Record<string, unknown>;
+  raw_response: {
+    qr_text?: string;
+    qr_image?: string;
+    urls?: {
+      name?: string;
+      description?: string;
+      link?: string;
+    }[];
+    mode?: string;
+    message?: string;
+    [key: string]: unknown;
+  };
   paid_at: string | null;
   created_at: string;
   updated_at: string;

@@ -2,15 +2,14 @@ import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/context/auth';
 
-// ▸ Google Console-оос авсан Client ID-ээ солино уу
-export const GOOGLE_IOS_CLIENT_ID = '1074205961751-egshclpstvb78p398re4h6noo4kaiake.apps.googleusercontent.com';
-export const GOOGLE_ANDROID_CLIENT_ID = 'YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com';
+export const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+export const GOOGLE_ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -22,30 +21,22 @@ type Props = {
 export function GoogleSignInButton({ label = 'Google-ээр нэвтрэх', onError }: Props) {
   const { loginWithGoogle } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const platformClientId = Platform.OS === 'ios'
+    ? GOOGLE_IOS_CLIENT_ID
+    : GOOGLE_ANDROID_CLIENT_ID;
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     iosClientId: GOOGLE_IOS_CLIENT_ID,
     androidClientId: GOOGLE_ANDROID_CLIENT_ID,
   });
 
-  useEffect(() => {
-    if (response?.type === 'success') {
-      handleGoogleCallback();
-    } else if (response?.type === 'error') {
-      setIsLoading(false);
-      onError?.('Google нэвтрэх үед алдаа гарлаа.');
-    }
-  }, [response]);
-
-  const handleGoogleCallback = async () => {
-    if (response?.type !== 'success' || !request) return;
+  const handleGoogleCallback = useCallback(async () => {
+    if (response?.type !== 'success' || !request || !platformClientId) return;
     setIsLoading(true);
     try {
-      const clientId =
-        Platform.OS === 'ios' ? GOOGLE_IOS_CLIENT_ID : GOOGLE_ANDROID_CLIENT_ID;
       const tokenResponse = await AuthSession.exchangeCodeAsync(
         {
-          clientId,
+          clientId: platformClientId,
           code: response.params.code,
           redirectUri: request.redirectUri,
           extraParams: request.codeVerifier
@@ -63,15 +54,31 @@ export function GoogleSignInButton({ label = 'Google-ээр нэвтрэх', onE
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [loginWithGoogle, onError, platformClientId, request, response]);
+
+  useEffect(() => {
+    if (response?.type === 'success') {
+      // OAuth provider response-ийг React state/auth state руу синк хийх шаардлагатай.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void handleGoogleCallback();
+    } else if (response?.type === 'error') {
+      setIsLoading(false);
+      onError?.('Google нэвтрэх үед алдаа гарлаа.');
+    }
+  }, [handleGoogleCallback, onError, response?.type]);
 
   return (
     <Pressable
-      onPress={() => {
+      onPress={async () => {
+        if (!platformClientId) {
+          onError?.('Google нэвтрэх тохиргоо энэ төхөөрөмжид хийгдээгүй байна.');
+          return;
+        }
         setIsLoading(true);
-        promptAsync();
+        const result = await promptAsync();
+        if (result.type !== 'success') setIsLoading(false);
       }}
-      disabled={!request || isLoading}
+      disabled={!request || isLoading || !platformClientId}
       style={({ pressed }) => [styles.button, (pressed || isLoading) && styles.pressed]}>
       <ThemedText type="smallBold" style={styles.text}>
         {isLoading ? 'Нэвтэрч байна...' : `🔵  ${label}`}

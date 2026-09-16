@@ -31,7 +31,7 @@ export default function HostTermsScreen() {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}>
           <Text style={[styles.title, { color: C.text }]}>Хостын үйлчилгээний нөхцөл</Text>
-          <Text style={[styles.date, { color: C.textSecondary }]}>Сүүлийн шинэчлэл: 2025 оны 1-р сар</Text>
+          <Text style={[styles.date, { color: C.textSecondary }]}>Хувилбар: 2026-09-15</Text>
 
           <Section title="1. Хост болох шаардлага" color={C.text} secondaryColor={C.textSecondary}>
             Хост болохын тулд та үнэн зөв мэдээлэл, иргэний үнэмлэхийн зураг болон өөрийн зургийг оруулан хүсэлт гаргана. Манай баг таны мэдээллийг шалгаж, 3-5 ажлын өдрийн дотор шийдвэрлэнэ.

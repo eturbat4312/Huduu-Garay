@@ -16,8 +16,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
 
-const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
-
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
@@ -40,6 +38,8 @@ import {
   todayYmd,
 } from '@/lib/dates';
 import type { ListingDetail, Review } from '@/types/api';
+
+const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
 
 // ─── Calendar picker ────────────────────────────────────────────────────────
 
@@ -66,7 +66,7 @@ function CalendarPicker({
   onSetCheckOut: (d: string) => void;
   onReset: () => void;
 }) {
-  const scheme = useColorScheme() ?? 'light';
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const C = Colors[scheme];
   const today = todayYmd();
 
@@ -174,13 +174,11 @@ function CalendarPicker({
           if (isCheckIn || isCheckOut) circleBg = '#2563EB';
 
           // Range strip background (full cell width, half for edge cells)
-          let stripBg = 'transparent';
-          if (isInRange) stripBg = '#BFDBFE';
           // Left half strip for checkOut, right half strip for checkIn
           // (simplified: just full strip on in-range days)
 
           // Text color
-          let textColor = C.text;
+          let textColor: string = C.text;
           if (isPast) textColor = C.textSecondary;
           if (isCheckIn || isCheckOut) textColor = '#FFFFFF';
           if (isInRange && !isCheckIn && !isCheckOut) textColor = '#1D4ED8';
@@ -343,7 +341,7 @@ const calStyles = StyleSheet.create({
 
 export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const scheme = useColorScheme() ?? "light";
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const C = Colors[scheme];
   const { user } = useAuth();
   const [listing, setListing] = useState<ListingDetail | null>(null);
@@ -362,7 +360,6 @@ export default function ListingDetailScreen() {
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
-  const [reviewHover, setReviewHover] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -770,7 +767,7 @@ export default function ListingDetailScreen() {
                 <View style={styles.starRow}>
                   {[1,2,3,4,5].map((s) => (
                     <Pressable key={s} onPress={() => setReviewRating(s)}>
-                      <ThemedText style={[styles.star, { color: s <= (reviewRating || reviewHover) ? '#F59E0B' : '#D1D5DB' }]}>★</ThemedText>
+                      <ThemedText style={[styles.star, { color: s <= reviewRating ? '#F59E0B' : '#D1D5DB' }]}>★</ThemedText>
                     </Pressable>
                   ))}
                 </View>
@@ -804,7 +801,7 @@ export default function ListingDetailScreen() {
                     <ThemedText style={styles.reviewStars}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</ThemedText>
                   </View>
                   <ThemedText themeColor="textSecondary" type="small">{r.comment}</ThemedText>
-                  <ThemedText themeColor="textSecondary" type="tiny" style={{ marginTop: 4 }}>
+                  <ThemedText themeColor="textSecondary" type="small" style={{ marginTop: 4, fontSize: 12 }}>
                     {new Date(r.created_at).toLocaleDateString('mn-MN')}
                   </ThemedText>
                 </View>
@@ -818,7 +815,7 @@ export default function ListingDetailScreen() {
 }
 
 function InfoPill({ label }: { label: string }) {
-  const scheme = useColorScheme() ?? "light";
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const C = Colors[scheme];
   return (
     <View style={[styles.pill, { backgroundColor: C.backgroundElement, borderColor: C.backgroundSelected }]}>

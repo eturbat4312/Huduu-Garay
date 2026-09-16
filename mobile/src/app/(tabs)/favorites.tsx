@@ -23,13 +23,12 @@ export default function FavoritesScreen() {
   const C = Colors[scheme];
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [favorites, setFavorites] = useState<FavoriteListItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [removing, setRemoving] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    setLoading(true);
     fetchFavorites()
       .then(setFavorites)
       .catch(() => setError('Мэдээлэл татахад алдаа гарлаа.'))

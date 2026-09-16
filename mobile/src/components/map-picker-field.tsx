@@ -44,7 +44,7 @@ type Props = {
 };
 
 export default function MapPickerField({ lat, lng, onChange, onMapFocus, onMapBlur }: Props) {
-  const scheme = useColorScheme() ?? 'light';
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const C = Colors[scheme];
 
   const mapRef = useRef<MapView>(null);
@@ -59,13 +59,15 @@ export default function MapPickerField({ lat, lng, onChange, onMapFocus, onMapBl
   // Parent-аас lat/lng өөрчлөгдвөл pin шинэчлэх
   useEffect(() => {
     if (lat != null && lng != null) {
+      // Async-аар ачаалсан parent coordinate-ийг editable local marker-тэй синк хийнэ.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPin({ latitude: lat, longitude: lng });
     }
   }, [lat, lng]);
 
   // MapTiler geocoding хайлт (debounce 300ms)
   useEffect(() => {
-    if (!q.trim()) { setResults([]); return; }
+    if (!q.trim()) return;
     const t = setTimeout(async () => {
       setSearching(true);
       try {
@@ -81,6 +83,11 @@ export default function MapPickerField({ lat, lng, onChange, onMapFocus, onMapBl
     }, 300);
     return () => clearTimeout(t);
   }, [q]);
+
+  const handleQueryChange = (value: string) => {
+    setQ(value);
+    if (!value.trim()) setResults([]);
+  };
 
   const placePin = (latitude: number, longitude: number) => {
     const coord = { latitude, longitude };
@@ -126,7 +133,7 @@ export default function MapPickerField({ lat, lng, onChange, onMapFocus, onMapBl
       <View style={styles.searchWrap}>
         <TextInput
           value={q}
-          onChangeText={setQ}
+          onChangeText={handleQueryChange}
           placeholder="Хот, дүүрэг, гудамж хайх..."
           placeholderTextColor={C.textSecondary}
           style={[styles.searchInput, { borderColor: C.backgroundSelected, color: C.text, backgroundColor: C.background }]}

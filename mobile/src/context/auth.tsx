@@ -56,6 +56,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // SecureStore дахь session-ийг анхны render-ийн дараа auth state-тай синк хийнэ.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadUser();
   }, [loadUser]);
 

@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -30,15 +30,6 @@ export default function EditProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-
-  // user өөрчлөгдвөл утгуудыг шинэчлэх
-  useEffect(() => {
-    if (user) {
-      setFullName(user.full_name ?? '');
-      setPhone(user.phone ?? '');
-      setBio(user.bio ?? '');
-    }
-  }, [user]);
 
   async function handleSave() {
     setError('');

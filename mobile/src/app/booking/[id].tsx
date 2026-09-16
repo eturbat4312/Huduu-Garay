@@ -29,7 +29,7 @@ function fmtDate(d: string) {
 }
 
 function Row({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
-  const scheme = useColorScheme() ?? 'light';
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const C = Colors[scheme];
   return (
     <View style={styles.row}>

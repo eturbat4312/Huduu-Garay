@@ -395,12 +395,18 @@ export function markNotificationsRead(type?: string): Promise<void> {
   });
 }
 
+export function markNotificationRead(notificationId: number | string): Promise<void> {
+  return request<void>(`/notifications/${notificationId}/read/`, {
+    method: 'POST',
+  });
+}
+
 // ─── Password Reset ───────────────────────────────────────────────────────────
 
 export async function requestPasswordReset(email: string): Promise<void> {
   await request<{ detail: string }>('/password-reset/', {
     method: 'POST',
-    body: { email },
+    body: { email, client: 'mobile' },
   });
 }
 
@@ -423,14 +429,14 @@ export function updateListing(
   id: number | string,
   payload: ListingUpdatePayload,
 ): Promise<import('@/types/api').ListingDetail> {
-  return request<import('@/types/api').ListingDetail>(`/listings/${id}/`, {
+  return request<import('@/types/api').ListingDetail>(`/listings/${id}/edit/`, {
     method: 'PATCH',
     body: payload,
   });
 }
 
 export async function deleteListingImage(imageId: number): Promise<void> {
-  await request<void>(`/listing-images/${imageId}/`, { method: 'DELETE' });
+  await request<void>(`/listing-images/${imageId}/delete/`, { method: 'DELETE' });
 }
 
 // ─── Reviews ──────────────────────────────────────────────────────────────────
