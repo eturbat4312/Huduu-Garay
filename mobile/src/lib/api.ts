@@ -258,6 +258,14 @@ export function fetchHostBookings(): Promise<import('@/types/api').BookingSummar
   return request<import('@/types/api').BookingSummary[]>('/host-bookings/');
 }
 
+export function fetchHostBookingDetail(id: number | string): Promise<BookingDetail> {
+  return request<BookingDetail>(`/host-bookings/${id}/`);
+}
+
+export function hostCancelBooking(id: number | string): Promise<void> {
+  return request<void>(`/bookings/${id}/host-cancel/`, { method: 'POST' });
+}
+
 export function applyToBeHost(payload: { message?: string }): Promise<HostApplication> {
   return request<HostApplication>('/host/apply/', {
     method: 'POST',
@@ -423,4 +431,70 @@ export function updateListing(
 
 export async function deleteListingImage(imageId: number): Promise<void> {
   await request<void>(`/listing-images/${imageId}/`, { method: 'DELETE' });
+}
+
+// ─── Reviews ──────────────────────────────────────────────────────────────────
+
+export function fetchReviews(
+  listingId: number | string,
+): Promise<import('@/types/api').Review[]> {
+  return request<import('@/types/api').Review[]>(`/listings/${listingId}/reviews/`);
+}
+
+export function createReview(
+  listingId: number | string,
+  payload: { rating: number; comment: string },
+): Promise<import('@/types/api').Review> {
+  return request<import('@/types/api').Review>(`/listings/${listingId}/reviews/`, {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+// ─── QPay Payment flow ────────────────────────────────────────────────────────
+
+export function createPaymentIntent(
+  payload: {
+    listing_id: number | string;
+    check_in: string;
+    check_out: string;
+    full_name: string;
+    phone_number: string;
+    notes?: string;
+    guest_count: number;
+  },
+  idempotencyKey: string,
+): Promise<import('@/types/api').PaymentIntent> {
+  return request<import('@/types/api').PaymentIntent>('/bookings/payment-intent/', {
+    method: 'POST',
+    body: payload,
+    headers: { 'X-Idempotency-Key': idempotencyKey },
+  });
+}
+
+export function createPayment(
+  bookingId: number,
+  idempotencyKey: string,
+): Promise<import('@/types/api').Payment> {
+  return request<import('@/types/api').Payment>('/payments/', {
+    method: 'POST',
+    body: { booking_id: bookingId },
+    headers: { 'X-Idempotency-Key': `${idempotencyKey}:payment` },
+  });
+}
+
+export function fetchPayment(paymentId: number | string): Promise<import('@/types/api').Payment> {
+  return request<import('@/types/api').Payment>(`/payments/${paymentId}/`);
+}
+
+export function checkPayment(paymentId: number | string): Promise<import('@/types/api').Payment> {
+  return request<import('@/types/api').Payment>(`/payments/${paymentId}/check/`, {
+    method: 'POST',
+  });
+}
+
+export function mockConfirmPayment(paymentId: number | string): Promise<import('@/types/api').Payment> {
+  return request<import('@/types/api').Payment>(`/payments/${paymentId}/mock-confirm/`, {
+    method: 'POST',
+  });
 }

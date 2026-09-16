@@ -97,6 +97,7 @@ export default function BecomeHostScreen() {
       fd.append('account_number', accountNumber.trim());
       fd.append('id_card_image', { uri: idCardImage.uri, name: idCardImage.name, type: idCardImage.type } as any);
       fd.append('selfie_with_id', { uri: selfieImage.uri, name: selfieImage.name, type: selfieImage.type } as any);
+      fd.append('host_terms_accepted', 'true');
 
       await applyToBeHostFormData(fd);
       await refresh();
@@ -306,6 +307,13 @@ export default function BecomeHostScreen() {
               </View>
             ) : null}
 
+            {/* Хостын нөхцөл */}
+            <Pressable
+              onPress={() => router.push('/host-terms' as never)}
+              style={styles.termsLinkBtn}>
+              <Text style={styles.termsLinkText}>📄 Хостын үйлчилгээний нөхцөлийг харах →</Text>
+            </Pressable>
+
             {/* Илгээх */}
             <Pressable
               onPress={handleSubmit}
@@ -372,6 +380,15 @@ const styles = StyleSheet.create({
   },
   errorText: { color: '#DC2626', fontSize: 13, lineHeight: 20 },
 
+  termsLinkBtn: {
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  termsLinkText: {
+    color: '#16A34A',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   submitBtn: {
     height: 52, borderRadius: 14, backgroundColor: '#16A34A',
     alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.five,

@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
-import { ApiError, createBooking, fetchListing } from '@/lib/api';
+import { ApiError, createPayment, createPaymentIntent, fetchListing } from '@/lib/api';
 import { datesBetweenNights, isDateString } from '@/lib/dates';
 import type { ListingDetail } from '@/types/api';
 
@@ -145,7 +145,8 @@ export default function CheckoutScreen() {
     setIsSubmitting(true);
 
     try {
-      const booking = await createBooking(
+      // Step 1: Create pending booking (payment-intent)
+      const intent = await createPaymentIntent(
         {
           listing_id: params.listing,
           check_in: params.check_in,
@@ -158,9 +159,13 @@ export default function CheckoutScreen() {
         attemptKeyRef.current,
       );
 
+      // Step 2: Create QPay payment invoice
+      const payment = await createPayment(intent.booking.id, attemptKeyRef.current);
+
+      // Navigate to payment screen to show QR and poll status
       router.replace({
-        pathname: '/bookings',
-        params: { created: String(booking.id) },
+        pathname: '/payment',
+        params: { payment_id: String(payment.id) },
       });
     } catch (err: unknown) {
       attemptKeyRef.current = null;
@@ -286,8 +291,12 @@ export default function CheckoutScreen() {
         <View style={styles.termsRow}>
           <Switch value={accepted} disabled={isSubmitting} onValueChange={setAccepted} />
           <ThemedText type="small" themeColor="textSecondary" style={styles.termsText}>
-            Үйлчилгээний нөхцөлийг зөвшөөрч байна.
+            Үйлчилгээний нөхцөлийг зөвшөөрч байна. (
           </ThemedText>
+          <Pressable onPress={() => router.push('/terms' as never)}>
+            <ThemedText type="small" style={styles.termsLink}>Харах</ThemedText>
+          </Pressable>
+          <ThemedText type="small" themeColor="textSecondary">)</ThemedText>
         </View>
 
         <Pressable
@@ -398,6 +407,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
+  },
+  termsLink: {
+    color: '#16A34A',
+    fontWeight: '600',
   },
   termsText: {
     flex: 1,

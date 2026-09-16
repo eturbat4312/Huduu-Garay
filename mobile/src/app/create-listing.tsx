@@ -169,6 +169,7 @@ export default function CreateListingScreen() {
   const [apartment, setApartment] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
   const [price, setPrice] = useState('');
   const [beds, setBeds] = useState(1);
   const [maxGuests, setMaxGuests] = useState(1);
@@ -213,8 +214,12 @@ export default function CreateListingScreen() {
       selectionLimit: 6 - imageUris.length,
     });
     if (result.canceled) return;
-    const uris = result.assets.map((a) => a.uri);
-    setImageUris((prev) => [...prev, ...uris].slice(0, 6));
+    const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const validAssets = result.assets.filter((a) => !a.mimeType || ALLOWED_TYPES.includes(a.mimeType));
+    if (validAssets.length < result.assets.length) {
+      Alert.alert('Зөвшөөрөгдсөн формат', 'Зөвхөн JPEG, PNG, WebP зураг оруулна уу.');
+    }
+    setImageUris((prev) => [...prev, ...validAssets.map((a) => a.uri)].slice(0, 6));
   };
 
   // ─── Toggle amenity ──────────────────────────────────────────────────────────
@@ -254,6 +259,7 @@ export default function CreateListingScreen() {
     if (!city.trim() || !district.trim()) return Alert.alert('Алдаа', 'Хот/Аймаг болон Дүүрэг/Сум заавал бөглөнө үү.');
     if (!categoryId) return Alert.alert('Алдаа', 'Ангилал сонгоно уу.');
     if (!plainPrice || plainPrice <= 0) return Alert.alert('Алдаа', 'Зөв үнэ оруулна уу.');
+    if (lat == null || lng == null) return Alert.alert('Алдаа', 'Газрын зураг дээр байршлаа тэмдэглэнэ үү.');
 
     setSubmitting(true);
     try {
@@ -318,7 +324,8 @@ export default function CreateListingScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        scrollEnabled={scrollEnabled}>
 
         {/* ── Үндсэн мэдээлэл ── */}
         <View style={[styles.section, { backgroundColor: C.backgroundElement }]}>
@@ -421,6 +428,8 @@ export default function CreateListingScreen() {
             lat={lat}
             lng={lng}
             onChange={(la, lo) => { setLat(la); setLng(lo); }}
+            onMapFocus={() => setScrollEnabled(false)}
+            onMapBlur={() => setScrollEnabled(true)}
           />
 
           <View style={[styles.privateBox, { backgroundColor: scheme === 'dark' ? '#1A2700' : '#FEFCE8', borderColor: '#A16207' }]}>

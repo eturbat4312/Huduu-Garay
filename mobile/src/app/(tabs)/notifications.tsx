@@ -1,7 +1,8 @@
-import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  DeviceEventEmitter,
   FlatList,
   Pressable,
   RefreshControl,
@@ -37,11 +38,13 @@ function notifIcon(type: string): string {
 // ─── Navigate on tap ────────────────────────────────────────────────────────
 function handleNotifPress(item: NotificationItem) {
   if (item.related_booking) {
-    if (item.type === 'booking_created') {
-      router.push(`/host-bookings` as never);
+    if (item.type === 'booking_created' || item.type === 'admin_booking') {
+      router.push('/host-bookings' as never);
     } else {
-      router.push(`/bookings` as never);
+      router.push('/bookings' as never);
     }
+  } else if (item.related_listing) {
+    router.push(`/listings/${item.related_listing}` as never);
   }
 }
 
@@ -53,14 +56,16 @@ function formatDate(iso: string): string {
 // ─── Row ────────────────────────────────────────────────────────────────────
 function NotifRow({ item, C }: { item: NotificationItem; C: (typeof Colors)['light'] }) {
   const unread = !item.is_read;
+  const tappable = !!(item.related_booking || item.related_listing);
   return (
     <Pressable
       onPress={() => handleNotifPress(item)}
+      disabled={!tappable}
       style={({ pressed }) => [
         styles.row,
         { backgroundColor: unread ? '#EFF6FF' : C.backgroundElement },
         unread && styles.rowUnread,
-        pressed && { opacity: 0.75 },
+        pressed && tappable && { opacity: 0.75 },
       ]}
     >
       <Text style={styles.icon}>{notifIcon(item.type)}</Text>
@@ -84,20 +89,31 @@ export default function NotificationsScreen() {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (!isAuthenticated) { setLoading(false); return; }
     if (isRefresh) setRefreshing(true); else setLoading(true);
+    setError(null);
     try {
       const data = await fetchNotifications();
       setItems(data);
       // Бүгдийг уншсан гэж тэмдэглэнэ
       await markNotificationsRead().catch(() => {});
-    } catch {}
-    finally { setLoading(false); setRefreshing(false); }
+      DeviceEventEmitter.emit('notifications:marked-read');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Мэдэгдэл ачаалахад алдаа гарлаа';
+      setError(msg);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [isAuthenticated]);
 
-  useEffect(() => { load(); }, [load]);
+  // Screen-д focus орох бүрт дахин ачаалах
+  useFocusEffect(useCallback(() => {
+    load();
+  }, [load]));
 
   if (!isAuthenticated) {
     return (
@@ -126,6 +142,16 @@ export default function NotificationsScreen() {
         {loading ? (
           <View style={styles.center}>
             <ActivityIndicator color={C.text} />
+          </View>
+        ) : error ? (
+          <View style={styles.center}>
+            <Text style={{ fontSize: 32 }}>⚠️</Text>
+            <ThemedText themeColor="textSecondary" style={{ marginTop: Spacing.two, textAlign: 'center' }}>
+              {error}
+            </ThemedText>
+            <Pressable onPress={() => load()} style={styles.retryBtn}>
+              <Text style={styles.retryBtnText}>Дахин оролдох</Text>
+            </Pressable>
           </View>
         ) : (
           <FlatList
@@ -187,4 +213,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   loginBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  retryBtn: {
+    marginTop: Spacing.two,
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: Spacing.four,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  retryBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
 });

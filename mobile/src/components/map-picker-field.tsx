@@ -20,7 +20,7 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Marker, UrlTile } from 'react-native-maps';
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
@@ -39,9 +39,11 @@ type Props = {
   lat: number | null;
   lng: number | null;
   onChange: (lat: number, lng: number) => void;
+  onMapFocus?: () => void;
+  onMapBlur?: () => void;
 };
 
-export default function MapPickerField({ lat, lng, onChange }: Props) {
+export default function MapPickerField({ lat, lng, onChange, onMapFocus, onMapBlur }: Props) {
   const scheme = useColorScheme() ?? 'light';
   const C = Colors[scheme];
 
@@ -156,10 +158,14 @@ export default function MapPickerField({ lat, lng, onChange }: Props) {
       )}
 
       {/* ─── Map ─── */}
-      <View style={styles.mapWrap}>
+      <View
+        style={styles.mapWrap}
+        onTouchStart={onMapFocus}
+        onTouchEnd={onMapBlur}
+        onTouchCancel={onMapBlur}>
         <MapView
           ref={mapRef}
-          provider={PROVIDER_DEFAULT}
+          mapType="none"
           style={styles.map}
           initialRegion={{
             ...(pin ?? UB_CENTER),
@@ -171,6 +177,13 @@ export default function MapPickerField({ lat, lng, onChange }: Props) {
             placePin(latitude, longitude);
             setResults([]);
           }}>
+          <UrlTile
+            urlTemplate={`https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
+            maximumZ={19}
+            flipY={false}
+            tileSize={256}
+            zIndex={0}
+          />
           {pin && (
             <Marker
               coordinate={pin}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Href } from "expo-router";
 import {
   ActivityIndicator,
@@ -14,7 +14,10 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import MapView, { Marker, UrlTile } from "react-native-maps";
+import type { MapView as MapViewRef } from "react-native-maps";
+
+const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
 import { router } from "expo-router";
 
 import { ThemedView } from "@/components/themed-view";
@@ -57,6 +60,8 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchExpanded, setSearchExpanded] = useState(false);
+  const [mapScrollEnabled, setMapScrollEnabled] = useState(true);
+  const homeMapRef = useRef<MapViewRef>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -119,6 +124,21 @@ export default function HomeScreen() {
     () => listings.filter((l) => l.location_lat != null && l.location_lng != null),
     [listings]
   );
+
+  // Зарууд ачаалагдсаны дараа preview map-д auto-fit
+  useEffect(() => {
+    if (mappableListings.length === 0) return;
+    const timer = setTimeout(() => {
+      homeMapRef.current?.fitToCoordinates(
+        mappableListings.map((l) => ({
+          latitude: l.location_lat!,
+          longitude: l.location_lng!,
+        })),
+        { edgePadding: { top: 40, right: 40, bottom: 40, left: 40 }, animated: true },
+      );
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [mappableListings.length]);
 
   const applyCategory = (category: string) => {
     const next = { ...filters, category };
@@ -245,39 +265,53 @@ export default function HomeScreen() {
           <View style={styles.mapPreviewWrap}>
             <View style={styles.mapPreviewHeader}>
               <Text style={[styles.mapPreviewTitle, { color: C.text }]}>🗺 Газрын зурган дээр</Text>
-              <Pressable onPress={() => router.push('/(tabs)/explore' as never)}>
+              <Pressable onPress={() => router.push('/(tabs)/map' as never)}>
                 <Text style={styles.mapPreviewLink}>Бүгдийг харах →</Text>
               </Pressable>
             </View>
-            <MapView
-              provider={PROVIDER_DEFAULT}
+            <View
               style={styles.mapPreviewBox}
-              scrollEnabled={false}
-              zoomEnabled={false}
-              pitchEnabled={false}
-              rotateEnabled={false}
-              initialRegion={{
-                latitude: 47.9,
-                longitude: 106.9,
-                latitudeDelta: 5.5,
-                longitudeDelta: 9.0,
-              }}
-            >
-              {mappableListings.map((item) => (
-                <Marker
-                  key={item.id}
-                  coordinate={{ latitude: item.location_lat!, longitude: item.location_lng! }}
-                  tracksViewChanges={false}
-                  onPress={() => router.push(`/listing/${item.id}` as never)}
-                >
-                  <View style={styles.mapPin}>
-                    <Text style={styles.mapPinText}>
-                      {'₮'}{Math.round(Number(item.price_per_night) / 1000)}{'К'}
-                    </Text>
-                  </View>
-                </Marker>
-              ))}
-            </MapView>
+              onTouchStart={() => setMapScrollEnabled(false)}
+              onTouchEnd={() => setMapScrollEnabled(true)}
+              onTouchCancel={() => setMapScrollEnabled(true)}>
+              <MapView
+                ref={homeMapRef}
+                mapType="none"
+                style={{ flex: 1 }}
+                scrollEnabled={true}
+                zoomEnabled={true}
+                pitchEnabled={false}
+                rotateEnabled={false}
+                initialRegion={{
+                  latitude: 47.918,
+                  longitude: 106.917,
+                  latitudeDelta: 0.35,
+                  longitudeDelta: 0.35,
+                }}
+              >
+                <UrlTile
+                  urlTemplate={`https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
+                  maximumZ={19}
+                  flipY={false}
+                  tileSize={256}
+                  zIndex={0}
+                />
+                {mappableListings.map((item) => (
+                  <Marker
+                    key={item.id}
+                    coordinate={{ latitude: item.location_lat!, longitude: item.location_lng! }}
+                    tracksViewChanges={false}
+                    onPress={() => router.push(`/listing/${item.id}` as never)}
+                  >
+                    <View style={styles.mapPin}>
+                      <Text style={styles.mapPinText}>
+                        {'₮'}{Math.round(Number(item.price_per_night) / 1000)}{'К'}
+                      </Text>
+                    </View>
+                  </Marker>
+                ))}
+              </MapView>
+            </View>
           </View>
         )}
 
@@ -450,6 +484,25 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   mapPinText: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  mapOverlayBtn: {
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
+  },
+  mapOverlayBtnInner: {
+    position: "absolute",
+    bottom: 12,
+    alignSelf: "center",
+    backgroundColor: "rgba(22,163,74,0.9)",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  mapOverlayBtnText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 
   // Sections
   sectionsContent: { paddingBottom: Spacing.five },

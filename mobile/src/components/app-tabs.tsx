@@ -1,7 +1,7 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import { DeviceEventEmitter, useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
@@ -33,10 +33,12 @@ export default function AppTabs() {
 
     load();
     const interval = setInterval(load, 30000);
+    const sub = DeviceEventEmitter.addListener('notifications:marked-read', load);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
+      sub.remove();
     };
   }, [isAuthenticated]);
 
@@ -65,6 +67,14 @@ export default function AppTabs() {
 
       <NativeTabs.Trigger name="explore">
         <NativeTabs.Trigger.Label>Хайх</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          src={require('@/assets/images/tabIcons/explore.png')}
+          renderingMode="template"
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="map">
+        <NativeTabs.Trigger.Label>Газрын зураг</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/explore.png')}
           renderingMode="template"

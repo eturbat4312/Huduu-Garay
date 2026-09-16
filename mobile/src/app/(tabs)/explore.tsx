@@ -13,7 +13,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import MapView, { Callout, Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Callout, Marker, UrlTile } from 'react-native-maps';
+
+const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
 
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Colors, Spacing } from '@/constants/theme';
@@ -28,10 +30,10 @@ import type { ListingCategory, ListingFilters, ListingSummary } from '@/types/ap
 
 // Монгол улсын төв координат
 const INITIAL_REGION = {
-  latitude: 47.9,
-  longitude: 106.9,
-  latitudeDelta: 5.5,
-  longitudeDelta: 9.0,
+  latitude: 47.918,
+  longitude: 106.917,
+  latitudeDelta: 0.4,
+  longitudeDelta: 0.4,
 };
 
 const emptyFilters: ListingFilters = {
@@ -246,9 +248,16 @@ export default function ExploreScreen() {
           /* ── MAP MODE ── */
           <View style={styles.mapWrapper}>
             <MapView
-              provider={PROVIDER_DEFAULT}
+              mapType="none"
               style={styles.map}
               initialRegion={INITIAL_REGION}>
+              <UrlTile
+                urlTemplate={`https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
+                maximumZ={19}
+                flipY={false}
+                tileSize={256}
+                zIndex={0}
+              />
               {mappableListings.map((item) => {
                 const price = Number(item.price_per_night ?? 0);
                 const priceLabel =

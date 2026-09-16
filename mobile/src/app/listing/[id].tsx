@@ -9,11 +9,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   useColorScheme,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Marker, UrlTile } from 'react-native-maps';
+
+const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -21,10 +24,12 @@ import { Colors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 import {
   createFavorite,
+  createReview,
   deleteFavorite,
   deleteListing,
   fetchAvailability,
   fetchListing,
+  fetchReviews,
   resolveMediaUrl,
 } from '@/lib/api';
 import {
@@ -34,7 +39,7 @@ import {
   normalizeCheckout,
   todayYmd,
 } from '@/lib/dates';
-import type { ListingDetail } from '@/types/api';
+import type { ListingDetail, Review } from '@/types/api';
 
 // ─── Calendar picker ────────────────────────────────────────────────────────
 
@@ -351,6 +356,36 @@ export default function ListingDetailScreen() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoriteId, setFavoriteId] = useState<number | null>(null);
   const routeError = id ? null : 'Зарын дугаар олдсонгүй';
+
+  // ── Reviews ──
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewHover, setReviewHover] = useState(0);
+
+  useEffect(() => {
+    if (!id) return;
+    fetchReviews(id).then(setReviews).catch(() => {});
+  }, [id]);
+
+  const handleSubmitReview = async () => {
+    if (reviewRating === 0) return Alert.alert('Алдаа', 'Үнэлгээ сонгоно уу.');
+    if (!reviewComment.trim()) return Alert.alert('Алдаа', 'Сэтгэгдэл бичнэ үү.');
+    setSubmittingReview(true);
+    try {
+      const r = await createReview(id!, { rating: reviewRating, comment: reviewComment.trim() });
+      setReviews((prev) => [r, ...prev]);
+      setReviewRating(0);
+      setReviewComment('');
+      Alert.alert('✅', 'Сэтгэгдэл амжилттай нийтлэгдлээ.');
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      Alert.alert('Алдаа', err.message ?? 'Сэтгэгдэл илгээхэд алдаа гарлаа.');
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) {
@@ -685,7 +720,7 @@ export default function ListingDetailScreen() {
               <ThemedText type="smallBold">Байршил</ThemedText>
               <View style={styles.mapContainer}>
                 <MapView
-                  provider={PROVIDER_DEFAULT}
+                  mapType="none"
                   style={styles.map}
                   initialRegion={{
                     latitude: listing.location_lat,
@@ -693,10 +728,17 @@ export default function ListingDetailScreen() {
                     latitudeDelta: 0.01,
                     longitudeDelta: 0.01,
                   }}
-                  scrollEnabled={false}
-                  zoomEnabled={false}
+                  scrollEnabled={true}
+                  zoomEnabled={true}
                   pitchEnabled={false}
                   rotateEnabled={false}>
+                  <UrlTile
+                    urlTemplate={`https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
+                    maximumZ={19}
+                    flipY={false}
+                    tileSize={256}
+                    zIndex={0}
+                  />
                   <Marker
                     coordinate={{
                       latitude: listing.location_lat,
@@ -717,6 +759,58 @@ export default function ListingDetailScreen() {
               <ThemedText themeColor="textSecondary">{listing.host_username}</ThemedText>
             </View>
           ) : null}
+
+          {/* ── Сэтгэгдэл ── */}
+          <View style={styles.section}>
+            <ThemedText type="smallBold">Сэтгэгдлүүд ({reviews.length})</ThemedText>
+
+            {/* Star rating input */}
+            {user && (
+              <View style={styles.reviewForm}>
+                <View style={styles.starRow}>
+                  {[1,2,3,4,5].map((s) => (
+                    <Pressable key={s} onPress={() => setReviewRating(s)}>
+                      <ThemedText style={[styles.star, { color: s <= (reviewRating || reviewHover) ? '#F59E0B' : '#D1D5DB' }]}>★</ThemedText>
+                    </Pressable>
+                  ))}
+                </View>
+                <TextInput
+                  value={reviewComment}
+                  onChangeText={setReviewComment}
+                  placeholder="Сэтгэгдлээ бичнэ үү..."
+                  placeholderTextColor={C.textSecondary}
+                  multiline
+                  numberOfLines={3}
+                  style={[styles.reviewInput, { backgroundColor: C.backgroundElement, color: C.text, borderColor: C.backgroundSelected }]}
+                />
+                <Pressable
+                  onPress={handleSubmitReview}
+                  disabled={submittingReview}
+                  style={[styles.reviewSubmitBtn, { opacity: submittingReview ? 0.6 : 1 }]}>
+                  <ThemedText style={styles.reviewSubmitText}>
+                    {submittingReview ? 'Илгээж байна...' : 'Сэтгэгдэл илгээх'}
+                  </ThemedText>
+                </Pressable>
+              </View>
+            )}
+
+            {reviews.length === 0 ? (
+              <ThemedText themeColor="textSecondary" style={{ marginTop: 8 }}>Одоохондоо сэтгэгдэл байхгүй байна.</ThemedText>
+            ) : (
+              reviews.map((r) => (
+                <View key={r.id} style={[styles.reviewCard, { backgroundColor: C.backgroundElement, borderColor: C.backgroundSelected }]}>
+                  <View style={styles.reviewCardHeader}>
+                    <ThemedText type="smallBold">{r.guest_username}</ThemedText>
+                    <ThemedText style={styles.reviewStars}>{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</ThemedText>
+                  </View>
+                  <ThemedText themeColor="textSecondary" type="small">{r.comment}</ThemedText>
+                  <ThemedText themeColor="textSecondary" type="tiny" style={{ marginTop: 4 }}>
+                    {new Date(r.created_at).toLocaleDateString('mn-MN')}
+                  </ThemedText>
+                </View>
+              ))
+            )}
+          </View>
         </View>
       </ScrollView>
     </ThemedView>
@@ -859,5 +953,52 @@ const styles = StyleSheet.create({
   ownerCalendarNote: {
     alignItems: 'center',
     paddingVertical: Spacing.two,
+  },
+  reviewForm: {
+    gap: 8,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  starRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  star: {
+    fontSize: 32,
+  },
+  reviewInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 14,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  reviewSubmitBtn: {
+    backgroundColor: '#16A34A',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  reviewSubmitText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  reviewCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    gap: 4,
+  },
+  reviewCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  reviewStars: {
+    color: '#F59E0B',
+    fontSize: 14,
   },
 });

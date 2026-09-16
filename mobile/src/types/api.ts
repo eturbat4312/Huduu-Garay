@@ -153,3 +153,35 @@ export type UnreadCountResponse = {
   total_unread: number;
   booking_unread: number;
 };
+
+export type Review = {
+  id: number;
+  listing: number;
+  guest: number;
+  guest_username: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+};
+
+export type Payment = {
+  id: number;
+  booking_id: number;
+  booking_status: string;
+  provider: string;
+  invoice_id: string;
+  sender_invoice_no: string;
+  amount: number | string;
+  currency: string;
+  status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'expired' | 'refunded';
+  raw_response: Record<string, unknown>;
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PaymentIntent = {
+  booking: BookingDetail;
+  service_fee: number | string;
+  payment_required_amount: number | string;
+};
