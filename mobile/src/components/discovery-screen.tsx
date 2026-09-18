@@ -55,6 +55,37 @@ type ListingSection = {
   items: ListingSummary[];
 };
 
+function normalizeCategoryName(name: string) {
+  return name.trim().toLocaleLowerCase('mn-MN');
+}
+
+function categoryOrder(name: string) {
+  const normalized = normalizeCategoryName(name);
+  if (normalized.includes('орон сууц')) return 0;
+  if (normalized.includes('зуслан')) return 1;
+  if (normalized.includes('амралтын газар')) return 2;
+  if (normalized === 'гэр' || normalized.includes('гэр')) return 3;
+  return 4;
+}
+
+function categoryLabel(name: string) {
+  const normalized = normalizeCategoryName(name);
+  if (normalized.includes('орон сууц')) return 'Орон сууц';
+  if (normalized.includes('зуслан')) return 'Зуслан';
+  if (normalized.includes('амралтын газар')) return 'Амралтын газрууд';
+  if (normalized === 'гэр' || normalized.includes('гэр')) return 'Гэр';
+  return name;
+}
+
+function categorySectionTitle(name: string) {
+  const normalized = normalizeCategoryName(name);
+  if (normalized.includes('орон сууц')) return 'Орон сууц түрээслэх зарууд';
+  if (normalized.includes('зуслан')) return 'Зуслангийн байшин түрээслэх зарууд';
+  if (normalized.includes('амралтын газар')) return 'Амралтын газрын зарууд';
+  if (normalized === 'гэр' || normalized.includes('гэр')) return 'Гэр түрээслэх зарууд';
+  return `${name} ангиллын зарууд`;
+}
+
 function formatPrice(value: number) {
   if (value >= 1_000_000) return `₮${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `₮${Math.round(value / 1_000)}K`;
@@ -136,6 +167,14 @@ export default function DiscoveryScreen() {
     [mappableListings, selectedId],
   );
 
+  const orderedCategories = useMemo(
+    () => [...categories].sort((a, b) => {
+      const rankDifference = categoryOrder(a.name) - categoryOrder(b.name);
+      return rankDifference || a.id - b.id;
+    }),
+    [categories],
+  );
+
   useEffect(() => {
     if (viewMode !== 'map' || mappableListings.length === 0) return;
     const timer = setTimeout(() => {
@@ -162,9 +201,13 @@ export default function DiscoveryScreen() {
   );
 
   const searchTitle =
-    [appliedFilters.location, appliedFilters.search, appliedFilters.category]
+    [
+      appliedFilters.location,
+      appliedFilters.search,
+      appliedFilters.category ? categoryLabel(appliedFilters.category) : '',
+    ]
       .filter(Boolean)
-      .join(' · ') || 'Хаана хоноё?';
+      .join(' · ') || 'Хаана хонох вэ?';
 
   const carouselCardWidth = Math.min(
     210,
@@ -176,34 +219,34 @@ export default function DiscoveryScreen() {
       return [{
         id: 'filtered',
         title: appliedFilters.category
-          ? `${appliedFilters.category} төрлийн газрууд`
+          ? categorySectionTitle(appliedFilters.category)
           : 'Хайлтын үр дүн',
         items: listings,
       }];
     }
 
-    const sections: ListingSection[] = categories.flatMap((category) => {
+    const sections: ListingSection[] = orderedCategories.flatMap((category) => {
       const items = listings.filter((item) => item.category?.name === category.name);
       if (items.length === 0) return [];
       return [{
         id: `category-${category.id}`,
-        title: category.name,
+        title: categorySectionTitle(category.name),
         category: category.name,
         items,
       }];
     });
-    const knownCategories = new Set(categories.map((category) => category.name));
+    const knownCategories = new Set(orderedCategories.map((category) => category.name));
     const otherListings = listings.filter(
       (item) => !item.category?.name || !knownCategories.has(item.category.name),
     );
     if (otherListings.length > 0) {
-      sections.push({ id: 'other', title: 'Бусад онцлох газрууд', items: otherListings });
+      sections.push({ id: 'other', title: 'Бусад түрээсийн зарууд', items: otherListings });
     }
     if (sections.length === 0 && listings.length > 0) {
-      sections.push({ id: 'all', title: 'Танд санал болгох газрууд', items: listings });
+      sections.push({ id: 'all', title: 'Түрээсийн зарууд', items: listings });
     }
     return sections;
-  }, [appliedFilters.category, categories, hasActiveFilters, listings]);
+  }, [appliedFilters.category, hasActiveFilters, listings, orderedCategories]);
 
   const updateListing = (next: ListingSummary) => {
     setListings((current) => current.map((item) => (item.id === next.id ? next : item)));
@@ -282,10 +325,10 @@ export default function DiscoveryScreen() {
               active={!appliedFilters.category}
               onPress={() => applyCategory('')}
             />
-            {categories.map((category) => (
+            {orderedCategories.map((category) => (
               <CategoryChip
                 key={category.id}
-                label={category.name}
+                label={categoryLabel(category.name)}
                 icon={category.icon ?? undefined}
                 active={appliedFilters.category === category.name}
                 onPress={() => applyCategory(category.name)}
@@ -295,7 +338,7 @@ export default function DiscoveryScreen() {
 
           <View style={styles.resultsRow}>
             <View>
-              <Text style={[styles.resultsTitle, { color: colors.text }]}>Олох газрууд</Text>
+              <Text style={[styles.resultsTitle, { color: colors.text }]}>Түрээсийн зарууд</Text>
               <Text style={[styles.resultsCount, { color: colors.textSecondary }]}>
                 {isLoading ? 'Хайж байна...' : `${listings.length} зар`}
               </Text>
@@ -314,7 +357,7 @@ export default function DiscoveryScreen() {
                 onPress={() => setViewMode('list')}
               />
               <ModeButton
-                label="Зураг"
+                label="Газрын зураг"
                 active={viewMode === 'map'}
                 onPress={() => setViewMode('map')}
               />
@@ -436,7 +479,7 @@ export default function DiscoveryScreen() {
       <FilterModal
         visible={filtersOpen}
         filters={draftFilters}
-        categories={categories}
+        categories={orderedCategories}
         colors={colors}
         onChange={setDraftFilters}
         onClose={() => setFiltersOpen(false)}
@@ -512,7 +555,7 @@ function ListingCarouselSection({
   return (
     <View style={styles.listingSection}>
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={2}>
           {section.title}
         </Text>
         {onSeeAll ? (
@@ -812,7 +855,7 @@ function FilterModal({
                 {categories.map((category) => (
                   <CategoryChip
                     key={category.id}
-                    label={category.name}
+                    label={categoryLabel(category.name)}
                     icon={category.icon ?? undefined}
                     active={filters.category === category.name}
                     onPress={() => onChange({ ...filters, category: category.name })}
@@ -943,14 +986,14 @@ const styles = StyleSheet.create({
   },
   listingSection: { width: '100%', gap: 12 },
   sectionHeader: {
-    minHeight: 40,
+    minHeight: 50,
     paddingHorizontal: Spacing.three,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.two,
   },
-  sectionTitle: { flex: 1, fontSize: 21, lineHeight: 27, fontWeight: '800' },
+  sectionTitle: { flex: 1, fontSize: 20, lineHeight: 25, fontWeight: '800' },
   sectionArrow: {
     width: 38,
     height: 38,
