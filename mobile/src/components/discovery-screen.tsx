@@ -263,6 +263,11 @@ export default function DiscoveryScreen() {
     setFiltersOpen(false);
   };
 
+  const applyFiltersOnMap = () => {
+    setViewMode('map');
+    applyFilters();
+  };
+
   const clearFilters = () => {
     setDraftFilters(EMPTY_FILTERS);
     setIsLoading(true);
@@ -485,6 +490,7 @@ export default function DiscoveryScreen() {
         onClose={() => setFiltersOpen(false)}
         onClear={clearFilters}
         onApply={applyFilters}
+        onApplyMap={applyFiltersOnMap}
       />
     </ThemedView>
   );
@@ -770,6 +776,7 @@ function FilterModal({
   onClose,
   onClear,
   onApply,
+  onApplyMap,
 }: {
   visible: boolean;
   filters: ListingFilters;
@@ -779,6 +786,7 @@ function FilterModal({
   onClose: () => void;
   onClear: () => void;
   onApply: () => void;
+  onApplyMap: () => void;
 }) {
   const borderColor = colors.backgroundSelected;
   const setPrice = (key: 'priceMin' | 'priceMax', value: string) => {
@@ -866,12 +874,21 @@ function FilterModal({
           </ScrollView>
 
           <View style={[styles.modalFooter, { borderTopColor: borderColor }]}>
-            <Pressable accessibilityRole="button" onPress={onClear} style={styles.clearButton}>
-              <Text style={[styles.clearButtonText, { color: colors.text }]}>Цэвэрлэх</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onApplyMap}
+              style={styles.mapFilterLink}>
+              <Text style={styles.mapFilterLinkIcon}>⌖</Text>
+              <Text style={styles.mapFilterLinkText}>Газрын зураг дээр харах</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={onApply} style={styles.applyButton}>
-              <Text style={styles.applyButtonText}>Газрууд харах</Text>
-            </Pressable>
+            <View style={styles.modalFooterRow}>
+              <Pressable accessibilityRole="button" onPress={onClear} style={styles.clearButton}>
+                <Text style={[styles.clearButtonText, { color: colors.text }]}>Цэвэрлэх</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={onApply} style={styles.applyButton}>
+                <Text style={styles.applyButtonText}>Зарууд харах</Text>
+              </Pressable>
+            </View>
           </View>
         </SafeAreaView>
       </ThemedView>
@@ -1189,6 +1206,23 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: Spacing.three,
     paddingVertical: 12,
+    gap: 10,
+  },
+  mapFilterLink: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  mapFilterLinkIcon: { color: '#16A34A', fontSize: 22, fontWeight: '700' },
+  mapFilterLinkText: {
+    color: '#16A34A',
+    fontSize: 14,
+    fontWeight: '800',
+    textDecorationLine: 'underline',
+  },
+  modalFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
