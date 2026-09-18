@@ -87,9 +87,7 @@ function categorySectionTitle(name: string) {
 }
 
 function formatPrice(value: number) {
-  if (value >= 1_000_000) return `₮${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `₮${Math.round(value / 1_000)}K`;
-  return `₮${value}`;
+  return `${value.toLocaleString('mn-MN')}₮`;
 }
 
 function listingHref(id: number) {
@@ -411,7 +409,7 @@ export default function DiscoveryScreen() {
                 const isSelected = item.id === selectedId;
                 return (
                   <Marker
-                    key={`${item.id}-${isSelected ? 'selected' : 'default'}`}
+                    key={`${item.id}-${item.price_per_night}-${isSelected ? 'selected' : 'default'}`}
                     coordinate={{
                       latitude: item.location_lat!,
                       longitude: item.location_lng!,
@@ -423,15 +421,16 @@ export default function DiscoveryScreen() {
                       event.stopPropagation();
                       setSelectedId(item.id);
                     }}>
-                    {isSelected ? (
-                      <View style={styles.selectedMarker}>
-                        <Text style={styles.selectedMarkerText}>
-                          {formatPrice(Number(item.price_per_night ?? 0))}
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={styles.markerDot} />
-                    )}
+                    <View style={[styles.priceMarker, isSelected && styles.priceMarkerSelected]}>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.priceMarkerText,
+                          isSelected && styles.priceMarkerTextSelected,
+                        ]}>
+                        {formatPrice(Number(item.price_per_night ?? 0))}
+                      </Text>
+                    </View>
                   </Marker>
                 );
               })}
@@ -1060,32 +1059,35 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   map: { flex: 1, borderRadius: 18, overflow: 'hidden' },
-  markerDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    backgroundColor: '#16A34A',
+  priceMarker: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#16A34A',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minHeight: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000000',
-    shadowOpacity: 0.24,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 4,
   },
-  selectedMarker: {
-    borderRadius: 18,
-    borderWidth: 2,
+  priceMarkerSelected: {
     borderColor: '#FFFFFF',
-    backgroundColor: '#111827',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    borderWidth: 2,
+    backgroundColor: '#15803D',
     elevation: 6,
   },
-  selectedMarkerText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  priceMarkerText: {
+    color: '#15803D',
+    fontSize: 12,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  priceMarkerTextSelected: { color: '#FFFFFF' },
   mapCountBadge: {
     position: 'absolute',
     top: 12,

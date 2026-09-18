@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from unittest.mock import patch
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from core.models import (
@@ -548,9 +549,111 @@ class ReviewTests(TestCase):
 
     def test_create(self):
         r = self.gc.post(f"/api/listings/{self.listing.id}/reviews/", {
-            "listing": self.listing.id, "rating": 5, "comment": "Сайн!",
+            "rating": 5, "comment": "Сайн!",
         }, format="json")
         self.assertEqual(r.status_code, 201)
+        self.assertEqual(Review.objects.get().booking, self.booking)
+
+    def test_eligibility_requires_completed_booking(self):
+        eligible = self.gc.get(f"/api/listings/{self.listing.id}/review-eligibility/")
+        self.assertEqual(eligible.status_code, 200)
+        self.assertTrue(eligible.data["can_review"])
+        self.assertEqual(eligible.data["booking_id"], self.booking.id)
+
+        future_listing = make_listing(
+            self.host,
+            category=self.listing.category,
+            title="Ирээдүйн байр",
+        )
+        Booking.objects.create(
+            listing=future_listing,
+            guest=self.guest,
+            check_in=date.today() + timedelta(days=1),
+            check_out=date.today() + timedelta(days=2),
+            full_name="RG",
+            phone_number="9900",
+            total_price=100000,
+        )
+        waiting = self.gc.get(f"/api/listings/{future_listing.id}/review-eligibility/")
+        self.assertFalse(waiting.data["can_review"])
+        self.assertEqual(waiting.data["reason_code"], "stay_not_completed")
+
+    def test_eligibility_requires_authentication(self):
+        r = APIClient().get(f"/api/listings/{self.listing.id}/review-eligibility/")
+        self.assertEqual(r.status_code, 401)
+
+    def test_review_form_closes_after_review(self):
+        Review.objects.create(
+            listing=self.listing,
+            booking=self.booking,
+            guest=self.guest,
+            rating=5,
+            comment="Сайн",
+        )
+        r = self.gc.get(f"/api/listings/{self.listing.id}/review-eligibility/")
+        self.assertFalse(r.data["can_review"])
+        self.assertEqual(r.data["reason_code"], "already_reviewed")
+
+    def test_cancelled_booking_is_not_eligible(self):
+        self.booking.status = "cancelled"
+        self.booking.guest_cancelled_at = timezone.now()
+        self.booking.save(update_fields=["status", "guest_cancelled_at"])
+
+        eligibility = self.gc.get(
+            f"/api/listings/{self.listing.id}/review-eligibility/"
+        )
+        create = self.gc.post(
+            f"/api/listings/{self.listing.id}/reviews/",
+            {"rating": 5, "comment": "Цуцлагдсан"},
+            format="json",
+        )
+
+        self.assertFalse(eligibility.data["can_review"])
+        self.assertEqual(eligibility.data["reason_code"], "no_completed_stay")
+        self.assertEqual(create.status_code, 400)
+
+    def test_each_completed_booking_can_have_one_review(self):
+        Review.objects.create(
+            listing=self.listing,
+            booking=self.booking,
+            guest=self.guest,
+            rating=4,
+            comment="Эхний удаа",
+        )
+        second_booking = Booking.objects.create(
+            listing=self.listing,
+            guest=self.guest,
+            check_in=date.today() - timedelta(days=1),
+            check_out=date.today(),
+            full_name="RG",
+            phone_number="9900",
+            total_price=100000,
+        )
+
+        r = self.gc.post(f"/api/listings/{self.listing.id}/reviews/", {
+            "rating": 5,
+            "comment": "Хоёр дахь удаа",
+        }, format="json")
+
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(Review.objects.get(comment="Хоёр дахь удаа").booking, second_booking)
+
+    def test_host_cannot_review_own_listing(self):
+        Booking.objects.create(
+            listing=self.listing,
+            guest=self.host,
+            check_in=date.today() - timedelta(days=2),
+            check_out=date.today() - timedelta(days=1),
+            full_name="RH",
+            phone_number="9901",
+            total_price=100000,
+        )
+        host_client = auth_client(self.host)
+
+        r = host_client.get(f"/api/listings/{self.listing.id}/review-eligibility/")
+
+        self.assertFalse(r.data["can_review"])
+        self.assertEqual(r.data["reason_code"], "listing_owner")
 
     def test_double_review_blocked(self):
         self.gc.post(f"/api/listings/{self.listing.id}/reviews/", {

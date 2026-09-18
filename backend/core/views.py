@@ -6,7 +6,9 @@ from rest_framework.generics import RetrieveAPIView, RetrieveUpdateAPIView
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 from PIL import Image, UnidentifiedImageError
 from io import BytesIO
 from django.core.files.base import ContentFile
@@ -1745,6 +1747,50 @@ class ListingDeleteView(APIView):
         )
 
 
+def _review_eligibility(listing, user):
+    if listing.host_id == user.id:
+        return None, "Түрээслүүлэгч өөрийн байранд сэтгэгдэл бичих боломжгүй.", "listing_owner"
+
+    today = timezone.localdate(timezone=ZoneInfo("Asia/Ulaanbaatar"))
+    confirmed_bookings = Booking.objects.filter(
+        listing=listing,
+        guest=user,
+        status="confirmed",
+        is_cancelled_by_host=False,
+        guest_cancelled_at__isnull=True,
+    )
+    completed_bookings = confirmed_bookings.filter(check_out__lte=today)
+    booking = (
+        completed_bookings.exclude(review__isnull=False)
+        .order_by("-check_out", "-id")
+        .first()
+    )
+
+    if booking:
+        return booking, "", "eligible"
+    if completed_bookings.exists():
+        return None, "Та энэ захиалгад аль хэдийн сэтгэгдэл үлдээсэн байна.", "already_reviewed"
+    if confirmed_bookings.filter(check_out__gt=today).exists():
+        return None, "Сэтгэгдэл бичих эрх буцах өдрөөс эхлэн нээгдэнэ.", "stay_not_completed"
+    return None, "Зөвхөн энэ байранд байрласан зочин сэтгэгдэл үлдээх боломжтой.", "no_completed_stay"
+
+
+class ReviewEligibilityView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, listing_id):
+        listing = get_object_or_404(Listing, pk=listing_id)
+        booking, reason, reason_code = _review_eligibility(listing, request.user)
+        return Response(
+            {
+                "can_review": booking is not None,
+                "reason": reason,
+                "reason_code": reason_code,
+                "booking_id": booking.id if booking else None,
+            }
+        )
+
+
 class ReviewCreateListView(generics.ListCreateAPIView):
     serializer_class = ReviewSerializer
 
@@ -1759,24 +1805,24 @@ class ReviewCreateListView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         user = self.request.user
-        listing = serializer.validated_data["listing"]
-
-        booking = (
-            Booking.objects.filter(
-                listing=listing, guest=user, check_out__lte=timezone.now(),
-                status="confirmed", is_cancelled_by_host=False,
-            )
-            .order_by("-check_out")
-            .first()
+        listing_id = self.kwargs.get("listing_id")
+        listing = (
+            get_object_or_404(Listing, pk=listing_id)
+            if listing_id is not None
+            else serializer.validated_data.get("listing")
         )
+        if listing is None:
+            raise ValidationError({"listing": "Байрны дугаар шаардлагатай."})
 
+        booking, reason, _ = _review_eligibility(listing, user)
         if not booking:
-            raise ValidationError("Та энэ байранд буусан байх ёстой.")
+            raise ValidationError(reason)
 
-        if Review.objects.filter(listing=listing, guest=user).exists():
-            raise ValidationError("Та аль хэдийн сэтгэгдэл үлдээсэн байна.")
-
-        serializer.save(guest=user, booking=booking)
+        try:
+            with transaction.atomic():
+                serializer.save(listing=listing, guest=user, booking=booking)
+        except IntegrityError as exc:
+            raise ValidationError("Та энэ захиалгад аль хэдийн сэтгэгдэл үлдээсэн байна.") from exc
 
         Notification.objects.create(
             user=listing.host,

@@ -568,7 +568,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             "guest": {"read_only": True},
-            "listing": {"write_only": True},
+            "listing": {"write_only": True, "required": False},
         }
         read_only_fields = ["guest", "created_at"]
 

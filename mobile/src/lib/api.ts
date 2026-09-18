@@ -9,6 +9,7 @@ import type {
   ListingDetail,
   ListingFilters,
   ListingSummary,
+  ReviewEligibility,
   UserProfile,
 } from '@/types/api';
 import { getItem, removeItem, setItem } from './storage';
@@ -106,18 +107,32 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     let data: unknown;
     try {
       data = await response.json();
-      const d = data as Record<string, unknown>;
-      message =
-        (d.detail as string) ??
-        (d.error as string) ??
-        (d.non_field_errors as string) ??
-        message;
+      message = extractErrorMessage(data) ?? message;
     } catch {}
     throw new ApiError(response.status, message, data);
   }
 
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+function extractErrorMessage(data: unknown): string | null {
+  if (typeof data === 'string') return data;
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      const message = extractErrorMessage(item);
+      if (message) return message;
+    }
+    return null;
+  }
+  if (data && typeof data === 'object') {
+    const values = Object.values(data as Record<string, unknown>);
+    for (const value of values) {
+      const message = extractErrorMessage(value);
+      if (message) return message;
+    }
+  }
+  return null;
 }
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -467,8 +482,14 @@ export function createReview(
 ): Promise<import('@/types/api').Review> {
   return request<import('@/types/api').Review>(`/listings/${listingId}/reviews/`, {
     method: 'POST',
-    body: payload,
+    body: { listing: Number(listingId), ...payload },
   });
+}
+
+export function fetchReviewEligibility(
+  listingId: number | string,
+): Promise<ReviewEligibility> {
+  return request<ReviewEligibility>(`/listings/${listingId}/review-eligibility/`);
 }
 
 // ─── QPay Payment flow ────────────────────────────────────────────────────────

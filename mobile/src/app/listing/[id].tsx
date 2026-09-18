@@ -27,6 +27,7 @@ import {
   deleteListing,
   fetchAvailability,
   fetchListing,
+  fetchReviewEligibility,
   fetchReviews,
   resolveMediaUrl,
 } from '@/lib/api';
@@ -37,7 +38,12 @@ import {
   normalizeCheckout,
   todayYmd,
 } from '@/lib/dates';
-import type { ListingDetail, Review } from '@/types/api';
+import type { ListingDetail, Review, ReviewEligibility } from '@/types/api';
+
+type LoadedReviewEligibility = ReviewEligibility & {
+  listingId: string;
+  userId: number;
+};
 
 const MAPTILER_KEY = process.env.EXPO_PUBLIC_MAPTILER_KEY ?? '';
 
@@ -169,9 +175,10 @@ function CalendarPicker({
             compareYmd(date, checkIn) > 0 &&
             compareYmd(date, normalizedCheckOut) < 0;
 
-          // Background of the circle
+          // Available dates use the same green hierarchy as the web calendar.
           let circleBg = 'transparent';
-          if (isCheckIn || isCheckOut) circleBg = '#2563EB';
+          if (!isPast && isAvailable) circleBg = '#BBF7D0';
+          if (isCheckIn || isCheckOut) circleBg = '#16A34A';
 
           // Range strip background (full cell width, half for edge cells)
           // Left half strip for checkOut, right half strip for checkIn
@@ -181,7 +188,8 @@ function CalendarPicker({
           let textColor: string = C.text;
           if (isPast) textColor = C.textSecondary;
           if (isCheckIn || isCheckOut) textColor = '#FFFFFF';
-          if (isInRange && !isCheckIn && !isCheckOut) textColor = '#1D4ED8';
+          else if (!isPast && isAvailable) textColor = '#14532D';
+          if (isInRange && !isCheckIn && !isCheckOut) textColor = '#166534';
 
           return (
             <Pressable
@@ -192,7 +200,7 @@ function CalendarPicker({
             >
               {/* Range strip */}
               {isInRange && (
-                <View style={[calStyles.strip, { backgroundColor: '#DBEAFE' }]} />
+                <View style={[calStyles.strip, { backgroundColor: '#DCFCE7' }]} />
               )}
               {/* Right-side strip for checkIn */}
               {isCheckIn && !!checkOut && (
@@ -207,11 +215,6 @@ function CalendarPicker({
               <View style={[calStyles.circle, { backgroundColor: circleBg }]}>
                 <Text style={[calStyles.dayText, { color: textColor }]}>{day}</Text>
               </View>
-
-              {/* Available dot — only for future available dates not in circle */}
-              {!isPast && isAvailable && !isCheckIn && !isCheckOut && (
-                <View style={calStyles.dot} />
-              )}
             </Pressable>
           );
         })}
@@ -220,11 +223,11 @@ function CalendarPicker({
       {/* Legend */}
       <View style={calStyles.legend}>
         <View style={calStyles.legendItem}>
-          <View style={[calStyles.dot, { marginTop: 0 }]} />
+          <View style={[calStyles.legendCircle, { backgroundColor: '#BBF7D0' }]} />
           <Text style={[calStyles.legendText, { color: C.textSecondary }]}>Боломжтой</Text>
         </View>
         <View style={calStyles.legendItem}>
-          <View style={[calStyles.legendCircle, { backgroundColor: '#2563EB' }]} />
+          <View style={[calStyles.legendCircle, { backgroundColor: '#16A34A' }]} />
           <Text style={[calStyles.legendText, { color: C.textSecondary }]}>Сонгосон</Text>
         </View>
       </View>
@@ -288,7 +291,7 @@ const calStyles = StyleSheet.create({
     top: '50%',
     height: 28,
     marginTop: -14,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: '#DCFCE7',
   },
   stripLeft: {
     position: 'absolute',
@@ -297,7 +300,7 @@ const calStyles = StyleSheet.create({
     top: '50%',
     height: 28,
     marginTop: -14,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: '#DCFCE7',
   },
   circle: {
     width: 32,
@@ -309,13 +312,6 @@ const calStyles = StyleSheet.create({
   dayText: {
     fontSize: 13,
     fontWeight: '500',
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#16A34A',
-    marginTop: 2,
   },
   legend: {
     flexDirection: 'row',
@@ -357,6 +353,7 @@ export default function ListingDetailScreen() {
 
   // ── Reviews ──
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewEligibility, setReviewEligibility] = useState<LoadedReviewEligibility | null>(null);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
@@ -365,6 +362,33 @@ export default function ListingDetailScreen() {
     if (!id) return;
     fetchReviews(id).then(setReviews).catch(() => {});
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !user) return;
+
+    let isMounted = true;
+    const listingId = String(id);
+    const userId = user.id;
+    fetchReviewEligibility(id)
+      .then((result) => {
+        if (isMounted) setReviewEligibility({ ...result, listingId, userId });
+      })
+      .catch(() => {
+        if (isMounted) {
+          setReviewEligibility({
+            can_review: false,
+            reason: '',
+            reason_code: 'no_completed_stay',
+            booking_id: null,
+            listingId,
+            userId,
+          });
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [id, user]);
 
   const handleSubmitReview = async () => {
     if (reviewRating === 0) return Alert.alert('Алдаа', 'Үнэлгээ сонгоно уу.');
@@ -375,7 +399,17 @@ export default function ListingDetailScreen() {
       setReviews((prev) => [r, ...prev]);
       setReviewRating(0);
       setReviewComment('');
-      Alert.alert('✅', 'Сэтгэгдэл амжилттай нийтлэгдлээ.');
+      setReviewEligibility((current) =>
+        current ? { ...current, can_review: false, booking_id: null } : current,
+      );
+      if (user) {
+        const listingId = String(id);
+        const userId = user.id;
+        fetchReviewEligibility(id!)
+          .then((result) => setReviewEligibility({ ...result, listingId, userId }))
+          .catch(() => {});
+      }
+      Alert.alert('Амжилттай', 'Сэтгэгдэл амжилттай нийтлэгдлээ.');
     } catch (e: unknown) {
       const err = e as { message?: string };
       Alert.alert('Алдаа', err.message ?? 'Сэтгэгдэл илгээхэд алдаа гарлаа.');
@@ -446,6 +480,11 @@ export default function ListingDetailScreen() {
   }, [checkIn, normalizedCheckOut]);
 
   const totalPrice = selectedNights.length * Number(listing?.price_per_night ?? 0);
+  const canReview =
+    !!user &&
+    reviewEligibility?.listingId === String(id) &&
+    reviewEligibility.userId === user.id &&
+    reviewEligibility.can_review;
 
   const validateSelectedRange = () => {
     if (!isDateString(checkIn) || !isDateString(checkOut)) {
@@ -752,7 +791,7 @@ export default function ListingDetailScreen() {
 
           {listing.host_username ? (
             <View style={styles.section}>
-              <ThemedText type="smallBold">Хост</ThemedText>
+              <ThemedText type="smallBold">Түрээслүүлэгч</ThemedText>
               <ThemedText themeColor="textSecondary">{listing.host_username}</ThemedText>
             </View>
           ) : null}
@@ -762,7 +801,7 @@ export default function ListingDetailScreen() {
             <ThemedText type="smallBold">Сэтгэгдлүүд ({reviews.length})</ThemedText>
 
             {/* Star rating input */}
-            {user && (
+            {canReview && (
               <View style={styles.reviewForm}>
                 <View style={styles.starRow}>
                   {[1,2,3,4,5].map((s) => (

@@ -17,11 +17,34 @@ interface Review {
   created_at: string;
 }
 
-interface Booking {
-  id: number;
-  listing: { id: number };
-  check_in: string;
-  check_out: string;
+interface ReviewEligibility {
+  can_review: boolean;
+  reason: string;
+  reason_code: string;
+  booking_id: number | null;
+}
+
+interface LoadedReviewEligibility extends ReviewEligibility {
+  listingId: number;
+  userId: number;
+}
+
+function getApiErrorMessage(error: unknown): string | null {
+  const data = (error as { response?: { data?: unknown } })?.response?.data;
+  if (typeof data === "string") return data;
+  if (Array.isArray(data)) {
+    return data.find((value): value is string => typeof value === "string") ?? null;
+  }
+  if (data && typeof data === "object") {
+    for (const value of Object.values(data as Record<string, unknown>)) {
+      if (typeof value === "string") return value;
+      if (Array.isArray(value)) {
+        const message = value.find((item): item is string => typeof item === "string");
+        if (message) return message;
+      }
+    }
+  }
+  return null;
 }
 
 export default function ReviewSection({ listingId }: { listingId: number }) {
@@ -31,26 +54,24 @@ export default function ReviewSection({ listingId }: { listingId: number }) {
   const [comment, setComment] = useState("");
   const [rating, setRating] = useState(0);
   const [error, setError] = useState("");
-  const [hasBooking, setHasBooking] = useState(false);
+  const [reviewEligibility, setReviewEligibility] =
+    useState<LoadedReviewEligibility | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Claude: hover state for interactive star rating UI
   const [hoverRating, setHoverRating] = useState(0);
+  const canReview =
+    !!user &&
+    reviewEligibility?.listingId === listingId &&
+    reviewEligibility.userId === user.id &&
+    reviewEligibility.can_review;
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchData = async () => {
       try {
         const res = await api.get<Review[]>(`/listings/${listingId}/reviews/`);
-        setReviews(res.data);
-
-        if (user) {
-          const bookingRes = await api.get<Booking[]>("/bookings/my/");
-          const today = new Date();
-
-          const hasPastBooking = bookingRes.data.some(
-            (b) => b.listing.id === listingId && new Date(b.check_out) < today
-          );
-          setHasBooking(hasPastBooking);
-        }
+        if (isMounted) setReviews(res.data);
       } catch (err: unknown) {
         if (err instanceof Error) {
           console.error("Error fetching reviews:", err.message);
@@ -58,9 +79,38 @@ export default function ReviewSection({ listingId }: { listingId: number }) {
           console.error("Error fetching reviews:", err);
         }
       }
+
+      if (!user) return;
+      try {
+        const res = await api.get<ReviewEligibility>(
+          `/listings/${listingId}/review-eligibility/`
+        );
+        if (isMounted) {
+          setReviewEligibility({
+            ...res.data,
+            listingId,
+            userId: user.id,
+          });
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          setReviewEligibility({
+            can_review: false,
+            reason: "",
+            reason_code: "no_completed_stay",
+            booking_id: null,
+            listingId,
+            userId: user.id,
+          });
+        }
+        console.error("Error fetching review eligibility:", err);
+      }
     };
 
     fetchData();
+    return () => {
+      isMounted = false;
+    };
   }, [listingId, user]);
 
   const handleSubmit = async () => {
@@ -79,11 +129,26 @@ export default function ReviewSection({ listingId }: { listingId: number }) {
       setReviews((prev) => [...prev, res.data]);
       setComment("");
       setRating(0);
+      setReviewEligibility((current) =>
+        current ? { ...current, can_review: false, booking_id: null } : current
+      );
+      api
+        .get<ReviewEligibility>(`/listings/${listingId}/review-eligibility/`)
+        .then((eligibility) => {
+          if (user) {
+            setReviewEligibility({
+              ...eligibility.data,
+              listingId,
+              userId: user.id,
+            });
+          }
+        })
+        .catch(() => {});
     } catch (err: unknown) {
       if (err instanceof Error) {
         console.error("Review submit error:", err.message);
       }
-      setError(t(locale, "review.error_submit"));
+      setError(getApiErrorMessage(err) ?? t(locale, "review.error_submit"));
     } finally {
       setSubmitting(false);
     }
@@ -118,7 +183,7 @@ export default function ReviewSection({ listingId }: { listingId: number }) {
         </ul>
       )}
 
-      {user && hasBooking && (
+      {user && canReview && (
         <div className="mt-6 border-t pt-4">
           <h4 className="font-semibold mb-2">
             {t(locale, "review.leave_review")}

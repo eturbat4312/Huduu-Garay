@@ -182,6 +182,13 @@ export type Review = {
   created_at: string;
 };
 
+export type ReviewEligibility = {
+  can_review: boolean;
+  reason: string;
+  reason_code: 'eligible' | 'already_reviewed' | 'stay_not_completed' | 'no_completed_stay' | 'listing_owner';
+  booking_id: number | null;
+};
+
 export type Payment = {
   id: number;
   booking_id: number;
