@@ -12,6 +12,7 @@ import {
   Text,
   TextInput,
   useColorScheme,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
@@ -47,6 +48,13 @@ const EMPTY_FILTERS: ListingFilters = {
   amenities: [],
 };
 
+type ListingSection = {
+  id: string;
+  title: string;
+  category?: string;
+  items: ListingSummary[];
+};
+
 function formatPrice(value: number) {
   if (value >= 1_000_000) return `₮${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `₮${Math.round(value / 1_000)}K`;
@@ -65,6 +73,7 @@ export default function DiscoveryScreen() {
   const colors = Colors[scheme];
   const isDark = scheme === 'dark';
   const { isAuthenticated } = useAuth();
+  const { width: windowWidth } = useWindowDimensions();
   const mapRef = useRef<MapView>(null);
 
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
@@ -156,6 +165,45 @@ export default function DiscoveryScreen() {
     [appliedFilters.location, appliedFilters.search, appliedFilters.category]
       .filter(Boolean)
       .join(' · ') || 'Хаана хоноё?';
+
+  const carouselCardWidth = Math.min(
+    210,
+    Math.max(164, (Math.min(windowWidth, MaxContentWidth) - 48) / 2.05),
+  );
+
+  const listingSections = useMemo<ListingSection[]>(() => {
+    if (hasActiveFilters) {
+      return [{
+        id: 'filtered',
+        title: appliedFilters.category
+          ? `${appliedFilters.category} төрлийн газрууд`
+          : 'Хайлтын үр дүн',
+        items: listings,
+      }];
+    }
+
+    const sections: ListingSection[] = categories.flatMap((category) => {
+      const items = listings.filter((item) => item.category?.name === category.name);
+      if (items.length === 0) return [];
+      return [{
+        id: `category-${category.id}`,
+        title: category.name,
+        category: category.name,
+        items,
+      }];
+    });
+    const knownCategories = new Set(categories.map((category) => category.name));
+    const otherListings = listings.filter(
+      (item) => !item.category?.name || !knownCategories.has(item.category.name),
+    );
+    if (otherListings.length > 0) {
+      sections.push({ id: 'other', title: 'Бусад онцлох газрууд', items: otherListings });
+    }
+    if (sections.length === 0 && listings.length > 0) {
+      sections.push({ id: 'all', title: 'Танд санал болгох газрууд', items: listings });
+    }
+    return sections;
+  }, [appliedFilters.category, categories, hasActiveFilters, listings]);
 
   const updateListing = (next: ListingSummary) => {
     setListings((current) => current.map((item) => (item.id === next.id ? next : item)));
@@ -364,18 +412,20 @@ export default function DiscoveryScreen() {
         ) : (
           <View style={styles.listShell}>
             <FlatList
-              data={listings}
-              keyExtractor={(item) => String(item.id)}
+              data={listingSections}
+              keyExtractor={(section) => section.id}
               showsVerticalScrollIndicator={false}
               refreshing={isRefreshing}
               onRefresh={refresh}
               contentContainerStyle={styles.listContent}
-              renderItem={({ item }) => (
-                <ListingCard
-                  item={item}
+              renderItem={({ item: section }) => (
+                <ListingCarouselSection
+                  section={section}
+                  cardWidth={carouselCardWidth}
                   colors={colors}
                   isAuthenticated={isAuthenticated}
                   onChange={updateListing}
+                  onSeeAll={section.category ? () => applyCategory(section.category!) : undefined}
                 />
               )}
             />
@@ -444,13 +494,73 @@ function ModeButton({ label, active, onPress }: { label: string; active: boolean
   );
 }
 
+function ListingCarouselSection({
+  section,
+  cardWidth,
+  colors,
+  isAuthenticated,
+  onChange,
+  onSeeAll,
+}: {
+  section: ListingSection;
+  cardWidth: number;
+  colors: (typeof Colors)['light'] | (typeof Colors)['dark'];
+  isAuthenticated: boolean;
+  onChange: (listing: ListingSummary) => void;
+  onSeeAll?: () => void;
+}) {
+  return (
+    <View style={styles.listingSection}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]} numberOfLines={1}>
+          {section.title}
+        </Text>
+        {onSeeAll ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${section.title} бүгдийг харах`}
+            onPress={onSeeAll}
+            style={({ pressed }) => [
+              styles.sectionArrow,
+              { backgroundColor: colors.backgroundElement },
+              pressed && styles.pressed,
+            ]}>
+            <Text style={[styles.sectionArrowText, { color: colors.text }]}>›</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      <FlatList
+        horizontal
+        data={section.items}
+        keyExtractor={(item) => `${section.id}-${item.id}`}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.carouselContent}
+        ItemSeparatorComponent={() => <View style={styles.carouselGap} />}
+        decelerationRate="fast"
+        snapToInterval={cardWidth + 12}
+        renderItem={({ item }) => (
+          <ListingCard
+            item={item}
+            width={cardWidth}
+            colors={colors}
+            isAuthenticated={isAuthenticated}
+            onChange={onChange}
+          />
+        )}
+      />
+    </View>
+  );
+}
+
 function ListingCard({
   item,
+  width,
   colors,
   isAuthenticated,
   onChange,
 }: {
   item: ListingSummary;
+  width: number;
   colors: (typeof Colors)['light'] | (typeof Colors)['dark'];
   isAuthenticated: boolean;
   onChange: (listing: ListingSummary) => void;
@@ -488,22 +598,19 @@ function ListingCard({
       accessibilityRole="button"
       accessibilityLabel={`${item.title}, ${location}`}
       onPress={() => router.push(listingHref(item.id))}
-      style={({ pressed }) => [styles.listingCard, pressed && styles.pressed]}>
-      <View style={styles.listingImageWrap}>
+      style={({ pressed }) => [styles.listingCard, { width }, pressed && styles.pressed]}>
+      <View style={[styles.listingImageWrap, { width, height: width }]}>
         {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.listingImage} resizeMode="cover" />
+          <Image
+            source={{ uri: imageUrl }}
+            style={[styles.listingImage, { width, height: width }]}
+            resizeMode="cover"
+          />
         ) : (
-          <View style={[styles.listingImage, styles.imagePlaceholder]}>
+          <View style={[styles.listingImage, styles.imagePlaceholder, { width, height: width }]}>
             <Text style={styles.placeholderIcon}>⌂</Text>
           </View>
         )}
-        {item.category?.name ? (
-          <View style={styles.categoryBadge}>
-            <Text style={styles.categoryBadgeText} numberOfLines={1}>
-              {item.category.icon ? `${item.category.icon} ` : ''}{item.category.name}
-            </Text>
-          </View>
-        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={item.is_favorited ? 'Хадгалснаас хасах' : 'Хадгалах'}
@@ -520,26 +627,19 @@ function ListingCard({
       </View>
 
       <View style={styles.listingBody}>
-        <View style={styles.listingTitleRow}>
-          <Text style={[styles.listingTitle, { color: colors.text }]} numberOfLines={1}>
-            {item.title}
-          </Text>
-          {item.average_rating != null ? (
-            <Text style={[styles.rating, { color: colors.text }]}>★ {item.average_rating}</Text>
-          ) : null}
-        </View>
+        <Text style={[styles.listingTitle, { color: colors.text }]} numberOfLines={2}>
+          {item.title}
+        </Text>
         <Text style={[styles.location, { color: colors.textSecondary }]} numberOfLines={1}>
           {location || 'Байршил оруулаагүй'}
         </Text>
-        <View style={styles.metaRow}>
-          <Text style={[styles.capacity, { color: colors.textSecondary }]}>
-            {item.max_guests} зочин · {item.beds} ор
-          </Text>
+        <Text style={[styles.priceLine, { color: colors.textSecondary }]} numberOfLines={1}>
           <Text style={[styles.price, { color: colors.text }]}>
-            ₮{Number(item.price_per_night ?? 0).toLocaleString('mn-MN')}
-            <Text style={[styles.priceUnit, { color: colors.textSecondary }]}> / хоног</Text>
+            {`₮${Number(item.price_per_night ?? 0).toLocaleString('mn-MN')}`}
           </Text>
-        </View>
+          {' / хоног'}
+          {item.average_rating != null ? ` · ★ ${item.average_rating}` : ''}
+        </Text>
       </View>
     </Pressable>
   );
@@ -838,54 +938,59 @@ const styles = StyleSheet.create({
   modeButtonTextActive: { color: '#FFFFFF' },
   listShell: { flex: 1, width: '100%', maxWidth: MaxContentWidth },
   listContent: {
-    paddingHorizontal: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.four,
-    gap: Spacing.four,
+    gap: 30,
   },
-  listingCard: { width: '100%' },
-  listingImageWrap: { position: 'relative', borderRadius: 18, overflow: 'hidden' },
-  listingImage: { width: '100%', aspectRatio: 1.55, backgroundColor: '#DDE7DF' },
-  imagePlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#DDE7DF' },
-  placeholderIcon: { fontSize: 52, color: '#6C8A72' },
-  categoryBadge: {
-    position: 'absolute',
-    left: 10,
-    top: 10,
-    maxWidth: '65%',
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.93)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  listingSection: { width: '100%', gap: 12 },
+  sectionHeader: {
+    minHeight: 40,
+    paddingHorizontal: Spacing.three,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
   },
-  categoryBadgeText: { color: '#111827', fontSize: 11, fontWeight: '700' },
-  favoriteButton: {
-    position: 'absolute',
-    right: 10,
-    top: 10,
+  sectionTitle: { flex: 1, fontSize: 21, lineHeight: 27, fontWeight: '800' },
+  sectionArrow: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: 'rgba(255,255,255,0.94)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
+  },
+  sectionArrowText: { fontSize: 30, lineHeight: 32, fontWeight: '400', marginTop: -2 },
+  carouselContent: { paddingHorizontal: Spacing.three },
+  carouselGap: { width: 12 },
+  listingCard: { flexShrink: 0 },
+  listingImageWrap: { position: 'relative', borderRadius: 16, overflow: 'hidden' },
+  listingImage: { backgroundColor: '#DDE7DF' },
+  imagePlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#DDE7DF' },
+  placeholderIcon: { fontSize: 42, color: '#6C8A72' },
+  favoriteButton: {
+    position: 'absolute',
+    right: 5,
+    top: 5,
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   favoriteBusy: { opacity: 0.55 },
-  favoriteIcon: { color: '#111827', fontSize: 25, lineHeight: 28 },
-  favoriteIconActive: { color: '#DC2626' },
-  listingBody: { paddingTop: 10, gap: 3 },
-  listingTitleRow: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.two },
-  listingTitle: { flex: 1, fontSize: 16, lineHeight: 21, fontWeight: '700' },
-  rating: { fontSize: 14, lineHeight: 21, fontWeight: '600' },
+  favoriteIcon: {
+    color: '#FFFFFF',
+    fontSize: 32,
+    lineHeight: 36,
+    fontWeight: '500',
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  favoriteIconActive: { color: '#E11D48' },
+  listingBody: { paddingTop: 8, paddingHorizontal: 4, gap: 1 },
+  listingTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
   location: { fontSize: 13, lineHeight: 18 },
-  metaRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
-  capacity: { flexShrink: 1, fontSize: 12, lineHeight: 18 },
-  price: { fontSize: 15, lineHeight: 20, fontWeight: '800' },
-  priceUnit: { fontSize: 12, fontWeight: '400' },
+  priceLine: { fontSize: 13, lineHeight: 18 },
+  price: { fontSize: 13, fontWeight: '700' },
   pressed: { opacity: 0.82 },
   mapShell: {
     flex: 1,
