@@ -36,13 +36,19 @@ class BookingAdmin(admin.ModelAdmin):
     list_display = (
         "id", "guest_name_display", "listing_title", "check_in", "check_out",
         "guest_count", "total_price_display", "host_payout_display", "platform_fee_display",
-        "status", "is_cancelled_by_host", "guest_cancelled_at", "created_at",
+        "status", "is_cancelled_by_host", "host_cancelled_at", "guest_cancelled_at", "created_at",
     )
-    list_filter = ("status", "is_cancelled_by_host", ("guest_cancelled_at", admin.EmptyFieldListFilter), "check_in")
+    list_filter = (
+        "status", "is_cancelled_by_host",
+        ("host_cancelled_at", admin.EmptyFieldListFilter),
+        ("guest_cancelled_at", admin.EmptyFieldListFilter), "check_in",
+    )
     search_fields = ("id", "full_name", "phone_number", "guest__username", "listing__title")
     ordering = ("-created_at",)
     readonly_fields = (
-        "created_at", "guest_cancelled_at", "guest_cancellation_reason",
+        "created_at", "host_cancelled_at", "host_cancellation_reason",
+        "host_cancellation_policy_version",
+        "guest_cancelled_at", "guest_cancellation_reason",
         "guest_cancellation_policy_version",
     )
 
@@ -65,7 +71,7 @@ class BookingAdmin(admin.ModelAdmin):
             return "₮0"
         payout = int(obj.total_price * 0.9)
         return f"₮{payout:,}"
-    host_payout_display.short_description = "Host авах"
+    host_payout_display.short_description = "Түрээслүүлэгчид олгох"
 
     def platform_fee_display(self, obj):
         if obj.guest_cancelled_at:
@@ -99,7 +105,7 @@ class ListingAdmin(admin.ModelAdmin):
 
     def host_username(self, obj):
         return obj.host.username
-    host_username.short_description = "Host"
+    host_username.short_description = "Түрээслүүлэгч"
 
     def location_display(self, obj):
         return ", ".join(filter(None, [obj.location_city, obj.location_district]))

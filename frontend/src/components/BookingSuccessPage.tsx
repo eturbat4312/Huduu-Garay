@@ -44,10 +44,16 @@ export default function BookingSuccessPage({
         {cancelled ? "Захиалга цуцлагдлаа" : confirmed ? t(locale, "booking_success") : "Захиалгын дэлгэрэнгүй"}
       </h1>
       {cancelled ? (
-        <p role="status" className="text-gray-700">
-          {booking.guest_cancelled_at ? "Та захиалгаа цуцалсан байна. " : "Захиалга цуцлагдсан байна. "}
-          Төлбөрийн буцаалтыг манай ажилтан нөхцөлийн дагуу гараар хянан шийдвэрлэнэ.
-        </p>
+        <div role="status" className="space-y-2 text-gray-700">
+          <p>
+            {booking.guest_cancelled_at
+              ? "Та захиалгаа цуцалсан байна. Төлбөрийн буцаалтыг манай ажилтан нөхцөлийн дагуу гараар хянан шийдвэрлэнэ."
+              : "Түрээслүүлэгч захиалгыг цуцалсан байна. Таны төлсөн нийт дүнгийн 100%-ийг буцаан олгоно. Буцаан олголтыг манай ажилтан гараар хянан шийдвэрлэнэ."}
+          </p>
+          {booking.is_cancelled_by_host && booking.host_cancellation_reason && (
+            <p>Цуцалсан шалтгаан: {booking.host_cancellation_reason}</p>
+          )}
+        </div>
       ) : confirmed ? <p className="text-gray-700">{t(locale, "booking_confirmed_details")}</p> : null}
 
       <div className="bg-white rounded shadow border p-4 space-y-4">
@@ -66,7 +72,8 @@ export default function BookingSuccessPage({
           <div>
             <h2 className="text-xl font-semibold">{booking.listing.title}</h2>
             <p>
-              📍 {t(locale, "location")}: {booking.listing.location}
+              📍 {t(locale, "location")}: {[booking.listing.location_city, booking.listing.location_district]
+                .filter(Boolean).join(", ") || booking.listing.location}
             </p>
             <p>
               📅 {t(locale, "date")}: {checkIn.toLocaleDateString()} →{" "}

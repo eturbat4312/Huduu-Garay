@@ -132,9 +132,14 @@ export default function BookingDetailScreen() {
 
             {booking.is_cancelled_by_host && (
               <View style={[styles.cancelNotice, { backgroundColor: '#FEE2E2' }]}>
-                <Text style={{ color: '#DC2626', fontSize: 14, fontWeight: '600' }}>
-                  Энэ захиалгыг түрээслүүлэгч цуцалсан байна.
+                <Text style={{ color: '#991B1B', fontSize: 14, fontWeight: '600', lineHeight: 22 }}>
+                  Түрээслүүлэгч захиалгыг цуцалсан байна. Таны төлсөн нийт дүнгийн 100%-ийг буцаан олгоно. Буцаан олголтыг манай ажилтан гараар хянан шийдвэрлэнэ.
                 </Text>
+                {booking.host_cancellation_reason ? (
+                  <Text style={{ color: '#991B1B', fontSize: 14, lineHeight: 22, marginTop: 8 }}>
+                    Цуцалсан шалтгаан: {booking.host_cancellation_reason}
+                  </Text>
+                ) : null}
               </View>
             )}
             {booking.guest_cancelled_at && (

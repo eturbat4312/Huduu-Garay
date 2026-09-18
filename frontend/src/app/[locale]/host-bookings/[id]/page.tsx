@@ -7,30 +7,12 @@ import api from "@/lib/axios";
 import { useNotification } from "@/context/NotificationContext";
 import { t } from "@/lib/i18n";
 import Image from "next/image";
-
-type BookingDetail = {
-  id: number;
-  check_in: string;
-  check_out: string;
-  guest_name: string;
-  guest_phone: string;
-  notes: string;
-  is_cancelled_by_host: boolean;
-  status: string;
-  guest_cancelled_at?: string | null;
-  total_price: number;
-  guest_count: number;
-  listing: {
-    title: string;
-    location: string;
-    price_per_night: number;
-    thumbnail: string | null;
-  };
-};
+import HostCancellationAction from "@/components/HostCancellationAction";
+import type { Booking } from "@/types";
 
 export default function HostBookingDetailPage() {
   const { id, locale } = useParams() as { id: string; locale: string };
-  const [booking, setBooking] = useState<BookingDetail | null>(null);
+  const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const { markBookingNotificationsAsRead } = useNotification();
 
@@ -49,19 +31,6 @@ export default function HostBookingDetailPage() {
     fetchBooking();
     markBookingNotificationsAsRead();
   }, [fetchBooking, markBookingNotificationsAsRead]);
-
-  const handleCancel = async () => {
-    if (!booking) return;
-    const confirm = window.confirm(t(locale, "booking_detail.cancel_confirm"));
-    if (!confirm) return;
-
-    try {
-      await api.post(`/bookings/${booking.id}/host-cancel/`);
-      fetchBooking();
-    } catch (err: unknown) {
-      console.error("Cancel booking error:", err);
-    }
-  };
 
   if (loading)
     return <p className="p-6">{t(locale, "booking_detail.loading")}</p>;
@@ -90,7 +59,7 @@ export default function HostBookingDetailPage() {
           {booking.listing.thumbnail ? (
             <Image
               src={booking.listing.thumbnail}
-              alt="Thumbnail"
+              alt="Зарын зураг"
               width={192}
               height={128}
               className="w-full md:w-48 h-32 object-cover rounded"
@@ -103,7 +72,10 @@ export default function HostBookingDetailPage() {
 
           <div className="flex-1">
             <h2 className="text-lg font-semibold">{booking.listing.title}</h2>
-            <p className="text-gray-600">{booking.listing.location}</p>
+            <p className="text-gray-600">
+              {[booking.listing.location_city, booking.listing.location_district]
+                .filter(Boolean).join(", ") || booking.listing.location}
+            </p>
             <p className="mt-1">
               💰 {t(locale, "booking_detail.price_per_night")}:{" "}
               <span className="font-medium">{price.toLocaleString()}₮</span>
@@ -165,14 +137,7 @@ export default function HostBookingDetailPage() {
         </div>
 
         <div className="flex gap-4 mt-4">
-          {!booking.is_cancelled_by_host && booking.status === "confirmed" && (
-            <button
-              onClick={handleCancel}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
-            >
-              {t(locale, "booking_detail.cancel_button")}
-            </button>
-          )}
+          <HostCancellationAction booking={booking} locale={locale} onChange={setBooking} />
 
           <a
             href={`tel:${booking.guest_phone}`}
@@ -188,9 +153,13 @@ export default function HostBookingDetailPage() {
           </p>
         )}
         {booking.is_cancelled_by_host && (
-          <p className="mt-4 text-red-600 font-medium">
-            ❌ {t(locale, "booking_detail.cancelled_msg")}
-          </p>
+          <div className="mt-4 space-y-2 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <p className="font-medium">
+              Та энэ захиалгыг цуцалсан. Зочинд 100% буцаалт олгох бөгөөд танд олгох төлбөр 0 байна.
+            </p>
+            <p>Буцаан олголтыг манай ажилтан гараар хянан шийдвэрлэнэ.</p>
+            {booking.host_cancellation_reason && <p>Шалтгаан: {booking.host_cancellation_reason}</p>}
+          </div>
         )}
       </div>
     </div>

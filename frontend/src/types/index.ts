@@ -66,7 +66,9 @@ export type Category = {
     listing: {
       id: number;
       title: string;
-      location: string;
+      location?: string;
+      location_city?: string;
+      location_district?: string;
       thumbnail: string | null;
       price_per_night: number;
     };
@@ -89,6 +91,15 @@ export type Category = {
     guest_name: string;
     guest_phone: string;
     is_cancelled_by_host: boolean;
+    host_cancelled_at?: string | null;
+    host_cancellation_reason?: string;
+    host_cancellation_policy_version?: string;
+    host_cancellation?: {
+      allowed: boolean;
+      blocked_reason: string;
+      policy_version: string;
+      policy: string[];
+    };
     guest_count: number;
     is_unread: boolean;
     host_name?: string | null;

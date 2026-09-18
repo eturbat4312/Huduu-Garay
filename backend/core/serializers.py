@@ -307,6 +307,7 @@ class BookingSerializer(serializers.ModelSerializer):
     host_name = serializers.SerializerMethodField()
     host_phone = serializers.SerializerMethodField()
     guest_cancellation = serializers.SerializerMethodField()
+    host_cancellation = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -325,6 +326,10 @@ class BookingSerializer(serializers.ModelSerializer):
             "guest_name",
             "guest_phone",
             "is_cancelled_by_host",
+            "host_cancelled_at",
+            "host_cancellation_reason",
+            "host_cancellation_policy_version",
+            "host_cancellation",
             "guest_count",
             "is_unread",
             "host_name",
@@ -336,6 +341,8 @@ class BookingSerializer(serializers.ModelSerializer):
             "guest_cancellation",
         ]
         read_only_fields = [
+            "host_cancelled_at", "host_cancellation_reason",
+            "host_cancellation_policy_version",
             "service_fee", "guest_cancelled_at", "guest_cancellation_reason",
             "guest_cancellation_policy_version",
         ]
@@ -354,6 +361,22 @@ class BookingSerializer(serializers.ModelSerializer):
             "blocked_reason": blocked_reason,
             "policy_version": GUEST_CANCELLATION_POLICY_VERSION,
             "policy": GUEST_CANCELLATION_POLICY,
+        }
+
+    def get_host_cancellation(self, obj):
+        from .services.cancellations import (
+            HOST_CANCELLATION_POLICY, HOST_CANCELLATION_POLICY_VERSION,
+            host_cancellation_blocked_reason,
+        )
+
+        request = self.context.get("request")
+        is_host = bool(request and request.user.pk == obj.listing.host_id)
+        blocked_reason = host_cancellation_blocked_reason(obj)
+        return {
+            "allowed": is_host and not blocked_reason,
+            "blocked_reason": blocked_reason,
+            "policy_version": HOST_CANCELLATION_POLICY_VERSION,
+            "policy": HOST_CANCELLATION_POLICY,
         }
 
     def get_listing(self, obj):

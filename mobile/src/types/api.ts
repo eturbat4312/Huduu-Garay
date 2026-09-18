@@ -125,6 +125,15 @@ export type BookingDetail = BookingSummary & {
   guest_count: number;
   service_fee: number | string;
   is_cancelled_by_host: boolean;
+  host_cancelled_at?: string | null;
+  host_cancellation_reason?: string;
+  host_cancellation_policy_version?: string;
+  host_cancellation?: {
+    allowed: boolean;
+    blocked_reason: string;
+    policy_version: string;
+    policy: string[];
+  };
   guest_cancelled_at?: string | null;
   guest_cancellation_reason?: string;
   guest_cancellation?: {

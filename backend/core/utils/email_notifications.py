@@ -39,6 +39,20 @@ def send_notification_email(user, notif_type, context):
             "Захиалгын огноо дахин нээгдсэн. Төлбөрийн буцаалт болон түрээслүүлэгчид "
             "олгох дүнг ажилтан гараар хянан шийдвэрлэнэ. Мөнгө автоматаар шилжээгүй."
         )
+    elif notif_type == "host_booking_cancelled":
+        subject = f"Түрээслүүлэгч захиалга #{context['booking_id']}-г цуцаллаа"
+        message = (
+            f"Зар: {context['listing_title']}\n"
+            f"Огноо: {context['check_in']} - {context['check_out']}\n"
+            f"Зочин: {context['full_name']}\n"
+            f"Утас: {context['phone_number']}\n"
+            f"Цуцалсан цаг: {context['cancelled_at']}\n"
+            f"Шалтгаан: {context['reason']}\n"
+            f"Нөхцөлийн хувилбар: {context['policy_version']}\n\n"
+            "Зочинд төлсөн нийт дүнгийн 100%-ийг буцаана. Түрээслүүлэгчид олгох "
+            "төлбөр 0 байна. Буцаан олголтыг ажилтан гараар хянан шийдвэрлэх бөгөөд "
+            "мөнгө автоматаар шилжээгүй. Захиалгын огноо дахин нээгдсэн."
+        )
     elif notif_type == "booking_cancelled":
         subject = "❗ Захиалга цуцлагдлаа"
         message = (
@@ -105,16 +119,16 @@ def send_notification_email(user, notif_type, context):
             f"Хоног: {context['total_nights']}\n"
             f"Зочны тоо: {context['guest_count']}\n"
             f"{'─' * 40}\n"
-            f"Guest: {context['guest_full_name']} ({context['guest_username']})\n"
-            f"Guest утас: {context['guest_phone']}\n"
-            f"Host: {context['host_name']} ({context['host_username']})\n"
-            f"Host утас: {context['host_phone']}\n"
+            f"Зочин: {context['guest_full_name']} ({context['guest_username']})\n"
+            f"Зочны утас: {context['guest_phone']}\n"
+            f"Түрээслүүлэгч: {context['host_name']} ({context['host_username']})\n"
+            f"Түрээслүүлэгчийн утас: {context['host_phone']}\n"
             f"{'─' * 40}\n"
             f"Байршил: {context['location']}\n"
             f"Байрны үнэ: ₮{context['total_price']:,}\n"
             f"Service fee: ₮{context['service_fee']:,}\n"
             f"Нийт төлсөн: ₮{context['guest_total']:,}\n"
-            f"Host авах: ₮{context['host_payout']:,}\n"
+            f"Түрээслүүлэгчид олгох: ₮{context['host_payout']:,}\n"
             f"{'─' * 40}\n\n"
             f"Admin dashboard дээр захиалгын дэлгэрэнгүйг шалгана уу."
         )
@@ -150,17 +164,17 @@ def send_notification_email(user, notif_type, context):
         )
 
     elif notif_type == "host_application_approved":
-        subject = "✅ Таны хост эрх батлагдлаа!"
+        subject = "✅ Таны түрээслүүлэгчийн эрх батлагдлаа!"
         message = (
             f"Баяр хүргэе {context['full_name']}!\n\n"
-            f"Таны хост эрх амжилттай батлагдлаа. Та одоо шинэ зар оруулах боломжтой боллоо."
+            f"Таны түрээслүүлэгчийн эрх амжилттай батлагдлаа. Та одоо шинэ зар оруулах боломжтой боллоо."
         )
 
     elif notif_type == "host_application_rejected":
-        subject = "❌ Хост эрхийн хүсэлт татгалзагдлаа"
+        subject = "❌ Түрээслүүлэгчийн эрхийн хүсэлт татгалзагдлаа"
         message = (
             f"Сайн байна уу {context['full_name']}!\n\n"
-            f"Таны хост эрхийн хүсэлт харамсалтайгаар татгалзагдлаа. "
+            f"Таны түрээслүүлэгчийн эрхийн хүсэлт харамсалтайгаар татгалзагдлаа. "
             f"Дахин оролдох эсвэл дэлгэрэнгүй мэдээлэл авахыг хүсвэл бидэнтэй холбоо барина уу."
         )
 

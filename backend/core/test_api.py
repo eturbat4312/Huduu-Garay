@@ -10,6 +10,7 @@ from core.models import (
     Category, Amenity, Listing, Availability,
     Booking, Favorite, Notification, Review, HostApplication,
 )
+from core.services.cancellations import HOST_CANCELLATION_POLICY_VERSION
 
 User = get_user_model()
 
@@ -305,6 +306,17 @@ class BookingTests(TestCase):
         self.listing = make_listing(self.host)
         add_availability(self.listing, 1, 5)
 
+    def _host_cancel(self, booking):
+        return self.hc.post(
+            f"/api/bookings/{booking.id}/host-cancel/",
+            {
+                "policy_accepted": True,
+                "policy_version": HOST_CANCELLATION_POLICY_VERSION,
+                "reason": "Байранд яаралтай засвар хийх шаардлагатай болсон.",
+            },
+            format="json",
+        )
+
     def _book(self, start=1, nights=3):
         today = date.today()
         return self.gc.post("/api/bookings/", {
@@ -370,7 +382,7 @@ class BookingTests(TestCase):
     def test_host_cancel(self):
         self._book()
         b = Booking.objects.first()
-        r = self.hc.post(f"/api/bookings/{b.id}/host-cancel/")
+        r = self._host_cancel(b)
         self.assertEqual(r.status_code, 200)
         b.refresh_from_db()
         self.assertTrue(b.is_cancelled_by_host)
@@ -379,16 +391,16 @@ class BookingTests(TestCase):
         self._book(start=1, nights=3)
         b = Booking.objects.first()
         before = Availability.objects.filter(listing=self.listing).count()
-        self.hc.post(f"/api/bookings/{b.id}/host-cancel/")
+        self._host_cancel(b)
         after = Availability.objects.filter(listing=self.listing).count()
         self.assertEqual(after - before, 3)
 
-    def test_double_cancel_fails(self):
+    def test_double_cancel_is_idempotent(self):
         self._book()
         b = Booking.objects.first()
-        self.hc.post(f"/api/bookings/{b.id}/host-cancel/")
-        r = self.hc.post(f"/api/bookings/{b.id}/host-cancel/")
-        self.assertEqual(r.status_code, 400)
+        self._host_cancel(b)
+        r = self._host_cancel(b)
+        self.assertEqual(r.status_code, 200)
 
     def test_notifications_on_booking(self):
         self._book()
@@ -398,7 +410,7 @@ class BookingTests(TestCase):
     def test_notification_on_cancel(self):
         self._book()
         b = Booking.objects.first()
-        self.hc.post(f"/api/bookings/{b.id}/host-cancel/")
+        self._host_cancel(b)
         self.assertEqual(
             Notification.objects.filter(user=self.guest, type="booking_cancelled").count(), 1
         )

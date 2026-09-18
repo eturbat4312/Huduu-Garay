@@ -269,8 +269,15 @@ export function fetchHostBookingDetail(id: number | string): Promise<BookingDeta
   return request<BookingDetail>(`/host-bookings/${id}/`);
 }
 
-export function hostCancelBooking(id: number | string): Promise<void> {
-  return request<void>(`/bookings/${id}/host-cancel/`, { method: 'POST' });
+export function hostCancelBooking(
+  id: number | string,
+  policyVersion: string,
+  reason: string,
+): Promise<BookingDetail> {
+  return request<BookingDetail>(`/bookings/${id}/host-cancel/`, {
+    method: 'POST',
+    body: { policy_accepted: true, policy_version: policyVersion, reason },
+  });
 }
 
 export function applyToBeHost(payload: { message?: string }): Promise<HostApplication> {

@@ -16,7 +16,9 @@ from core.utils.email_notifications import send_notification_email
 from core.services.qpay import QPayAPIError, QPayClient, QPayConfigurationError
 from core.services.cancellations import (
     GUEST_CANCELLATION_POLICY_VERSION,
+    HOST_CANCELLATION_POLICY_VERSION,
     guest_cancellation_blocked_reason,
+    host_cancellation_blocked_reason,
 )
 from decimal import Decimal
 from google.oauth2 import id_token
@@ -1458,60 +1460,111 @@ class GuestBookingCancelView(APIView):
 class HostBookingCancelView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @transaction.atomic
     def post(self, request, booking_id):
-        try:
-            booking = Booking.objects.select_for_update().get(id=booking_id, listing__host=request.user)
-        except Booking.DoesNotExist:
-            return Response({"error": "Захиалга олдсонгүй."}, status=404)
+        with transaction.atomic():
+            try:
+                booking = Booking.objects.select_for_update().get(
+                    id=booking_id, listing__host=request.user
+                )
+            except Booking.DoesNotExist:
+                return Response({"error": "Захиалга олдсонгүй."}, status=404)
 
-        if booking.is_cancelled_by_host or booking.status == "cancelled":
-            return Response(
-                {"error": "Захиалгыг аль хэдийн цуцалсан байна."}, status=400
+            # Давтан хүсэлт нь мэдэгдэл дахин үүсгэх эсвэл огноо дахин нээхгүй.
+            if booking.is_cancelled_by_host or booking.host_cancelled_at:
+                return Response(
+                    BookingSerializer(booking, context={"request": request}).data
+                )
+
+            blocked_reason = host_cancellation_blocked_reason(booking)
+            if blocked_reason:
+                return Response({"error": blocked_reason}, status=400)
+            if request.data.get("policy_accepted") is not True:
+                return Response(
+                    {"error": "Цуцлалтын нөхцөлтэй танилцсанаа тэмдэглэнэ үү."},
+                    status=400,
+                )
+            if request.data.get("policy_version") != HOST_CANCELLATION_POLICY_VERSION:
+                return Response(
+                    {"error": "Нөхцөл шинэчлэгдсэн байна. Хуудсаа шинэчилж дахин уншина уу."},
+                    status=409,
+                )
+            reason = request.data.get("reason")
+            if not isinstance(reason, str) or not reason.strip():
+                return Response({"error": "Цуцлах шалтгаанаа бичнэ үү."}, status=400)
+            if len(reason) > 1000:
+                return Response(
+                    {"error": "Шалтгааныг 1000 хүртэлх тэмдэгтээр бичнэ үү."},
+                    status=400,
+                )
+
+            booking.is_cancelled_by_host = True
+            booking.status = "cancelled"
+            booking.host_cancelled_at = timezone.now()
+            booking.host_cancellation_reason = reason.strip()
+            booking.host_cancellation_policy_version = HOST_CANCELLATION_POLICY_VERSION
+            booking.save(update_fields=[
+                "is_cancelled_by_host", "status", "host_cancelled_at",
+                "host_cancellation_reason", "host_cancellation_policy_version",
+            ])
+
+            dates, _ = _get_requested_dates(booking.check_in, booking.check_out)
+            for target_date in dates:
+                Availability.objects.get_or_create(
+                    listing=booking.listing, date=target_date
+                )
+            BookingHold.objects.filter(booking=booking).delete()
+
+            summary = (
+                f"Түрээслүүлэгч захиалга #{booking.id}-г цуцаллаа. "
+                f"{booking.listing.title}, {booking.check_in} - {booking.check_out}. "
+                "Зочинд 100% буцаалт олгоно. Буцаан олголтыг ажилтан гараар хянан шийдвэрлэнэ."
             )
+            recipients = {
+                booking.guest_id: booking.guest,
+                booking.listing.host_id: booking.listing.host,
+            }
+            recipients.update({
+                user.pk: user
+                for user in User.objects.filter(is_staff=True, is_active=True)
+            })
+            context = {
+                "booking_id": booking.id,
+                "listing_title": booking.listing.title,
+                "check_in": str(booking.check_in),
+                "check_out": str(booking.check_out),
+                "full_name": booking.full_name,
+                "phone_number": booking.phone_number,
+                "cancelled_at": booking.host_cancelled_at.isoformat(),
+                "reason": booking.host_cancellation_reason,
+                "policy_version": booking.host_cancellation_policy_version,
+            }
+            for user in recipients.values():
+                Notification.objects.create(
+                    user=user,
+                    type="booking_cancelled",
+                    message=summary,
+                    related_booking=booking,
+                )
 
-        if booking.status != "confirmed":
-            return Response({"error": "Зөвхөн баталгаажсан захиалгыг цуцална."}, status=400)
+            def email_after_commit():
+                for user in recipients.values():
+                    if not user.email:
+                        continue
+                    try:
+                        send_notification_email(
+                            user, "host_booking_cancelled", context
+                        )
+                    except Exception:
+                        import logging
+                        logging.getLogger(__name__).exception(
+                            "Host cancellation email failed for booking %s",
+                            booking.id,
+                        )
 
-        # ✅ Цуцлалтыг бүртгэх
-        booking.is_cancelled_by_host = True
-        booking.status = "cancelled"
-        booking.save(update_fields=["is_cancelled_by_host", "status"])
-
-        # ✅ Захиалгад хамаарах бүх огноог буцааж нэмэх
-        date = booking.check_in
-        while date < booking.check_out:
-            Availability.objects.get_or_create(
-                listing=booking.listing,
-                date=date,
-            )
-            date += timedelta(days=1)
-
-        # ✅ Notification: захиалга цуцлагдсан тухай хэрэглэгчид мэдэгдэл
-        Notification.objects.create(
-            user=booking.guest,
-            message=f"Таны захиалга ({booking.listing.title}) цуцлагдлаа.",
-            type="booking_cancelled",
-            related_booking=booking,
-        )
-        try:
-            send_notification_email(
-                user=booking.guest,
-                notif_type="booking_cancelled",
-                context={
-                    "listing_title": booking.listing.title,
-                    "check_in": booking.check_in.strftime("%Y-%m-%d"),
-                    "check_out": booking.check_out.strftime("%Y-%m-%d"),
-                    "full_name": booking.full_name,
-                    "guest_count": booking.guest_count,
-                    "phone_number": booking.phone_number,
-                },
-            )
-        except Exception as e:
-            print(f"❌ Цуцлалтын имэйл илгээхэд алдаа гарлаа: {e}")
+            transaction.on_commit(email_after_commit)
 
         return Response(
-            {"message": "Захиалгыг амжилттай цуцаллаа. Өдрүүд сэргээгдлээ."}, status=200
+            BookingSerializer(booking, context={"request": request}).data
         )
 
 

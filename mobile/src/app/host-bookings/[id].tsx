@@ -2,7 +2,6 @@ import { router, useLocalSearchParams , useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,8 +12,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
+import { HostCancellationAction } from '@/components/host-cancellation-action';
 import { Colors, Spacing, type ColorPalette } from '@/constants/theme';
-import { fetchHostBookingDetail, hostCancelBooking } from '@/lib/api';
+import { fetchHostBookingDetail } from '@/lib/api';
 import type { BookingDetail } from '@/types/api';
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -44,7 +44,6 @@ export default function HostBookingDetailScreen() {
 
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState('');
 
   useFocusEffect(useCallback(() => {
@@ -56,33 +55,6 @@ export default function HostBookingDetailScreen() {
       .catch(() => setError('Мэдээлэл татахад алдаа гарлаа.'))
       .finally(() => setLoading(false));
   }, [id]));
-
-  const handleCancel = () => {
-    Alert.alert(
-      'Захиалга цуцлах',
-      'Та энэ захиалгыг цуцлахдаа итгэлтэй байна уу? Энэ үйлдлийг буцаах боломжгүй.',
-      [
-        { text: 'Болих', style: 'cancel' },
-        {
-          text: 'Цуцлах',
-          style: 'destructive',
-          onPress: async () => {
-            if (!booking) return;
-            setCancelling(true);
-            try {
-              await hostCancelBooking(booking.id);
-              setBooking((prev) => prev ? { ...prev, is_cancelled_by_host: true, status: 'cancelled' } : prev);
-            } catch (e: unknown) {
-              const msg = e instanceof Error ? e.message : 'Цуцлахад алдаа гарлаа.';
-              Alert.alert('Алдаа', msg);
-            } finally {
-              setCancelling(false);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   if (loading) {
     return (
@@ -132,8 +104,6 @@ export default function HostBookingDetailScreen() {
   const nights = Math.round(
     (new Date(booking.check_out).getTime() - new Date(booking.check_in).getTime()) / 86400000
   );
-  const canCancel = booking.status === 'confirmed' && !booking.is_cancelled_by_host;
-
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safe}>
@@ -196,28 +166,18 @@ export default function HostBookingDetailScreen() {
               </Text>
             </View>
           )}
-          {canCancel && (
-            <Pressable
-              onPress={handleCancel}
-              disabled={cancelling}
-              style={({ pressed }) => [
-                styles.cancelBtn,
-                pressed && { opacity: 0.75 },
-                cancelling && { opacity: 0.5 },
-              ]}
-            >
-              {cancelling
-                ? <ActivityIndicator color="#DC2626" />
-                : <Text style={styles.cancelBtnText}>Захиалга цуцлах</Text>
-              }
-            </Pressable>
-          )}
+          <HostCancellationAction booking={booking} onChange={setBooking} />
 
           {booking.is_cancelled_by_host && (
             <View style={styles.cancelledNote}>
-              <Text style={{ color: '#DC2626', fontSize: 13 }}>
-                ⚠️ Та энэ захиалгыг цуцалсан бөгөөд тухайн огнооны боломж буцаан нэмэгдсэн.
+              <Text style={{ color: '#991B1B', fontSize: 14, lineHeight: 22 }}>
+                Та энэ захиалгыг цуцалсан. Зочинд 100% буцаалт олгох бөгөөд танд олгох төлбөр 0 байна. Буцаан олголтыг манай ажилтан гараар хянан шийдвэрлэнэ.
               </Text>
+              {booking.host_cancellation_reason ? (
+                <Text style={{ color: '#991B1B', fontSize: 14, lineHeight: 22, marginTop: 8 }}>
+                  Шалтгаан: {booking.host_cancellation_reason}
+                </Text>
+              ) : null}
             </View>
           )}
         </ScrollView>
@@ -271,13 +231,6 @@ const styles = StyleSheet.create({
   },
   payoutLabel: { fontSize: 15, fontWeight: '600' },
   payoutValue: { fontSize: 20, fontWeight: '800' },
-
-  cancelBtn: {
-    height: 50, borderRadius: 14,
-    borderWidth: 1.5, borderColor: '#DC2626',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  cancelBtnText: { color: '#DC2626', fontSize: 15, fontWeight: '700' },
 
   cancelledNote: {
     borderRadius: 12, padding: Spacing.three,
