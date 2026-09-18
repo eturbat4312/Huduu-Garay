@@ -88,7 +88,7 @@ export default function BecomeHostScreen() {
     if (!accountNumber.trim()) { setError('Дансны дугаар оруулна уу.'); return; }
     if (!idCardImage)          { setError('Иргэний үнэмлэхний зургийг оруулна уу.'); return; }
     if (!selfieImage)          { setError('Иргэний үнэмлэхтэй хамт зурсан зургийг оруулна уу.'); return; }
-    if (!termsAccepted)        { setError('Хостын үйлчилгээний нөхцөлийг зөвшөөрнө үү.'); return; }
+    if (!termsAccepted)        { setError('Түрээслүүлэгчийн нөхцөлийг зөвшөөрнө үү.'); return; }
 
     setSubmitting(true);
     try {
@@ -117,13 +117,13 @@ export default function BecomeHostScreen() {
     }
   }
 
-  // ── Аль хэдийн хост / өргөдөл илгээсэн ──────────────────────────────────
+  // ── Аль хэдийн түрээслүүлэгч / хүсэлт илгээсэн ───────────────────────────
   if (user?.is_host) {
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView style={[styles.safe, styles.center]}>
           <Text style={{ fontSize: 56 }}>🏠</Text>
-          <Text style={[styles.statusTitle, { color: '#16A34A' }]}>Та аль хэдийн хост болсон байна!</Text>
+          <Text style={[styles.statusTitle, { color: '#16A34A' }]}>Та аль хэдийн түрээслүүлэгч болсон байна!</Text>
           <Pressable onPress={() => router.back()} style={styles.backPressable}>
             <Text style={[styles.backLinkText, { color: C.textSecondary }]}>‹ Буцах</Text>
           </Pressable>
@@ -309,7 +309,7 @@ export default function BecomeHostScreen() {
               </View>
             ) : null}
 
-            {/* Хостын нөхцөл */}
+            {/* Түрээслүүлэгчийн нөхцөл */}
             <Pressable
               onPress={() => setTermsAccepted((accepted) => !accepted)}
               accessibilityRole="checkbox"
@@ -323,7 +323,7 @@ export default function BecomeHostScreen() {
                 {termsAccepted ? <Text style={styles.checkmark}>✓</Text> : null}
               </View>
               <Text style={[styles.termsConsentText, { color: C.text }]}>
-                Би хостын үйлчилгээний нөхцөл болон захиалга бүрээс 10% үйлчилгээний
+                Би түрээслүүлэгчийн нөхцөл болон захиалга бүрээс 10% үйлчилгээний
                 шимтгэл суутгахыг уншиж, зөвшөөрч байна.
               </Text>
             </Pressable>
@@ -331,7 +331,7 @@ export default function BecomeHostScreen() {
             <Pressable
               onPress={() => router.push('/host-terms' as never)}
               style={styles.termsLinkBtn}>
-              <Text style={styles.termsLinkText}>📄 Хостын үйлчилгээний нөхцөлийг харах →</Text>
+              <Text style={styles.termsLinkText}>📄 Түрээслүүлэгчийн нөхцөлийг харах →</Text>
             </Pressable>
 
             {/* Илгээх */}
