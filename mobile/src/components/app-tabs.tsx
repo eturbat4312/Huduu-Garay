@@ -57,64 +57,45 @@ export default function AppTabs() {
       indicatorColor={colors.backgroundElement}
       labelStyle={{ selected: { color: colors.text } }}>
       <NativeTabs.Trigger name="index">
-        <NativeTabs.Trigger.Label>Нүүр</NativeTabs.Trigger.Label>
-        <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/home.png')}
-          renderingMode="template"
-        />
-      </NativeTabs.Trigger>
-
-      <NativeTabs.Trigger name="explore">
         <NativeTabs.Trigger.Label>Хайх</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
+          sf="magnifyingglass"
+          md="search"
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="map">
-        <NativeTabs.Trigger.Label>Газрын зураг</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="favorites">
+        <NativeTabs.Trigger.Label>Хадгалсан</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
+          sf={{ default: 'heart', selected: 'heart.fill' }}
+          md={{ default: 'favorite_border', selected: 'favorite' }}
         />
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="bookings">
         <NativeTabs.Trigger.Label>Захиалга</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/explore.png')}
-          renderingMode="template"
+          sf="calendar"
+          md="calendar_month"
         />
       </NativeTabs.Trigger>
 
-      {/* Нэвтрээгүй үед: Хадгалсан | Нэвтэрсэн үед: Мэдэгдэл — 4-р байр үргэлж 5 tab л байна */}
-      {isAuthenticated ? (
-        <NativeTabs.Trigger name="notifications">
-          <NativeTabs.Trigger.Label>Мэдэгдэл</NativeTabs.Trigger.Label>
-          <NativeTabs.Trigger.Icon
-            src={require('@/assets/images/tabIcons/home.png')}
-            renderingMode="template"
-          />
-          <NativeTabs.Trigger.Badge hidden={unreadCount === 0}>
-            {unreadCount > 99 ? '99+' : String(unreadCount)}
-          </NativeTabs.Trigger.Badge>
-        </NativeTabs.Trigger>
-      ) : (
-        <NativeTabs.Trigger name="favorites">
-          <NativeTabs.Trigger.Label>Хадгалсан</NativeTabs.Trigger.Label>
-          <NativeTabs.Trigger.Icon
-            src={require('@/assets/images/tabIcons/home.png')}
-            renderingMode="template"
-          />
-        </NativeTabs.Trigger>
-      )}
+      <NativeTabs.Trigger name="notifications">
+        <NativeTabs.Trigger.Label>Мэдэгдэл</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'bell', selected: 'bell.fill' }}
+          md={{ default: 'notifications_none', selected: 'notifications' }}
+        />
+        <NativeTabs.Trigger.Badge hidden={!isAuthenticated || unreadCount === 0}>
+          {unreadCount > 99 ? '99+' : String(unreadCount)}
+        </NativeTabs.Trigger.Badge>
+      </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="profile">
         <NativeTabs.Trigger.Label>Профайл</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          src={require('@/assets/images/tabIcons/home.png')}
-          renderingMode="template"
+          sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }}
+          md={{ default: 'person_outline', selected: 'person' }}
         />
       </NativeTabs.Trigger>
     </NativeTabs>

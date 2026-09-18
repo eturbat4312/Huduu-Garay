@@ -60,17 +60,14 @@ export default function AppTabs() {
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <CustomTabList>
-          <TabTrigger name="home" href="/" asChild>
-            <TabButton>Нүүр</TabButton>
-          </TabTrigger>
-          <TabTrigger name="explore" href="/explore" asChild>
+          <TabTrigger name="search" href="/" asChild>
             <TabButton>Хайх</TabButton>
-          </TabTrigger>
-          <TabTrigger name="bookings" href="/bookings" asChild>
-            <TabButton>Захиалга</TabButton>
           </TabTrigger>
           <TabTrigger name="favorites" href="/favorites" asChild>
             <TabButton>Хадгалсан</TabButton>
+          </TabTrigger>
+          <TabTrigger name="bookings" href="/bookings" asChild>
+            <TabButton>Захиалга</TabButton>
           </TabTrigger>
           <TabTrigger name="notifications" href="/notifications" asChild>
             <TabButton badgeCount={state.status === 'authenticated' ? unreadCount : 0}>Мэдэгдэл</TabButton>
