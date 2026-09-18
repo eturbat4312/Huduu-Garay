@@ -149,11 +149,12 @@ export default function EditListingPage() {
         (booking: {
           listing: { id: number };
           is_cancelled_by_host: boolean;
+          status: string;
           check_in: string;
           check_out: string;
         }) => {
           if (booking.listing.id !== Number(id)) return;
-          if (booking.is_cancelled_by_host) return;
+          if (booking.is_cancelled_by_host || booking.status !== "confirmed") return;
           const date = new Date(booking.check_in);
           const end = new Date(booking.check_out);
           while (date < end) {

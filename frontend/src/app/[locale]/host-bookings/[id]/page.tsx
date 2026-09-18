@@ -16,6 +16,9 @@ type BookingDetail = {
   guest_phone: string;
   notes: string;
   is_cancelled_by_host: boolean;
+  status: string;
+  guest_cancelled_at?: string | null;
+  total_price: number;
   guest_count: number;
   listing: {
     title: string;
@@ -72,7 +75,7 @@ export default function HostBookingDetailPage() {
     Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / 86400000)
   );
   const price = booking.listing.price_per_night || 0;
-  const total = price * nights;
+  const total = booking.total_price;
   const commission = Math.floor(total * 0.1);
   const netIncome = total - commission;
 
@@ -157,12 +160,12 @@ export default function HostBookingDetailPage() {
           </p>
           <p className="font-semibold text-green-700">
             ✅ {t(locale, "booking_detail.net_income")}:{" "}
-            {netIncome.toLocaleString()}₮
+            {booking.guest_cancelled_at ? "Гараар шийдвэрлэнэ" : booking.is_cancelled_by_host ? "0₮" : `${netIncome.toLocaleString()}₮`}
           </p>
         </div>
 
         <div className="flex gap-4 mt-4">
-          {!booking.is_cancelled_by_host && (
+          {!booking.is_cancelled_by_host && booking.status === "confirmed" && (
             <button
               onClick={handleCancel}
               className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
@@ -179,6 +182,11 @@ export default function HostBookingDetailPage() {
           </a>
         </div>
 
+        {booking.guest_cancelled_at && (
+          <p className="mt-4 text-sm text-red-700">
+            Зочин захиалгаа цуцалсан. Төлбөрийн буцаалт болон танд олгох дүнг манай ажилтан гараар хянан шийдвэрлэнэ.
+          </p>
+        )}
         {booking.is_cancelled_by_host && (
           <p className="mt-4 text-red-600 font-medium">
             ❌ {t(locale, "booking_detail.cancelled_msg")}

@@ -20,6 +20,7 @@ from .views import (
     MyBookingView,
     HostBookingListView,
     HostBookingCancelView,
+    GuestBookingCancelView,
     NotificationListView,
     NotificationUnreadCountView,
     NotificationMarkAsReadView,
@@ -102,6 +103,7 @@ urlpatterns = [
     path("bookings/my/", MyBookingView.as_view(), name="my-bookings"),
     path("host-bookings/", HostBookingListView.as_view(), name="host-bookings"),
     path("bookings/<int:booking_id>/host-cancel/", HostBookingCancelView.as_view()),
+    path("bookings/<int:booking_id>/guest-cancel/", GuestBookingCancelView.as_view()),
     path("bookings/<int:pk>/", BookingRetrieveView.as_view(), name="booking-detail"),
     path("notifications/", NotificationListView.as_view(), name="notification-list"),
     path("host-bookings/<int:pk>/", HostBookingDetailView.as_view()),  # ✅ нэмсэн

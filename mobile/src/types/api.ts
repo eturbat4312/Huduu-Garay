@@ -125,6 +125,14 @@ export type BookingDetail = BookingSummary & {
   guest_count: number;
   service_fee: number | string;
   is_cancelled_by_host: boolean;
+  guest_cancelled_at?: string | null;
+  guest_cancellation_reason?: string;
+  guest_cancellation?: {
+    allowed: boolean;
+    blocked_reason: string;
+    policy_version: string;
+    policy: string[];
+  };
 };
 
 export type NotificationItem = {
@@ -146,6 +154,7 @@ export type NotificationItem = {
     | string;
   created_at: string;
   related_booking?: number | null;
+  booking_role?: 'guest' | 'host' | 'admin' | null;
   related_listing?: number | null;
 };
 

@@ -70,7 +70,7 @@ export default function ListingDetailPage() {
 
           bookingsRes.data.forEach((booking) => {
             if (booking.listing.id !== Number(id)) return;
-            if (booking.is_cancelled_by_host) return;
+            if (booking.is_cancelled_by_host || booking.status !== "confirmed") return;
             const startDate = new Date(booking.check_in);
             const end = new Date(booking.check_out);
             const loopDate = new Date(startDate);

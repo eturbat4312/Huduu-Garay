@@ -13,11 +13,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { GuestCancellationAction } from '@/components/guest-cancellation-action';
 import { Colors, Spacing } from '@/constants/theme';
 import { fetchBooking } from '@/lib/api';
 import type { BookingDetail } from '@/types/api';
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  pending_payment: { label: 'Төлбөр хүлээгдэж байна', color: '#D97706' },
+  expired: { label: 'Хугацаа дууссан', color: '#6B7280' },
+  payment_failed: { label: 'Төлбөр амжилтгүй', color: '#DC2626' },
   pending:   { label: 'Хүлээгдэж байна', color: '#D97706' },
   confirmed: { label: 'Баталгаажсан',    color: '#16A34A' },
   cancelled: { label: 'Цуцалсан',        color: '#DC2626' },
@@ -129,10 +133,18 @@ export default function BookingDetailScreen() {
             {booking.is_cancelled_by_host && (
               <View style={[styles.cancelNotice, { backgroundColor: '#FEE2E2' }]}>
                 <Text style={{ color: '#DC2626', fontSize: 14, fontWeight: '600' }}>
-                  ⚠️ Энэ захиалгыг хост цуцалсан байна.
+                  Энэ захиалгыг түрээслүүлэгч цуцалсан байна.
                 </Text>
               </View>
             )}
+            {booking.guest_cancelled_at && (
+              <View style={styles.cancelNotice}>
+                <Text accessibilityRole="alert" style={[styles.rowValue, { color: C.text, textAlign: 'left' }]}>
+                  Та захиалгаа цуцалсан байна. Төлбөрийн буцаалтыг манай ажилтан нөхцөлийн дагуу гараар хянан шийдвэрлэнэ.
+                </Text>
+              </View>
+            )}
+            <GuestCancellationAction booking={booking} onChange={setBooking} />
           </ScrollView>
         ) : null}
       </SafeAreaView>
@@ -151,7 +163,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { minWidth: 64 },
   backText: { fontSize: 16 },
-  headerTitle: { fontSize: 16, fontWeight: '700' },
+  headerTitle: { fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
   content: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.five },
   statusBox: {
@@ -172,7 +184,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   rowLabel: { flex: 1 },
-  rowValue: { fontSize: 14, fontWeight: '600', textAlign: 'right' },
+  rowValue: { fontSize: 14, fontWeight: '600', textAlign: 'right', flexShrink: 1 },
   divider: { height: StyleSheet.hairlineWidth, marginVertical: 4 },
   cancelNotice: { borderRadius: 12, padding: 14 },
 });

@@ -233,6 +233,13 @@ export function fetchBooking(id: number | string): Promise<BookingDetail> {
   return request<BookingDetail>(`/bookings/${id}/`);
 }
 
+export function guestCancelBooking(id: number, policyVersion: string, reason: string): Promise<BookingDetail> {
+  return request<BookingDetail>(`/bookings/${id}/guest-cancel/`, {
+    method: 'POST',
+    body: { policy_accepted: true, policy_version: policyVersion, reason },
+  });
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export function resolveMediaUrl(url: string | null | undefined): string | null {

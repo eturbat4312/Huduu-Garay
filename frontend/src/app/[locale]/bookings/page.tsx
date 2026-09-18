@@ -8,6 +8,11 @@ import api from "@/lib/axios";
 import { t } from "@/lib/i18n";
 import Image from "next/image"; // ✅ next/image ашиглаж байна
 
+const statusLabels: Record<string, string> = {
+  confirmed: "Батлагдлаа", cancelled: "Цуцлагдсан", pending_payment: "Төлбөр хүлээгдэж байна",
+  expired: "Хугацаа дууссан", payment_failed: "Төлбөр амжилтгүй",
+};
+
 type Booking = {
   id: number;
   check_in: string;
@@ -95,7 +100,7 @@ export default function MyBookingsPage() {
                     {typeof booking.total_price === "number"
                       ? `${booking.total_price.toLocaleString()} ₮`
                       : t(locale, "no_price")}{" "}
-                    – {booking.status}
+                    – {statusLabels[booking.status] || booking.status}
                   </p>
                 </div>
               </div>

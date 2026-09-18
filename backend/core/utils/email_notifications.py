@@ -26,6 +26,19 @@ def send_notification_email(user, notif_type, context):
             f"{'─' * 40}\n\n"
             f"Захиалгыг системд нэвтрэн харна уу."
         )
+    elif notif_type == "guest_booking_cancelled":
+        subject = f"Зочин захиалга #{context['booking_id']}-г цуцаллаа"
+        message = (
+            f"Зар: {context['listing_title']}\n"
+            f"Огноо: {context['check_in']} - {context['check_out']}\n"
+            f"Зочин: {context['full_name']}\n"
+            f"Утас: {context['phone_number']}\n"
+            f"Цуцалсан цаг: {context['cancelled_at']}\n"
+            f"Шалтгаан: {context['reason']}\n"
+            f"Нөхцөлийн хувилбар: {context['policy_version']}\n\n"
+            "Захиалгын огноо дахин нээгдсэн. Төлбөрийн буцаалт болон түрээслүүлэгчид "
+            "олгох дүнг ажилтан гараар хянан шийдвэрлэнэ. Мөнгө автоматаар шилжээгүй."
+        )
     elif notif_type == "booking_cancelled":
         subject = "❗ Захиалга цуцлагдлаа"
         message = (

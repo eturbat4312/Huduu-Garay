@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils.html import format_html
 from django.shortcuts import render
 from django.utils import timezone
@@ -36,12 +36,15 @@ class BookingAdmin(admin.ModelAdmin):
     list_display = (
         "id", "guest_name_display", "listing_title", "check_in", "check_out",
         "guest_count", "total_price_display", "host_payout_display", "platform_fee_display",
-        "status", "is_cancelled_by_host", "created_at",
+        "status", "is_cancelled_by_host", "guest_cancelled_at", "created_at",
     )
-    list_filter = ("status", "is_cancelled_by_host", "check_in")
+    list_filter = ("status", "is_cancelled_by_host", ("guest_cancelled_at", admin.EmptyFieldListFilter), "check_in")
     search_fields = ("id", "full_name", "phone_number", "guest__username", "listing__title")
     ordering = ("-created_at",)
-    readonly_fields = ("created_at",)
+    readonly_fields = (
+        "created_at", "guest_cancelled_at", "guest_cancellation_reason",
+        "guest_cancellation_policy_version",
+    )
 
     def guest_name_display(self, obj):
         return f"{obj.full_name} (@{obj.guest.username})"
@@ -56,11 +59,19 @@ class BookingAdmin(admin.ModelAdmin):
     total_price_display.short_description = "Нийт үнэ"
 
     def host_payout_display(self, obj):
+        if obj.guest_cancelled_at:
+            return "Гараар шийдвэрлэнэ"
+        if obj.is_cancelled_by_host:
+            return "₮0"
         payout = int(obj.total_price * 0.9)
         return f"₮{payout:,}"
     host_payout_display.short_description = "Host авах"
 
     def platform_fee_display(self, obj):
+        if obj.guest_cancelled_at:
+            return "Гараар шийдвэрлэнэ"
+        if obj.is_cancelled_by_host:
+            return "₮0"
         fee = int(obj.total_price * 0.1) + obj.service_fee
         return f"₮{fee:,}"
     platform_fee_display.short_description = "Платформ орлого"
@@ -173,7 +184,7 @@ def stats_view(request):
 
     total_bookings = bookings.count()
     active_bookings = active.count()
-    cancelled_bookings = bookings.filter(is_cancelled_by_host=True).count()
+    cancelled_bookings = bookings.filter(Q(is_cancelled_by_host=True) | Q(status="cancelled")).count()
     month_booking_count = month_bookings.count()
 
     monthly_data = []

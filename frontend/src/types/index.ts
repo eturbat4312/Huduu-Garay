@@ -72,7 +72,16 @@ export type Category = {
     };
     listing_id?: number; // write-only
     total_price: number;
+    service_fee: number;
     status: string;
+    guest_cancelled_at?: string | null;
+    guest_cancellation_reason?: string;
+    guest_cancellation?: {
+      allowed: boolean;
+      blocked_reason: string;
+      policy_version: string;
+      policy: string[];
+    };
     created_at: string;
     notes?: string;
     full_name: string;

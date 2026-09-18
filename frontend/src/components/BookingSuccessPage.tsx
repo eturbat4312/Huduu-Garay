@@ -2,8 +2,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
 import { Booking } from "@/types";
+import GuestCancellationAction from "@/components/GuestCancellationAction";
 
 interface BookingSuccessPageProps {
   booking: Booking;
@@ -11,10 +13,14 @@ interface BookingSuccessPageProps {
 }
 
 export default function BookingSuccessPage({
-  booking,
+  booking: initialBooking,
   locale,
 }: BookingSuccessPageProps) {
   const router = useRouter();
+  const [booking, setBooking] = useState(initialBooking);
+  useEffect(() => setBooking(initialBooking), [initialBooking]);
+  const cancelled = booking.status === "cancelled" || booking.is_cancelled_by_host;
+  const confirmed = booking.status === "confirmed" && !cancelled;
 
   const checkIn = new Date(booking.check_in);
   const checkOut = new Date(booking.check_out);
@@ -29,15 +35,20 @@ export default function BookingSuccessPage({
   );
 
   const totalPrice = booking.total_price;
-  const serviceFee = Math.floor(totalPrice * 0.1);
+  const serviceFee = booking.service_fee;
   const grandTotal = totalPrice + serviceFee;
 
   return (
     <main className="max-w-2xl mx-auto px-6 py-10 space-y-6">
-      <h1 className="text-3xl font-bold text-green-700">
-        ✅ {t(locale, "booking_success")}
+      <h1 className={`text-2xl font-bold ${cancelled ? "text-red-700" : "text-green-700"}`}>
+        {cancelled ? "Захиалга цуцлагдлаа" : confirmed ? t(locale, "booking_success") : "Захиалгын дэлгэрэнгүй"}
       </h1>
-      <p className="text-gray-700">{t(locale, "booking_confirmed_details")}</p>
+      {cancelled ? (
+        <p role="status" className="text-gray-700">
+          {booking.guest_cancelled_at ? "Та захиалгаа цуцалсан байна. " : "Захиалга цуцлагдсан байна. "}
+          Төлбөрийн буцаалтыг манай ажилтан нөхцөлийн дагуу гараар хянан шийдвэрлэнэ.
+        </p>
+      ) : confirmed ? <p className="text-gray-700">{t(locale, "booking_confirmed_details")}</p> : null}
 
       <div className="bg-white rounded shadow border p-4 space-y-4">
         <div className="flex gap-4">
@@ -111,10 +122,12 @@ export default function BookingSuccessPage({
             🧾 {t(locale, "service_fee")}: ₮{serviceFee.toLocaleString()}
           </p>
           <p className="font-semibold text-blue-700">
-            💳 {t(locale, "total_paid")}: ₮{grandTotal.toLocaleString()}
+            Нийт төлбөр: ₮{grandTotal.toLocaleString()}
           </p>
         </div>
       </div>
+
+      <GuestCancellationAction booking={booking} locale={locale} onChange={setBooking} />
 
       <button
         onClick={() => router.push(`/${locale}/bookings`)}

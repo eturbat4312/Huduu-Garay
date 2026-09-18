@@ -183,12 +183,19 @@ export default function HostBookingDetailScreen() {
             <View style={[styles.payoutRow]}>
               <Text style={[styles.payoutLabel, { color: C.textSecondary }]}>Таны авах мөнгө</Text>
               <Text style={[styles.payoutValue, { color: '#16A34A' }]}>
-                ₮{(Number(booking.total_price) - Number(booking.service_fee)).toLocaleString()}
+                {booking.guest_cancelled_at ? 'Гараар шийдвэрлэнэ' : booking.is_cancelled_by_host ? '₮0' : `₮${(Number(booking.total_price) - Number(booking.service_fee)).toLocaleString()}`}
               </Text>
             </View>
           </View>
 
           {/* Цуцлах */}
+          {booking.guest_cancelled_at && (
+            <View style={styles.cancelledNote}>
+              <Text style={{ color: C.text, fontSize: 14, lineHeight: 22 }}>
+                Зочин захиалгаа цуцалсан. Төлбөрийн буцаалт болон танд олгох дүнг манай ажилтан гараар хянан шийдвэрлэнэ.
+              </Text>
+            </View>
+          )}
           {canCancel && (
             <Pressable
               onPress={handleCancel}

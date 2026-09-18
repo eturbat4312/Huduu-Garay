@@ -14,11 +14,18 @@ type Notification = {
   created_at: string;
   type?: string;
   related_booking?: number | null;
+  booking_role?: "guest" | "host" | "admin" | null;
   related_listing?: number | null;
 };
 
 function getNotificationLink(n: Notification, locale: string): string {
   if (n.related_booking) {
+    if (n.booking_role === "guest") return `/${locale}/bookings/${n.related_booking}`;
+    if (n.booking_role === "host") return `/${locale}/host-bookings/${n.related_booking}`;
+    if (n.booking_role === "admin") {
+      const origin = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/api\/?$/, "");
+      return `${origin}/admin/core/booking/${n.related_booking}/change/`;
+    }
     if (
       n.type === "booking_created" ||
       n.type === "booking_cancelled" ||

@@ -306,6 +306,7 @@ class BookingSerializer(serializers.ModelSerializer):
     is_unread = serializers.SerializerMethodField()
     host_name = serializers.SerializerMethodField()
     host_phone = serializers.SerializerMethodField()
+    guest_cancellation = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
@@ -328,7 +329,32 @@ class BookingSerializer(serializers.ModelSerializer):
             "is_unread",
             "host_name",
             "host_phone",
+            "service_fee",
+            "guest_cancelled_at",
+            "guest_cancellation_reason",
+            "guest_cancellation_policy_version",
+            "guest_cancellation",
         ]
+        read_only_fields = [
+            "service_fee", "guest_cancelled_at", "guest_cancellation_reason",
+            "guest_cancellation_policy_version",
+        ]
+
+    def get_guest_cancellation(self, obj):
+        from .services.cancellations import (
+            GUEST_CANCELLATION_POLICY, GUEST_CANCELLATION_POLICY_VERSION,
+            guest_cancellation_blocked_reason,
+        )
+
+        request = self.context.get("request")
+        is_guest = bool(request and request.user.pk == obj.guest_id)
+        blocked_reason = guest_cancellation_blocked_reason(obj)
+        return {
+            "allowed": is_guest and not blocked_reason,
+            "blocked_reason": blocked_reason,
+            "policy_version": GUEST_CANCELLATION_POLICY_VERSION,
+            "policy": GUEST_CANCELLATION_POLICY,
+        }
 
     def get_listing(self, obj):
         request = self.context.get("request")
@@ -353,10 +379,7 @@ class BookingSerializer(serializers.ModelSerializer):
         return obj.phone_number
 
     def get_total_price(self, obj):
-        nights = (obj.check_out - obj.check_in).days
-        return (
-            nights * obj.listing.price_per_night if obj.listing.price_per_night else 0
-        )
+        return obj.total_price
 
     def get_is_unread(self, obj):
         request = self.context.get("request")
@@ -443,6 +466,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
 
 class NotificationSerializer(serializers.ModelSerializer):
+    booking_role = serializers.SerializerMethodField()
     related_booking = serializers.SerializerMethodField()
     related_listing = serializers.SerializerMethodField()
     # related_booking = serializers.IntegerField(
@@ -462,7 +486,20 @@ class NotificationSerializer(serializers.ModelSerializer):
             "type",
             "related_booking",
             "related_listing",
+            "booking_role",
         ]
+
+    def get_booking_role(self, obj):
+        booking = obj.related_booking
+        if not booking:
+            return None
+        if obj.user_id == booking.guest_id:
+            return "guest"
+        if obj.user_id == booking.listing.host_id:
+            return "host"
+        if obj.user.is_staff:
+            return "admin"
+        return None
 
     def get_related_booking(self, obj):
         return obj.related_booking.id if obj.related_booking else None

@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   DeviceEventEmitter,
   FlatList,
+  Linking,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -17,7 +18,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, BottomTabInset, type ColorPalette } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
-import { fetchNotifications, markNotificationRead } from '@/lib/api';
+import { API_BASE_URL, fetchNotifications, markNotificationRead } from '@/lib/api';
 import type { NotificationItem } from '@/types/api';
 
 // ─── Notification icon by type ──────────────────────────────────────────────
@@ -38,6 +39,18 @@ function notifIcon(type: string): string {
 // ─── Navigate on tap ────────────────────────────────────────────────────────
 function navigateForNotification(item: NotificationItem) {
   if (item.related_booking) {
+    if (item.booking_role === 'admin') {
+      void Linking.openURL(`${API_BASE_URL.replace(/\/api\/?$/, '')}/admin/core/booking/${item.related_booking}/change/`);
+      return;
+    }
+    if (item.booking_role === 'guest') {
+      router.push(`/booking/${item.related_booking}` as never);
+      return;
+    }
+    if (item.booking_role === 'host') {
+      router.push(`/host-bookings/${item.related_booking}` as never);
+      return;
+    }
     if (item.type === 'booking_created' || item.type === 'admin_booking') {
       router.push(`/host-bookings/${item.related_booking}` as never);
     } else {

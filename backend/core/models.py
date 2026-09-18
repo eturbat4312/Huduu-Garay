@@ -173,6 +173,13 @@ class Booking(models.Model):
     phone_number = models.CharField(max_length=20, default="00000000")
     notes = models.TextField(default="", blank=True)
     is_cancelled_by_host = models.BooleanField(default=False)
+    guest_cancelled_at = models.DateTimeField(
+        "Зочин цуцалсан огноо", null=True, blank=True, db_index=True
+    )
+    guest_cancellation_reason = models.TextField("Зочны цуцлах шалтгаан", blank=True)
+    guest_cancellation_policy_version = models.CharField(
+        "Цуцлахдаа зөвшөөрсөн нөхцөлийн хувилбар", max_length=20, blank=True
+    )
     guest_count = models.PositiveIntegerField(default=1)
     total_price = models.PositiveIntegerField(default=0)
     service_fee = models.PositiveIntegerField(default=0)

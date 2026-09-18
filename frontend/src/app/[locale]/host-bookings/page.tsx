@@ -15,6 +15,7 @@ type Booking = {
   guest_phone: string;
   notes: string;
   is_cancelled_by_host: boolean;
+  status: string;
   guest_count: number;
   total_price: string;
   listing: {
@@ -77,7 +78,7 @@ export default function HostBookingsPage() {
               >
                 <div
                   className={`flex flex-col md:flex-row gap-4 p-4 ${
-                    booking.is_cancelled_by_host ? "opacity-50" : ""
+                    booking.is_cancelled_by_host || booking.status === "cancelled" ? "opacity-50" : ""
                   }`}
                 >
                   {booking.listing.thumbnail ? (
@@ -120,7 +121,7 @@ export default function HostBookingsPage() {
                       </p>
                     )}
 
-                    {booking.is_cancelled_by_host && (
+                    {(booking.is_cancelled_by_host || booking.status === "cancelled") && (
                       <p className="text-red-600 mt-2 font-medium">
                         ❌ {t(locale, "host_bookings.cancelled")}
                       </p>
