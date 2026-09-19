@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db import transaction
 from django.db.models import Q, Sum
 from django.utils.html import format_html
 from django.shortcuts import render
@@ -14,7 +15,9 @@ from .models import (
     HostApplication,
     Notification,
     Payment,
+    SupportRequest,
 )
+from core.utils.email_notifications import send_notification_email
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -137,6 +140,115 @@ class HostApplicationAdmin(admin.ModelAdmin):
         "host_terms_accepted_user_agent",
         "submitted_at",
     )
+
+
+# ── SupportRequest ───────────────────────────────────────────────────────────
+@admin.register(SupportRequest)
+class SupportRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "subject",
+        "user",
+        "category",
+        "status",
+        "created_at",
+        "responded_at",
+    )
+    list_filter = ("status", "category", "created_at")
+    search_fields = (
+        "subject",
+        "message",
+        "admin_reply",
+        "user__username",
+        "user__email",
+        "user__phone",
+    )
+    ordering = ("-created_at",)
+    readonly_fields = (
+        "user",
+        "category",
+        "subject",
+        "message",
+        "created_at",
+        "updated_at",
+        "responded_by",
+        "responded_at",
+        "user_contact",
+    )
+    fields = (
+        "user",
+        "user_contact",
+        "category",
+        "subject",
+        "message",
+        "status",
+        "admin_reply",
+        "responded_by",
+        "responded_at",
+        "created_at",
+        "updated_at",
+    )
+
+    @admin.display(description="Холбоо барих мэдээлэл")
+    def user_contact(self, obj):
+        if not obj or not obj.user_id:
+            return "-"
+        return f"Цахим шуудан: {obj.user.email or '-'} | Утас: {obj.user.phone or '-'}"
+
+    def save_model(self, request, obj, form, change):
+        previous_reply = ""
+        if change and obj.pk:
+            previous_reply = (
+                SupportRequest.objects.filter(pk=obj.pk)
+                .values_list("admin_reply", flat=True)
+                .first()
+                or ""
+            )
+
+        reply_changed = bool(obj.admin_reply.strip()) and (
+            obj.admin_reply.strip() != previous_reply.strip()
+        )
+        if reply_changed:
+            obj.responded_by = request.user
+            obj.responded_at = timezone.now()
+            if obj.status != "closed":
+                obj.status = "answered"
+
+        super().save_model(request, obj, form, change)
+
+        if not reply_changed:
+            return
+
+        Notification.objects.create(
+            user=obj.user,
+            message=f"Тусламжийн хүсэлт #{obj.id}-д хариу ирлээ: {obj.subject}",
+            type="support_reply",
+            related_support_request=obj,
+        )
+        context = {
+            "request_id": obj.id,
+            "subject": obj.subject,
+            "reply": obj.admin_reply,
+            "full_name": obj.user.full_name or obj.user.username,
+        }
+
+        def email_user_after_commit():
+            if not obj.user.email:
+                return
+            try:
+                send_notification_email(
+                    obj.user,
+                    notif_type="support_request_answered",
+                    context=context,
+                )
+            except Exception:
+                import logging
+
+                logging.getLogger(__name__).exception(
+                    "Support reply email failed for request %s", obj.id
+                )
+
+        transaction.on_commit(email_user_after_commit)
 
 
 # ── Category ──────────────────────────────────────────────────────────────────

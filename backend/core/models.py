@@ -323,6 +323,57 @@ class Payment(models.Model):
         return f"{self.provider} {self.sender_invoice_no} ({self.status})"
 
 
+class SupportRequest(models.Model):
+    CATEGORY_CHOICES = [
+        ("booking", "Захиалга"),
+        ("payment", "Төлбөр, буцаалт"),
+        ("listing", "Зар, түрээслүүлэлт"),
+        ("account", "Бүртгэл"),
+        ("other", "Бусад"),
+    ]
+    STATUS_CHOICES = [
+        ("new", "Хүлээн авсан"),
+        ("in_progress", "Шалгаж байна"),
+        ("answered", "Хариулсан"),
+        ("closed", "Хаасан"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="support_requests",
+        verbose_name="Хэрэглэгч",
+    )
+    category = models.CharField(
+        "Төрөл", max_length=20, choices=CATEGORY_CHOICES, default="other"
+    )
+    subject = models.CharField("Гарчиг", max_length=160)
+    message = models.TextField("Зурвас")
+    status = models.CharField(
+        "Төлөв", max_length=20, choices=STATUS_CHOICES, default="new", db_index=True
+    )
+    admin_reply = models.TextField("Админы хариу", blank=True)
+    responded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="answered_support_requests",
+        verbose_name="Хариулсан ажилтан",
+    )
+    responded_at = models.DateTimeField("Хариулсан огноо", null=True, blank=True)
+    created_at = models.DateTimeField("Илгээсэн огноо", auto_now_add=True)
+    updated_at = models.DateTimeField("Шинэчилсэн огноо", auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Тусламжийн хүсэлт"
+        verbose_name_plural = "Тусламжийн хүсэлтүүд"
+
+    def __str__(self):
+        return f"#{self.pk} {self.subject} ({self.user.username})"
+
+
 class Notification(models.Model):
     NOTIFICATION_TYPES = [
         ("booking_created", "Шинэ захиалга (хост)"),
@@ -335,6 +386,8 @@ class Notification(models.Model):
         ("review", "Сэтгэгдэл"),
         ("listing_published", "Зар нийтлэгдсэн"),
         ("payment", "Төлбөр"),
+        ("admin_support", "Шинэ тусламжийн хүсэлт (админ)"),
+        ("support_reply", "Тусламжийн хүсэлтийн хариу"),
         # legacy aliases
         ("booking", "Захиалга"),
         ("comment", "Сэтгэгдэл"),
@@ -363,6 +416,14 @@ class Notification(models.Model):
         null=True,
         blank=True,
         on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+
+    related_support_request = models.ForeignKey(
+        "SupportRequest",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
         related_name="notifications",
     )
 

@@ -32,12 +32,22 @@ function notifIcon(type: string): string {
     case 'review':             return '⭐';
     case 'listing_published':  return '🏠';
     case 'payment':            return '💳';
+    case 'admin_support':      return '🆘';
+    case 'support_reply':      return '💬';
     default:                   return '🔔';
   }
 }
 
 // ─── Navigate on tap ────────────────────────────────────────────────────────
 function navigateForNotification(item: NotificationItem) {
+  if (item.type === 'support_reply') {
+    router.push('/support' as never);
+    return;
+  }
+  if (item.type === 'admin_support' && item.related_support_request) {
+    void Linking.openURL(`${API_BASE_URL.replace(/\/api\/?$/, '')}/admin/core/supportrequest/${item.related_support_request}/change/`);
+    return;
+  }
   if (item.related_booking) {
     if (item.booking_role === 'admin') {
       void Linking.openURL(`${API_BASE_URL.replace(/\/api\/?$/, '')}/admin/core/booking/${item.related_booking}/change/`);

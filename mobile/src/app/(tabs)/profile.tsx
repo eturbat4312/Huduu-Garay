@@ -231,6 +231,14 @@ export default function ProfileScreen() {
               borderColor={C.backgroundSelected}
               onPress={() => router.push('/(tabs)/favorites' as never)}
             />
+            <MenuRow
+              icon="❓"
+              label="Тусламж"
+              color={C.text}
+              borderColor={C.backgroundSelected}
+              onPress={() => router.push('/support' as never)}
+              isLast
+            />
           </MenuSection>
 
           {/* ── Хост хэсэг ── */}

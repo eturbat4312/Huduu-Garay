@@ -87,6 +87,14 @@ export default function UserDropdownMenu() {
                 {t(locale, "menu_terms")}
               </button>
             </li>
+            <li>
+              <button
+                onClick={() => go(`/${locale}/support`)}
+                className="w-full text-left px-4 py-2 hover:bg-gray-100"
+              >
+                {t(locale, "menu_support")}
+              </button>
+            </li>
             {user.is_host && (
               <>
                 <hr className="my-1" />

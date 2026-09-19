@@ -57,6 +57,7 @@ from .models import (
     Notification,
     Review,
     HostApplication,
+    SupportRequest,
 )
 from .serializers import (
     CategorySerializer,
@@ -75,6 +76,7 @@ from .serializers import (
     NotificationSerializer,
     ReviewSerializer,
     HostApplicationSerializer,
+    SupportRequestSerializer,
 )
 
 User = get_user_model()
@@ -1096,7 +1098,7 @@ class PaymentCreateView(APIView):
                 invoice_response = QPayClient().create_invoice(
                     sender_invoice_no=sender_invoice_no,
                     amount=amount,
-                    description=f"Танайд Хоной захиалга #{booking.id}",
+                    description=f"Танайд Хоноё захиалга #{booking.id}",
                 )
             except QPayConfigurationError as exc:
                 return Response(
@@ -1654,6 +1656,62 @@ class NotificationMarkOneAsReadView(APIView):
             notification.is_read = True
             notification.save(update_fields=["is_read"])
         return Response({"message": "Marked as read."})
+
+
+class SupportRequestListCreateView(generics.ListCreateAPIView):
+    serializer_class = SupportRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return SupportRequest.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            support_request = serializer.save(user=self.request.user)
+            admin_users = list(User.objects.filter(is_staff=True, is_active=True))
+            admin_message = (
+                f"Шинэ тусламжийн хүсэлт #{support_request.id} ирлээ. "
+                f"{support_request.user.username}: {support_request.subject}"
+            )
+            for admin_user in admin_users:
+                Notification.objects.create(
+                    user=admin_user,
+                    message=admin_message,
+                    type="admin_support",
+                    related_support_request=support_request,
+                )
+
+            context = {
+                "request_id": support_request.id,
+                "category": support_request.get_category_display(),
+                "subject": support_request.subject,
+                "message": support_request.message,
+                "username": support_request.user.username,
+                "full_name": support_request.user.full_name,
+                "email": support_request.user.email,
+                "phone": support_request.user.phone,
+                "created_at": support_request.created_at.strftime("%Y-%m-%d %H:%M"),
+            }
+
+            def email_admins_after_commit():
+                for admin_user in admin_users:
+                    if not admin_user.email:
+                        continue
+                    try:
+                        send_notification_email(
+                            admin_user,
+                            notif_type="admin_support_request_created",
+                            context=context,
+                        )
+                    except Exception:
+                        import logging
+
+                        logging.getLogger(__name__).exception(
+                            "Support request email failed for request %s",
+                            support_request.id,
+                        )
+
+            transaction.on_commit(email_admins_after_commit)
 
 
 class HostBookingDetailView(RetrieveAPIView):

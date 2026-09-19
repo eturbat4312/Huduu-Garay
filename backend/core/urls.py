@@ -45,6 +45,7 @@ from .views import (
     GoogleLogin,
     PasswordResetRequestView,
     PasswordResetConfirmView,
+    SupportRequestListCreateView,
 )
 
 # from core.adapters import GoogleOneTapLoginView
@@ -114,6 +115,11 @@ urlpatterns = [
         name="notification-unread-count",
     ),
     path("notifications/mark-read/", NotificationMarkAsReadView.as_view()),
+    path(
+        "support-requests/",
+        SupportRequestListCreateView.as_view(),
+        name="support-request-list-create",
+    ),
     path(
         "notifications/<int:notification_id>/read/",
         NotificationMarkOneAsReadView.as_view(),

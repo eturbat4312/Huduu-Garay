@@ -183,11 +183,26 @@ export type NotificationItem = {
   related_booking?: number | null;
   booking_role?: 'guest' | 'host' | 'admin' | null;
   related_listing?: number | null;
+  related_support_request?: number | null;
 };
 
 export type UnreadCountResponse = {
   total_unread: number;
   booking_unread: number;
+};
+
+export type SupportRequest = {
+  id: number;
+  category: 'booking' | 'payment' | 'listing' | 'account' | 'other';
+  category_display: string;
+  subject: string;
+  message: string;
+  status: 'new' | 'in_progress' | 'answered' | 'closed';
+  status_display: string;
+  admin_reply: string;
+  responded_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Review = {

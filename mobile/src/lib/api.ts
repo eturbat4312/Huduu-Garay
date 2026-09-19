@@ -431,6 +431,23 @@ export function markNotificationRead(notificationId: number | string): Promise<v
   });
 }
 
+// ─── Support ────────────────────────────────────────────────────────────────
+
+export function fetchSupportRequests(): Promise<import('@/types/api').SupportRequest[]> {
+  return request<import('@/types/api').SupportRequest[]>('/support-requests/');
+}
+
+export function createSupportRequest(payload: {
+  category: import('@/types/api').SupportRequest['category'];
+  subject: string;
+  message: string;
+}): Promise<import('@/types/api').SupportRequest> {
+  return request<import('@/types/api').SupportRequest>('/support-requests/', {
+    method: 'POST',
+    body: payload,
+  });
+}
+
 // ─── Password Reset ───────────────────────────────────────────────────────────
 
 export async function requestPasswordReset(email: string): Promise<void> {

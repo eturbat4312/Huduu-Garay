@@ -178,6 +178,31 @@ def send_notification_email(user, notif_type, context):
             f"Дахин оролдох эсвэл дэлгэрэнгүй мэдээлэл авахыг хүсвэл бидэнтэй холбоо барина уу."
         )
 
+    elif notif_type == "admin_support_request_created":
+        subject = f"Шинэ тусламжийн хүсэлт #{context['request_id']} ирлээ"
+        message = (
+            f"Шинэ тусламжийн хүсэлт ирлээ.\n\n"
+            f"Хүсэлтийн дугаар: #{context['request_id']}\n"
+            f"Төрөл: {context['category']}\n"
+            f"Гарчиг: {context['subject']}\n"
+            f"Зурвас: {context['message']}\n\n"
+            f"Хэрэглэгч: {context['full_name'] or context['username']} "
+            f"(@{context['username']})\n"
+            f"Цахим шуудан: {context['email'] or 'Байхгүй'}\n"
+            f"Утас: {context['phone'] or 'Байхгүй'}\n"
+            f"Илгээсэн огноо: {context['created_at']}\n\n"
+            "Админ хэсгийн Тусламжийн хүсэлтүүд цэсээс шалгаж хариу өгнө үү."
+        )
+
+    elif notif_type == "support_request_answered":
+        subject = f"Тусламжийн хүсэлт #{context['request_id']}-д хариу ирлээ"
+        message = (
+            f"Сайн байна уу {context['full_name']}!\n\n"
+            f"Таны '{context['subject']}' хүсэлтэд манай ажилтан хариу өглөө.\n\n"
+            f"{context['reply']}\n\n"
+            "Танайд Хоноё системийн Тусламж хэсгээс хүсэлт, хариугаа харна уу."
+        )
+
     # Claude: password reset email
     elif notif_type == "password_reset":
         subject = "🔐 Нууц үг сэргээх хүсэлт"

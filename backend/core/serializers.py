@@ -15,6 +15,7 @@ from .models import (
     Notification,
     Review,
     HostApplication,
+    SupportRequest,
 )
 
 User = get_user_model()
@@ -653,6 +654,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             "type",
             "related_booking",
             "related_listing",
+            "related_support_request",
             "booking_role",
         ]
 
@@ -673,6 +675,50 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_related_listing(self, obj):
         return obj.related_listing.id if obj.related_listing else None
+
+
+class SupportRequestSerializer(serializers.ModelSerializer):
+    category_display = serializers.CharField(
+        source="get_category_display", read_only=True
+    )
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = SupportRequest
+        fields = [
+            "id",
+            "category",
+            "category_display",
+            "subject",
+            "message",
+            "status",
+            "status_display",
+            "admin_reply",
+            "responded_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "status",
+            "admin_reply",
+            "responded_at",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_subject(self, value):
+        value = value.strip()
+        if len(value) < 3:
+            raise serializers.ValidationError("Гарчгийг 3-аас олон тэмдэгтээр бичнэ үү.")
+        return value
+
+    def validate_message(self, value):
+        value = value.strip()
+        if len(value) < 10:
+            raise serializers.ValidationError("Зурвасаа 10-аас олон тэмдэгтээр бичнэ үү.")
+        if len(value) > 3000:
+            raise serializers.ValidationError("Зурвас 3000-аас ихгүй тэмдэгт байна.")
+        return value
 
 
 class BookingCalendarSerializer(serializers.ModelSerializer):

@@ -16,9 +16,17 @@ type Notification = {
   related_booking?: number | null;
   booking_role?: "guest" | "host" | "admin" | null;
   related_listing?: number | null;
+  related_support_request?: number | null;
 };
 
 function getNotificationLink(n: Notification, locale: string): string {
+  if (n.type === "support_reply") {
+    return `/${locale}/support`;
+  }
+  if (n.type === "admin_support" && n.related_support_request) {
+    const origin = (process.env.NEXT_PUBLIC_API_URL || "/api").replace(/\/api\/?$/, "");
+    return `${origin}/admin/core/supportrequest/${n.related_support_request}/change/`;
+  }
   if (n.related_booking) {
     if (n.booking_role === "guest") return `/${locale}/bookings/${n.related_booking}`;
     if (n.booking_role === "host") return `/${locale}/host-bookings/${n.related_booking}`;

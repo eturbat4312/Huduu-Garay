@@ -73,6 +73,10 @@ export default function RootLayout() {
               name="host-bookings"
               options={{ headerShown: false }}
             />
+            <Stack.Screen
+              name="support"
+              options={{ headerShown: false }}
+            />
           </Stack>
         </AppShell>
       </AuthProvider>
