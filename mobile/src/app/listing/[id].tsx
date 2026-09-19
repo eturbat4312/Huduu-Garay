@@ -4,13 +4,17 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   useColorScheme,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -340,8 +344,10 @@ export default function ListingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const C = Colors[scheme];
+  const { width: screenWidth } = useWindowDimensions();
   const { user } = useAuth();
   const [listing, setListing] = useState<ListingDetail | null>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set());
   const [checkIn, setCheckIn] = useState('');
   const [checkOut, setCheckOut] = useState('');
@@ -430,6 +436,7 @@ export default function ListingDetailScreen() {
       .then(([listingData, availabilityData]) => {
         if (isMounted) {
           setListing(listingData);
+          setCurrentImageIndex(0);
           setAvailableDates(new Set(availabilityData.map((day) => day.date.trim())));
           setIsFavorited(listingData.is_favorited ?? false);
           setFavoriteId(listingData.favorite_id ?? null);
@@ -452,13 +459,21 @@ export default function ListingDetailScreen() {
     };
   }, [id]);
 
-  const imageUrl = useMemo(() => {
-    if (!listing) {
-      return null;
-    }
-
-    return resolveMediaUrl(listing.images[0]?.image ?? listing.thumbnail);
+  const imageUrls = useMemo(() => {
+    const urls = (listing?.images ?? [])
+      .map((image) => resolveMediaUrl(image.image))
+      .filter((url): url is string => Boolean(url));
+    const fallback = resolveMediaUrl(listing?.thumbnail);
+    if (urls.length === 0 && fallback) urls.push(fallback);
+    return urls;
   }, [listing]);
+
+  const handleImageScrollEnd = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const pageWidth = event.nativeEvent.layoutMeasurement.width;
+    if (!pageWidth) return;
+    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+    setCurrentImageIndex(Math.max(0, Math.min(nextIndex, imageUrls.length - 1)));
+  };
 
   const normalizedCheckOut = useMemo(() => {
     if (!isDateString(checkIn) || !isDateString(checkOut)) {
@@ -637,8 +652,49 @@ export default function ListingDetailScreen() {
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.heroImage} />
+        {imageUrls.length > 0 ? (
+          <View style={styles.gallery}>
+            <FlatList
+              data={imageUrls}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(url, index) => `${url}-${index}`}
+              renderItem={({ item, index }) => (
+                <Image
+                  source={{ uri: item }}
+                  style={[styles.heroImage, { width: screenWidth }]}
+                  accessibilityLabel={`Байрны зураг ${index + 1}`}
+                />
+              )}
+              getItemLayout={(_, index) => ({
+                length: screenWidth,
+                offset: screenWidth * index,
+                index,
+              })}
+              onMomentumScrollEnd={handleImageScrollEnd}
+            />
+            {imageUrls.length > 1 ? (
+              <>
+                <View style={styles.imageCountBadge}>
+                  <Text style={styles.imageCountText}>
+                    {currentImageIndex + 1}/{imageUrls.length}
+                  </Text>
+                </View>
+                <View style={styles.galleryDots} pointerEvents="none">
+                  {imageUrls.map((_, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.galleryDot,
+                        index === currentImageIndex && styles.galleryDotActive,
+                      ]}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : null}
+          </View>
         ) : (
           <View style={styles.heroPlaceholder} />
         )}
@@ -924,10 +980,48 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: Spacing.five,
   },
+  gallery: {
+    position: 'relative',
+  },
   heroImage: {
-    width: '100%',
     height: 280,
     backgroundColor: '#DDE7DF',
+  },
+  imageCountBadge: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    minWidth: 48,
+    height: 30,
+    paddingHorizontal: 10,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.68)',
+  },
+  imageCountText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  galleryDots: {
+    position: 'absolute',
+    bottom: 12,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  galleryDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.58)',
+  },
+  galleryDotActive: {
+    width: 20,
+    backgroundColor: '#FFFFFF',
   },
   heroPlaceholder: {
     height: 280,
