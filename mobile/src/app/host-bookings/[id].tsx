@@ -28,6 +28,17 @@ function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('mn-MN', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
+function formatListingAddress(listing: BookingDetail['listing']) {
+  return [
+    listing.location_city,
+    listing.location_district,
+    listing.location_khoroo,
+    listing.location_extra,
+    listing.location_building,
+    listing.location_apartment ? `${listing.location_apartment} тоот` : '',
+  ].filter(Boolean).join(', ');
+}
+
 function InfoRow({ label, value, C }: { label: string; value: string; C: ColorPalette }) {
   return (
     <View style={styles.infoRow}>
@@ -128,7 +139,7 @@ export default function HostBookingDetailScreen() {
             <Text style={[styles.sectionTitle, { color: C.textSecondary }]}>🏠 Зар</Text>
             <Text style={[styles.listingTitle, { color: C.text }]}>{booking.listing.title}</Text>
             <Text style={[styles.listingLocation, { color: C.textSecondary }]}>
-              📍 {booking.listing.location_city}, {booking.listing.location_district}
+              📍 {formatListingAddress(booking.listing)}
             </Text>
           </View>
 

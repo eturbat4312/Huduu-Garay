@@ -33,6 +33,7 @@ export type Category = {
     location_extra?: string;
     location_building?: string;
     location_apartment?: string;
+    can_view_private_location?: boolean;
     location_lat?: number;
     location_lng?: number;
     category?: Category | null;
@@ -69,6 +70,11 @@ export type Category = {
       location?: string;
       location_city?: string;
       location_district?: string;
+      location_khoroo?: string;
+      location_extra?: string;
+      location_building?: string;
+      location_apartment?: string;
+      can_view_private_location?: boolean;
       thumbnail: string | null;
       price_per_night: number;
     };

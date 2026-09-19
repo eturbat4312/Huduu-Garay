@@ -327,9 +327,6 @@ export default function EditListingScreen() {
             </View>
           </View>
 
-          <Text style={[S.label, { color: C.textSecondary }]}>Байр / Хаяг</Text>
-          <TextInput style={inp} value={building} onChangeText={setBuilding} placeholder="15-р байр" placeholderTextColor={C.textSecondary} />
-
           <Text style={[S.label, { color: C.textSecondary }]}>Газрын зураг дээр байршил тэмдэглэх</Text>
           <MapPickerField
             lat={lat}
@@ -343,6 +340,8 @@ export default function EditListingScreen() {
             <Text style={{ color: '#A16207', fontWeight: '600', fontSize: 13, marginBottom: 6 }}>
               🔒 Захиалсны дараа харагдах
             </Text>
+            <Text style={[S.label, { color: C.textSecondary }]}>Байр / Хаяг</Text>
+            <TextInput style={inp} value={building} onChangeText={setBuilding} placeholder="15-р байр" placeholderTextColor={C.textSecondary} />
             <Text style={[S.label, { color: C.textSecondary }]}>Тоот</Text>
             <TextInput style={inp} value={apartment} onChangeText={setApartment} placeholder="42" placeholderTextColor={C.textSecondary} keyboardType="numeric" />
           </View>

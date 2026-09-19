@@ -5,25 +5,17 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useNotification } from "@/context/NotificationContext";
 import UserDropdownMenu from "./UserDropdownMenu";
-import { useRouter, useParams, usePathname } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Bell } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
 import Image from "next/image";
-
-const supportedLocales = [
-  { code: "mn", label: "🇲🇳" },
-  { code: "en", label: "🇬🇧" },
-  // { code: "fr", label: "🇫🇷" },
-];
 
 export default function Navbar() {
   const { user, loading } = useAuth();
   const { totalUnread } = useNotification();
   const router = useRouter();
   const { locale } = useParams();
-  const pathname = usePathname();
-  const basePath = pathname.replace(/^\/(mn|en|fr)/, "");
   const [menuOpen, setMenuOpen] = useState(false);
 
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -68,24 +60,6 @@ export default function Navbar() {
 
       {/* ✅ Desktop menu */}
       <div className="hidden md:flex items-center gap-4">
-        {/* 🌍 Language switcher */}
-        <div className="flex gap-1 items-center">
-          {supportedLocales.map((lang) => (
-            <Link
-              key={lang.code}
-              href={`/${lang.code}${basePath}`}
-              className={`text-xl px-2 rounded ${
-                lang.code === locale
-                  ? "font-bold text-green-700"
-                  : "text-gray-400 hover:text-green-600"
-              }`}
-              title={lang.code}
-            >
-              {lang.label}
-            </Link>
-          ))}
-        </div>
-
         {!loading ? (
           user ? (
             <>
@@ -182,23 +156,6 @@ export default function Navbar() {
           ref={menuRef}
           className="absolute top-14 right-4 bg-white shadow-lg rounded p-4 flex flex-col gap-3 md:hidden z-50"
         >
-          {/* 🌍 Languages in one line */}
-          <div className="flex justify-center gap-3 border-b pb-2">
-            {supportedLocales.map((lang) => (
-              <Link
-                key={lang.code}
-                href={`/${lang.code}${basePath}`}
-                className={`text-xl ${
-                  lang.code === locale
-                    ? "font-bold text-green-700"
-                    : "text-gray-400 hover:text-green-600"
-                }`}
-              >
-                {lang.label}
-              </Link>
-            ))}
-          </div>
-
           {!loading ? (
             user ? (
               <>

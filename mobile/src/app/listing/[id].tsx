@@ -613,6 +613,18 @@ export default function ListingDetailScreen() {
     );
   }
 
+  const canViewPrivateLocation = listing.can_view_private_location || isOwner;
+  const visibleLocation = [
+    listing.location_city,
+    listing.location_district,
+    listing.location_khoroo,
+    listing.location_extra,
+    canViewPrivateLocation ? listing.location_building : '',
+    canViewPrivateLocation && listing.location_apartment
+      ? `${listing.location_apartment} тоот`
+      : '',
+  ].filter(Boolean).join(', ');
+
   return (
     <ThemedView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -646,11 +658,9 @@ export default function ListingDetailScreen() {
               ) : null}
             </View>
             <ThemedText themeColor="textSecondary">
-              {[listing.location_city, listing.location_district, listing.location_khoroo, listing.location_extra, listing.location_building].filter(Boolean).join(', ')}
-              {isOwner && listing.location_apartment
-                ? `, ${listing.location_apartment} тоот`
-                : !isOwner
-                ? ' (тоот — захиалсны дараа)'
+              {visibleLocation}
+              {!canViewPrivateLocation
+                ? ' (байр, тоот захиалга баталгаажсаны дараа харагдана)'
                 : ''}
             </ThemedText>
             <ThemedText type="subtitle">

@@ -58,6 +58,7 @@ export type ListingHost = {
 export type ListingDetail = ListingSummary & {
   location_building?: string;
   location_apartment?: string | null;
+  can_view_private_location?: boolean;
   host_username: string | null;
   host?: ListingHost | null;
   is_favorited: boolean;
@@ -86,6 +87,11 @@ export type BookingSummary = {
     title: string;
     location_city: string;
     location_district: string;
+    location_khoroo?: string;
+    location_extra?: string;
+    location_building?: string;
+    location_apartment?: string;
+    can_view_private_location?: boolean;
     thumbnail: string | null;
     price_per_night: number | string;
   };

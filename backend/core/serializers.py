@@ -147,6 +147,28 @@ class ListingImageSerializer(serializers.ModelSerializer):
 # -------------------- LISTING --------------------
 
 
+def can_view_private_listing_location(listing, request):
+    if not request or not request.user.is_authenticated:
+        return False
+
+    user = request.user
+    if user.is_staff or listing.host_id == user.id:
+        return True
+
+    allowed_listing_ids = getattr(request, "_private_location_listing_ids", None)
+    if allowed_listing_ids is None:
+        allowed_listing_ids = set(
+            Booking.objects.filter(
+                guest=user,
+                status="confirmed",
+                is_cancelled_by_host=False,
+                guest_cancelled_at__isnull=True,
+            ).values_list("listing_id", flat=True)
+        )
+        request._private_location_listing_ids = allowed_listing_ids
+    return listing.id in allowed_listing_ids
+
+
 class ListingSerializer(serializers.ModelSerializer):
     images = ListingImageSerializer(many=True, read_only=True)
     amenities = AmenitySerializer(many=True, read_only=True)
@@ -157,6 +179,7 @@ class ListingSerializer(serializers.ModelSerializer):
     thumbnail = serializers.SerializerMethodField()  # 🟢 ШИНЭЭР НЭМНЭ
     host = UserSerializer(read_only=True)  # 👈 заавал энэ байх хэрэгтэй
     average_rating = serializers.SerializerMethodField()
+    can_view_private_location = serializers.SerializerMethodField()
 
     category_id = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(), source="category", write_only=True
@@ -177,6 +200,7 @@ class ListingSerializer(serializers.ModelSerializer):
             "location_extra",
             "location_building",
             "location_apartment",
+            "can_view_private_location",
             "price_per_night",
             "max_guests",
             "beds",
@@ -198,6 +222,16 @@ class ListingSerializer(serializers.ModelSerializer):
 
     def get_host_username(self, obj):
         return obj.host.username if obj.host else None
+
+    def get_can_view_private_location(self, obj):
+        return can_view_private_listing_location(obj, self.context.get("request"))
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not data["can_view_private_location"]:
+            data["location_building"] = ""
+            data["location_apartment"] = ""
+        return data
 
     def get_is_favorited(self, obj):
         request = self.context.get("request")
@@ -381,6 +415,7 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def get_listing(self, obj):
         request = self.context.get("request")
+        can_view_private_location = can_view_private_listing_location(obj.listing, request)
         thumbnail = None
         if obj.listing.images.exists():
             image_url = obj.listing.images.first().image.url
@@ -391,6 +426,11 @@ class BookingSerializer(serializers.ModelSerializer):
             "title": obj.listing.title,
             "location_city": obj.listing.location_city,
             "location_district": obj.listing.location_district,
+            "location_khoroo": obj.listing.location_khoroo,
+            "location_extra": obj.listing.location_extra,
+            "location_building": obj.listing.location_building if can_view_private_location else "",
+            "location_apartment": obj.listing.location_apartment if can_view_private_location else "",
+            "can_view_private_location": can_view_private_location,
             "thumbnail": thumbnail,
             "price_per_night": obj.listing.price_per_night,
         }

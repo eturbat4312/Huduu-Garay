@@ -207,6 +207,18 @@ export default function ListingDetailPage() {
   // ---------- Render ----------
   if (!listing) return <p className="p-6">{t(locale as string, "loading")}</p>;
 
+  const canViewPrivateLocation = listing.can_view_private_location || !!isOwner;
+  const visibleLocation = [
+    listing.location_city,
+    listing.location_district,
+    listing.location_khoroo,
+    listing.location_extra,
+    canViewPrivateLocation ? listing.location_building : "",
+    canViewPrivateLocation && listing.location_apartment
+      ? `${listing.location_apartment} тоот`
+      : "",
+  ].filter(Boolean).join(", ");
+
   return (
     <main className="max-w-6xl mx-auto px-4 md:px-6 py-10 space-y-10">
       {/* Cover image */}
@@ -255,7 +267,7 @@ export default function ListingDetailPage() {
         </div>
 
         <p className="text-gray-600">
-          📍 {[listing.location_city, listing.location_district, listing.location_khoroo, listing.location_extra, listing.location_building].filter(Boolean).join(", ")}
+          📍 {visibleLocation}
         </p>
 
         <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-thin scrollbar-thumb-gray-400">
@@ -438,12 +450,11 @@ export default function ListingDetailPage() {
           <ul className="mt-4 space-y-1">
             <li>
               📍 <strong>{t(locale as string, "location")}:</strong>{" "}
-              {[listing.location_city, listing.location_district, listing.location_khoroo, listing.location_extra, listing.location_building].filter(Boolean).join(", ")}
-              {isOwner && listing.location_apartment && (
-                <span className="ml-1 text-gray-700">, {listing.location_apartment} тоот</span>
-              )}
-              {!isOwner && (
-                <span className="ml-1 text-gray-400 italic text-sm">(тоот — захиалсны дараа харагдана)</span>
+              {visibleLocation}
+              {!canViewPrivateLocation && (
+                <span className="ml-1 text-gray-400 italic text-sm">
+                  (байр, тоот захиалга баталгаажсаны дараа харагдана)
+                </span>
               )}
             </li>
             <li>

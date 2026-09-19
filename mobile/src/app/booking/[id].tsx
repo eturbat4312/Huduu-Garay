@@ -32,6 +32,17 @@ function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('mn-MN', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
+function formatListingAddress(listing: BookingDetail['listing']) {
+  return [
+    listing.location_city,
+    listing.location_district,
+    listing.location_khoroo,
+    listing.location_extra,
+    listing.location_building,
+    listing.location_apartment ? `${listing.location_apartment} тоот` : '',
+  ].filter(Boolean).join(', ');
+}
+
 function Row({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const C = Colors[scheme];
@@ -97,7 +108,7 @@ export default function BookingDetailScreen() {
               <ThemedText type="smallBold" style={styles.cardTitle}>🏠 Зар</ThemedText>
               <Text style={[styles.listingTitle, { color: C.text }]}>{booking.listing.title}</Text>
               <ThemedText themeColor="textSecondary" type="small">
-                📍 {booking.listing.location_city}, {booking.listing.location_district}
+                📍 {formatListingAddress(booking.listing)}
               </ThemedText>
               <Pressable
                 onPress={() => router.push(`/listing/${booking.listing.id}` as never)}

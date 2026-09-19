@@ -232,6 +232,10 @@ export default function LocationField({
           </div>
         </div>
 
+      </div>
+
+      <div className="border rounded-xl p-4 space-y-3 bg-yellow-50">
+        <p className="text-sm font-semibold text-yellow-800 mb-3">🔒 Захиалсны дараа харагдах</p>
         <div>
           <label className="text-xs text-gray-600 block mb-1">Байр / Хаяг</label>
           <input
@@ -241,11 +245,6 @@ export default function LocationField({
             placeholder="15-р байр"
           />
         </div>
-      </div>
-
-      {/* Private field — apartment only */}
-      <div className="border rounded-xl p-4 bg-yellow-50">
-        <p className="text-sm font-semibold text-yellow-800 mb-3">🔒 Захиалсны дараа харагдах</p>
         <div>
           <label className="text-xs text-gray-600 block mb-1">Тоот</label>
           <input

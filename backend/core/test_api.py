@@ -174,6 +174,67 @@ class ListingTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data["id"], listing.id)
 
+    def test_private_location_requires_confirmed_booking(self):
+        listing = make_listing(self.host, self.cat)
+        listing.location_khoroo = "1-р хороо"
+        listing.location_extra = "Төв хороолол"
+        listing.location_building = "15-р байр"
+        listing.location_apartment = "42"
+        listing.save(update_fields=[
+            "location_khoroo", "location_extra", "location_building",
+            "location_apartment",
+        ])
+
+        public = APIClient().get(f"/api/listings/{listing.id}/")
+        guest_before_booking = self.gc.get(f"/api/listings/{listing.id}/")
+        owner = self.hc.get(f"/api/listings/{listing.id}/")
+
+        self.assertEqual(public.data["location_building"], "")
+        self.assertEqual(public.data["location_apartment"], "")
+        self.assertFalse(public.data["can_view_private_location"])
+        self.assertEqual(guest_before_booking.data["location_building"], "")
+        self.assertFalse(guest_before_booking.data["can_view_private_location"])
+        self.assertEqual(owner.data["location_building"], "15-р байр")
+        self.assertEqual(owner.data["location_apartment"], "42")
+        self.assertTrue(owner.data["can_view_private_location"])
+
+        booking = Booking.objects.create(
+            listing=listing,
+            guest=self.guest,
+            check_in=date.today() + timedelta(days=1),
+            check_out=date.today() + timedelta(days=2),
+            full_name="Guest",
+            phone_number="9900",
+            total_price=100000,
+            status="pending_payment",
+        )
+        pending = self.gc.get(f"/api/listings/{listing.id}/")
+        pending_booking = self.gc.get(f"/api/bookings/{booking.id}/")
+        self.assertEqual(pending.data["location_building"], "")
+        self.assertFalse(pending.data["can_view_private_location"])
+        self.assertEqual(pending_booking.data["listing"]["location_building"], "")
+
+        booking.status = "confirmed"
+        booking.save(update_fields=["status"])
+        confirmed = self.gc.get(f"/api/listings/{listing.id}/")
+        booking_detail = self.gc.get(f"/api/bookings/{booking.id}/")
+
+        self.assertEqual(confirmed.data["location_building"], "15-р байр")
+        self.assertEqual(confirmed.data["location_apartment"], "42")
+        self.assertTrue(confirmed.data["can_view_private_location"])
+        self.assertEqual(booking_detail.data["listing"]["location_building"], "15-р байр")
+        self.assertEqual(booking_detail.data["listing"]["location_apartment"], "42")
+
+        booking.status = "cancelled"
+        booking.guest_cancelled_at = timezone.now()
+        booking.save(update_fields=["status", "guest_cancelled_at"])
+        cancelled = self.gc.get(f"/api/listings/{listing.id}/")
+        cancelled_booking = self.gc.get(f"/api/bookings/{booking.id}/")
+
+        self.assertEqual(cancelled.data["location_building"], "")
+        self.assertFalse(cancelled.data["can_view_private_location"])
+        self.assertEqual(cancelled_booking.data["listing"]["location_apartment"], "")
+
     def test_filter_by_category(self):
         cat2 = make_category("Гэр")
         make_listing(self.host, self.cat, title="Байр нэг")

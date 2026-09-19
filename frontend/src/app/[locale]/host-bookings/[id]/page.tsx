@@ -47,6 +47,16 @@ export default function HostBookingDetailPage() {
   const total = booking.total_price;
   const commission = Math.floor(total * 0.1);
   const netIncome = total - commission;
+  const listingAddress = [
+    booking.listing.location_city,
+    booking.listing.location_district,
+    booking.listing.location_khoroo,
+    booking.listing.location_extra,
+    booking.listing.location_building,
+    booking.listing.location_apartment
+      ? `${booking.listing.location_apartment} тоот`
+      : "",
+  ].filter(Boolean).join(", ");
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -73,8 +83,7 @@ export default function HostBookingDetailPage() {
           <div className="flex-1">
             <h2 className="text-lg font-semibold">{booking.listing.title}</h2>
             <p className="text-gray-600">
-              {[booking.listing.location_city, booking.listing.location_district]
-                .filter(Boolean).join(", ") || booking.listing.location}
+              {listingAddress || booking.listing.location}
             </p>
             <p className="mt-1">
               💰 {t(locale, "booking_detail.price_per_night")}:{" "}

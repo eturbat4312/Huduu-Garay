@@ -21,10 +21,10 @@ export const metadata: Metadata = {
   description: "Монголын гэр, амралт, байр түрээсийн платформ",
 };
 
-const locales = ["mn", "en", "fr"];
+const locales = ["mn"];
 
 export async function generateStaticParams() {
-  return [{ locale: "mn" }, { locale: "en" }, { locale: "fr" }];
+  return [{ locale: "mn" }];
 }
 
 // ✅ params-ийг await хийдэг болголоо

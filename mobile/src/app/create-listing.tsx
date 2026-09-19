@@ -414,15 +414,6 @@ export default function CreateListingScreen() {
             </View>
           </View>
 
-          <Text style={[styles.label, { color: C.textSecondary }]}>Байр / Хаяг</Text>
-          <TextInput
-            style={inp}
-            placeholder="15-р байр"
-            placeholderTextColor={C.textSecondary}
-            value={building}
-            onChangeText={setBuilding}
-          />
-
           <Text style={[styles.label, { color: C.textSecondary }]}>Газрын зураг дээр байршил тэмдэглэх</Text>
           <MapPickerField
             lat={lat}
@@ -436,6 +427,14 @@ export default function CreateListingScreen() {
             <Text style={{ color: '#A16207', fontWeight: '600', fontSize: 13, marginBottom: 6 }}>
               🔒 Захиалсны дараа харагдах
             </Text>
+            <Text style={[styles.label, { color: C.textSecondary }]}>Байр / Хаяг</Text>
+            <TextInput
+              style={inp}
+              placeholder="15-р байр"
+              placeholderTextColor={C.textSecondary}
+              value={building}
+              onChangeText={setBuilding}
+            />
             <Text style={[styles.label, { color: C.textSecondary }]}>Тоот</Text>
             <TextInput
               style={inp}

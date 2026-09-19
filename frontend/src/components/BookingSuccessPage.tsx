@@ -37,6 +37,16 @@ export default function BookingSuccessPage({
   const totalPrice = booking.total_price;
   const serviceFee = booking.service_fee;
   const grandTotal = totalPrice + serviceFee;
+  const listingAddress = [
+    booking.listing.location_city,
+    booking.listing.location_district,
+    booking.listing.location_khoroo,
+    booking.listing.location_extra,
+    booking.listing.location_building,
+    booking.listing.location_apartment
+      ? `${booking.listing.location_apartment} тоот`
+      : "",
+  ].filter(Boolean).join(", ");
 
   return (
     <main className="max-w-2xl mx-auto px-6 py-10 space-y-6">
@@ -72,8 +82,7 @@ export default function BookingSuccessPage({
           <div>
             <h2 className="text-xl font-semibold">{booking.listing.title}</h2>
             <p>
-              📍 {t(locale, "location")}: {[booking.listing.location_city, booking.listing.location_district]
-                .filter(Boolean).join(", ") || booking.listing.location}
+              📍 {t(locale, "location")}: {listingAddress || booking.listing.location}
             </p>
             <p>
               📅 {t(locale, "date")}: {checkIn.toLocaleDateString()} →{" "}
