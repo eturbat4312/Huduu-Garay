@@ -156,7 +156,9 @@ class HostCancellationTests(TestCase):
         self.booking.check_in = self.now.date()
         self.booking.check_out = self.now.date() + timedelta(days=1)
         self.booking.save(update_fields=["check_in", "check_out"])
-        self.assertEqual(self.cancel().status_code, 200)
+        before_check_in = self.now.replace(hour=5)
+        with patch("django.utils.timezone.now", return_value=before_check_in):
+            self.assertEqual(self.cancel().status_code, 200)
 
     def test_pending_booking_keeps_payment_and_hold(self):
         self.booking.status = "pending_payment"

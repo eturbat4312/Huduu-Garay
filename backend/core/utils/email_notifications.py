@@ -112,8 +112,8 @@ def send_notification_email(user, notif_type, context):
             f"Шинэ төлбөртэй захиалга баталгаажлаа.\n\n"
             f"{'─' * 40}\n"
             f"Захиалгын дугаар: #{context['booking_id']}\n"
-            f"Payment ID: #{context['payment_id']}\n"
-            f"Invoice: {context['invoice_id']}\n"
+            f"Төлбөрийн дугаар: #{context['payment_id']}\n"
+            f"Нэхэмжлэлийн дугаар: {context['invoice_id']}\n"
             f"Зар: {context['listing_title']} (#{context['listing_id']})\n"
             f"Огноо: {context['check_in']} → {context['check_out']}\n"
             f"Хоног: {context['total_nights']}\n"
@@ -126,11 +126,11 @@ def send_notification_email(user, notif_type, context):
             f"{'─' * 40}\n"
             f"Байршил: {context['location']}\n"
             f"Байрны үнэ: ₮{context['total_price']:,}\n"
-            f"Service fee: ₮{context['service_fee']:,}\n"
+            f"Зочны үйлчилгээний шимтгэл: ₮{context['service_fee']:,}\n"
             f"Нийт төлсөн: ₮{context['guest_total']:,}\n"
             f"Түрээслүүлэгчид олгох: ₮{context['host_payout']:,}\n"
             f"{'─' * 40}\n\n"
-            f"Admin dashboard дээр захиалгын дэлгэрэнгүйг шалгана уу."
+            f"Админ хяналтын хуудсаас захиалгын дэлгэрэнгүйг шалгана уу."
         )
 
     elif notif_type == "review":

@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Colors, Spacing, type ColorPalette } from '@/constants/theme';
+import { CHECK_IN_TIME, CHECK_OUT_TIME } from '@/constants/booking-times';
 import { useAuth } from '@/context/auth';
 import { fetchHostBookings, fetchMyBookings, resolveMediaUrl } from '@/lib/api';
 import type { BookingSummary } from '@/types/api';
@@ -77,6 +78,7 @@ function BookingCard({
         <Text style={[styles.cardDate, { color: C.textSecondary }]}>
           📅 {formatDate(item.check_in)} — {formatDate(item.check_out)}
         </Text>
+        <Text style={[styles.cardDate, { color: C.textSecondary }]}>Орох {CHECK_IN_TIME} · Гарах {CHECK_OUT_TIME}</Text>
         <View style={styles.cardPriceRow}>
           <Text style={[styles.cardPrice, { color: C.text }]}>
             ₮{Number(item.total_price).toLocaleString()}

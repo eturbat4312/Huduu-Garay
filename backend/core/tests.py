@@ -321,6 +321,7 @@ class PaymentFoundationTests(TestCase):
                 Availability.objects.create(listing=self.listing, date=target_date)
 
 
+@override_settings(DEBUG=True)
 class BookingCreateRegressionTests(TestCase):
     def setUp(self):
         User = get_user_model()

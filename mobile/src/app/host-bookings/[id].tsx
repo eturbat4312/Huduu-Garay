@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/themed-view';
 import { HostCancellationAction } from '@/components/host-cancellation-action';
 import { Colors, Spacing, type ColorPalette } from '@/constants/theme';
+import { CHECK_IN_TIME, CHECK_OUT_TIME } from '@/constants/booking-times';
 import { fetchHostBookingDetail } from '@/lib/api';
 import type { BookingDetail } from '@/types/api';
 
@@ -154,8 +155,8 @@ export default function HostBookingDetailScreen() {
           {/* Огноо ба үнэ */}
           <View style={[styles.section, { backgroundColor: C.backgroundElement }]}>
             <Text style={[styles.sectionTitle, { color: C.textSecondary }]}>📅 Захиалгын мэдээлэл</Text>
-            <InfoRow label="Ирэх огноо"   value={fmtDate(booking.check_in)}  C={C} />
-            <InfoRow label="Гарах огноо"  value={fmtDate(booking.check_out)} C={C} />
+            <InfoRow label="Орох" value={`${fmtDate(booking.check_in)} · ${CHECK_IN_TIME}`} C={C} />
+            <InfoRow label="Гарах" value={`${fmtDate(booking.check_out)} · ${CHECK_OUT_TIME}`} C={C} />
             <InfoRow label="Хонох хоног"  value={`${nights} хоног`}          C={C} />
             <InfoRow label="Зочны тоо"    value={`${booking.guest_count} хүн`} C={C} />
             <View style={[styles.divider, { backgroundColor: C.backgroundSelected }]} />

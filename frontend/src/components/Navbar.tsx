@@ -10,6 +10,7 @@ import { Bell } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { t } from "@/lib/i18n";
 import Image from "next/image";
+import AnalyticsTracker from "./AnalyticsTracker";
 
 export default function Navbar() {
   const { user, loading } = useAuth();
@@ -46,6 +47,7 @@ export default function Navbar() {
 
   return (
     <nav className="bg-white shadow-md px-4 py-2 flex justify-between items-center relative">
+      <AnalyticsTracker />
       {/* ✅ Logo */}
       <Link href={`/${locale}`} className="flex items-center">
         <Image

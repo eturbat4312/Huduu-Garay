@@ -6,6 +6,7 @@ import { useNotification } from "@/context/NotificationContext";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { t } from "@/lib/i18n";
+import { CHECK_IN_TIME, CHECK_OUT_TIME } from "@/lib/bookingTimes";
 
 type Booking = {
   id: number;
@@ -104,6 +105,9 @@ export default function HostBookingsPage() {
                       📅 {checkIn.toLocaleDateString()} →{" "}
                       {checkOut.toLocaleDateString()} ({nights}{" "}
                       {t(locale, "host_bookings.nights")})
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Орох {CHECK_IN_TIME} · Гарах {CHECK_OUT_TIME}
                     </p>
                     <p>
                       👤 {booking.guest_name} | 📞 {booking.guest_phone} | 👥{" "}

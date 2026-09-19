@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
+import { CHECK_IN_TIME, CHECK_OUT_TIME } from '@/constants/booking-times';
 import { fetchHostBookings, resolveMediaUrl } from '@/lib/api';
 import type { BookingSummary } from '@/types/api';
 
@@ -114,6 +115,7 @@ export default function HostBookingsScreen() {
                     <Text style={[styles.cardDate, { color: C.textSecondary }]}>
                       📅 {formatDate(item.check_in)} — {formatDate(item.check_out)}
                     </Text>
+                    <Text style={[styles.cardDate, { color: C.textSecondary }]}>Орох {CHECK_IN_TIME} · Гарах {CHECK_OUT_TIME}</Text>
                     <View style={styles.cardFooter}>
                       <Text style={[styles.cardPrice, { color: C.text }]}>
                         ₮{Number(item.total_price).toLocaleString()}

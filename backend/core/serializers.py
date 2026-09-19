@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from datetime import timedelta
 from django.contrib.auth import get_user_model
+from django.core.signing import salted_hmac
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from .models import (
@@ -16,6 +18,8 @@ from .models import (
     Review,
     HostApplication,
     SupportRequest,
+    PlatformAnalyticsEvent,
+    HOST_TERMS_VERSION,
 )
 
 User = get_user_model()
@@ -633,6 +637,64 @@ class PaymentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class AnalyticsEventSerializer(serializers.Serializer):
+    event_id = serializers.UUIDField()
+    event_type = serializers.ChoiceField(
+        choices=PlatformAnalyticsEvent.EVENT_CHOICES
+    )
+    visitor_id = serializers.CharField(min_length=8, max_length=128, write_only=True)
+    session_id = serializers.CharField(
+        min_length=8, max_length=128, allow_blank=True, required=False, write_only=True
+    )
+    path = serializers.CharField(max_length=300, allow_blank=True, required=False)
+    platform = serializers.ChoiceField(
+        choices=PlatformAnalyticsEvent.PLATFORM_CHOICES
+    )
+    app_version = serializers.CharField(
+        max_length=40, allow_blank=True, required=False
+    )
+
+    @staticmethod
+    def _hash_identifier(value):
+        if not value:
+            return ""
+        return salted_hmac("platform-analytics", value).hexdigest()
+
+    def create(self, validated_data):
+        visitor_hash = self._hash_identifier(validated_data.pop("visitor_id"))
+        session_hash = self._hash_identifier(validated_data.pop("session_id", ""))
+        values = {
+            **validated_data,
+            "visitor_hash": visitor_hash,
+            "session_hash": session_hash,
+        }
+
+        try:
+            with transaction.atomic():
+                if values["event_type"] == PlatformAnalyticsEvent.EVENT_APP_INSTALL:
+                    event, created = PlatformAnalyticsEvent.objects.get_or_create(
+                        event_type=values["event_type"],
+                        visitor_hash=visitor_hash,
+                        defaults=values,
+                    )
+                else:
+                    event, created = PlatformAnalyticsEvent.objects.get_or_create(
+                        event_id=values["event_id"],
+                        defaults=values,
+                    )
+        except IntegrityError:
+            if values["event_type"] == PlatformAnalyticsEvent.EVENT_APP_INSTALL:
+                event = PlatformAnalyticsEvent.objects.get(
+                    event_type=values["event_type"], visitor_hash=visitor_hash
+                )
+            else:
+                event = PlatformAnalyticsEvent.objects.get(event_id=values["event_id"])
+            created = False
+
+        self.created = created
+        return event
+
+
 class NotificationSerializer(serializers.ModelSerializer):
     booking_role = serializers.SerializerMethodField()
     related_booking = serializers.SerializerMethodField()
@@ -816,6 +878,6 @@ class HostApplicationSerializer(serializers.ModelSerializer):
                 "HTTP_USER_AGENT", ""
             )
         validated_data["host_terms_accepted_at"] = timezone.now()
-        validated_data["host_terms_version"] = "2026-09-15"
+        validated_data["host_terms_version"] = HOST_TERMS_VERSION
         validated_data["host_commission_rate"] = "10.00"
         return super().create(validated_data)

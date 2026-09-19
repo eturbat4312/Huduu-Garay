@@ -46,12 +46,14 @@ from .views import (
     PasswordResetRequestView,
     PasswordResetConfirmView,
     SupportRequestListCreateView,
+    AnalyticsEventCreateView,
 )
 
 # from core.adapters import GoogleOneTapLoginView
 # from core.views import GoogleOneTapLoginView
 
 urlpatterns = [
+    path("analytics/events/", AnalyticsEventCreateView.as_view(), name="analytics-event-create"),
     path("categories/", CategoryListCreateView.as_view(), name="category-list-create"),
     path("listings/", ListingListCreateView.as_view(), name="listing-list-create"),
     path(

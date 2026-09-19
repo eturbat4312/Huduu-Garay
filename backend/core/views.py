@@ -5,10 +5,10 @@ from rest_framework.views import APIView
 from rest_framework.generics import RetrieveAPIView, RetrieveUpdateAPIView
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import AnonRateThrottle
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from datetime import timedelta
-from zoneinfo import ZoneInfo
 from PIL import Image, UnidentifiedImageError
 from io import BytesIO
 from django.core.files.base import ContentFile
@@ -22,6 +22,8 @@ from core.services.cancellations import (
     guest_cancellation_blocked_reason,
     host_cancellation_blocked_reason,
 )
+from core.services.booking_times import local_now, stay_has_ended
+from core.services.settlements import ensure_host_payout, sync_cancellation_settlements
 from decimal import Decimal
 from google.oauth2 import id_token
 import uuid
@@ -77,6 +79,7 @@ from .serializers import (
     ReviewSerializer,
     HostApplicationSerializer,
     SupportRequestSerializer,
+    AnalyticsEventSerializer,
 )
 
 User = get_user_model()
@@ -87,6 +90,25 @@ ALLOWED_LISTING_IMAGE_TYPES = {
     "image/webp",
     "image/gif",
 }
+
+
+class AnalyticsEventThrottle(AnonRateThrottle):
+    rate = "120/min"
+
+
+class AnalyticsEventCreateView(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [AnalyticsEventThrottle]
+
+    def post(self, request):
+        serializer = AnalyticsEventSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            {"recorded": True},
+            status=status.HTTP_201_CREATED if serializer.created else status.HTTP_200_OK,
+        )
 
 # ---------------------- AUTH ----------------------
 
@@ -443,6 +465,13 @@ class BookingCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, format=None):
+        if not settings.DEBUG:
+            return Response(
+                {
+                    "error": "Захиалгыг зөвхөн төлбөрийн нэхэмжлэл үүсгэх шинэ үйлдлээр хийнэ үү."
+                },
+                status=status.HTTP_410_GONE,
+            )
         serializer = BookingSerializer(data=request.data, context={"request": request})
         if serializer.is_valid():
             listing = serializer.validated_data["listing"]
@@ -511,7 +540,7 @@ class BookingCreateView(APIView):
                     user=listing.host,
                     message=(
                         f"Шинэ захиалга #{booking.id} — {full_name} таны '{listing.title}' байранд "
-                        f"{check_in.strftime('%Y-%m-%d')} – {check_out.strftime('%Y-%m-%d')} "
+                        f"{check_in.strftime('%Y-%m-%d')} 14:00 – {check_out.strftime('%Y-%m-%d')} 12:00 "
                         f"({total_nights} хонох), {guest_count} зочин. Таны авах мөнгө: ₮{host_payout:,}"
                     ),
                     type="booking_created",
@@ -523,7 +552,7 @@ class BookingCreateView(APIView):
                     user=guest,
                     message=(
                         f"Захиалга #{booking.id} баталгаажлаа — '{listing.title}', "
-                        f"{check_in.strftime('%Y-%m-%d')} – {check_out.strftime('%Y-%m-%d')} "
+                        f"{check_in.strftime('%Y-%m-%d')} 14:00 – {check_out.strftime('%Y-%m-%d')} 12:00 "
                         f"({total_nights} хонох). Нийт төлөх дүн: ₮{guest_total:,}"
                     ),
                     type="booking_confirmed",
@@ -541,8 +570,8 @@ class BookingCreateView(APIView):
                             "guest_name": guest.username,
                             "full_name": full_name,
                             "phone_number": phone_number,
-                            "check_in": check_in.strftime("%Y-%m-%d"),
-                            "check_out": check_out.strftime("%Y-%m-%d"),
+                            "check_in": check_in.strftime("%Y-%m-%d 14:00"),
+                            "check_out": check_out.strftime("%Y-%m-%d 12:00"),
                             "total_nights": total_nights,
                             "guest_count": guest_count,
                             "total_price": int(total_price),
@@ -569,8 +598,8 @@ class BookingCreateView(APIView):
                             "location_apartment": listing.location_apartment,
                             "location_lat": listing.location_lat,
                             "location_lng": listing.location_lng,
-                            "check_in": check_in.strftime("%Y-%m-%d"),
-                            "check_out": check_out.strftime("%Y-%m-%d"),
+                            "check_in": check_in.strftime("%Y-%m-%d 14:00"),
+                            "check_out": check_out.strftime("%Y-%m-%d 12:00"),
                             "total_nights": total_nights,
                             "guest_count": guest_count,
                             "full_name": full_name,
@@ -768,8 +797,8 @@ def _create_notification_once(user, notif_type, related_booking, message):
 def _notify_confirmed_booking(booking, payment, requested_dates):
     details = _get_booking_party_details(booking, requested_dates)
     listing = details["listing"]
-    check_in = booking.check_in.strftime("%Y-%m-%d")
-    check_out = booking.check_out.strftime("%Y-%m-%d")
+    check_in = booking.check_in.strftime("%Y-%m-%d 14:00")
+    check_out = booking.check_out.strftime("%Y-%m-%d 12:00")
 
     _create_notification_once(
         user=listing.host,
@@ -796,13 +825,13 @@ def _notify_confirmed_booking(booking, payment, requested_dates):
     admin_message = (
         f"Шинэ төлбөртэй захиалга #{booking.id} баталгаажлаа. "
         f"Зар: '{listing.title}' #{listing.id}. "
-        f"Host: {details['host_name']} ({listing.host.username}), утас: {details['host_phone']}. "
-        f"Guest: {booking.full_name} ({booking.guest.username}), утас: {booking.phone_number}. "
+        f"Түрээслүүлэгч: {details['host_name']} ({listing.host.username}), утас: {details['host_phone']}. "
+        f"Зочин: {booking.full_name} ({booking.guest.username}), утас: {booking.phone_number}. "
         f"Огноо: {check_in} – {check_out}, {details['total_nights']} хонох, "
         f"{booking.guest_count} зочин. Байршил: {listing.location_city}, "
         f"{listing.location_district}, {listing.location_khoroo}. "
-        f"Үндсэн үнэ: ₮{details['total_price']:,}, service fee: ₮{details['service_fee']:,}, "
-        f"нийт төлсөн: ₮{details['guest_total']:,}, host авах: ₮{details['host_payout']:,}. "
+        f"Үндсэн үнэ: ₮{details['total_price']:,}, зочны үйлчилгээний шимтгэл: ₮{details['service_fee']:,}, "
+        f"нийт төлсөн: ₮{details['guest_total']:,}, түрээслүүлэгчид олгох: ₮{details['host_payout']:,}. "
         f"Payment #{payment.id}, invoice: {payment.invoice_id or payment.sender_invoice_no}."
     )
     admin_users = User.objects.filter(is_staff=True, is_active=True)
@@ -938,6 +967,7 @@ def _confirm_paid_payment(payment, raw_response, request=None):
 
     booking.status = "confirmed"
     booking.save(update_fields=["status"])
+    ensure_host_payout(booking)
     payment.booking = booking
     BookingHold.objects.filter(
         booking=booking, listing=booking.listing, date__in=requested_dates
@@ -1436,6 +1466,7 @@ class GuestBookingCancelView(APIView):
                 "status", "guest_cancelled_at", "guest_cancellation_reason",
                 "guest_cancellation_policy_version",
             ])
+            sync_cancellation_settlements(booking)
             dates, _ = _get_requested_dates(booking.check_in, booking.check_out)
             for target_date in dates:
                 Availability.objects.get_or_create(listing=booking.listing, date=target_date)
@@ -1451,8 +1482,8 @@ class GuestBookingCancelView(APIView):
             context = {
                 "booking_id": booking.id,
                 "listing_title": booking.listing.title,
-                "check_in": str(booking.check_in),
-                "check_out": str(booking.check_out),
+                "check_in": f"{booking.check_in} 14:00",
+                "check_out": f"{booking.check_out} 12:00",
                 "full_name": booking.full_name,
                 "phone_number": booking.phone_number,
                 "cancelled_at": booking.guest_cancelled_at.isoformat(),
@@ -1529,6 +1560,7 @@ class HostBookingCancelView(APIView):
                 "is_cancelled_by_host", "status", "host_cancelled_at",
                 "host_cancellation_reason", "host_cancellation_policy_version",
             ])
+            sync_cancellation_settlements(booking)
 
             dates, _ = _get_requested_dates(booking.check_in, booking.check_out)
             for target_date in dates:
@@ -1553,8 +1585,8 @@ class HostBookingCancelView(APIView):
             context = {
                 "booking_id": booking.id,
                 "listing_title": booking.listing.title,
-                "check_in": str(booking.check_in),
-                "check_out": str(booking.check_out),
+                "check_in": f"{booking.check_in} 14:00",
+                "check_out": f"{booking.check_out} 12:00",
                 "full_name": booking.full_name,
                 "phone_number": booking.phone_number,
                 "cancelled_at": booking.host_cancelled_at.isoformat(),
@@ -1818,6 +1850,16 @@ class ListingDeleteView(APIView):
                 status=status.HTTP_409_CONFLICT,
             )
 
+        if Booking.objects.filter(listing=listing).exists():
+            listing.is_active = False
+            listing.save(update_fields=["is_active"])
+            return Response(
+                {
+                    "message": "Зар хэрэглэгчдээс нуугдлаа. Захиалга, төлбөрийн түүхийг хадгалахын тулд бүр мөсөн устгаагүй."
+                },
+                status=status.HTTP_200_OK,
+            )
+
         listing.delete()
         return Response(
             {"message": "Зар амжилттай устгагдлаа."}, status=status.HTTP_200_OK
@@ -1828,7 +1870,8 @@ def _review_eligibility(listing, user):
     if listing.host_id == user.id:
         return None, "Түрээслүүлэгч өөрийн байранд сэтгэгдэл бичих боломжгүй.", "listing_owner"
 
-    today = timezone.localdate(timezone=ZoneInfo("Asia/Ulaanbaatar"))
+    now = timezone.now()
+    today = local_now(now).date()
     confirmed_bookings = Booking.objects.filter(
         listing=listing,
         guest=user,
@@ -1837,18 +1880,23 @@ def _review_eligibility(listing, user):
         guest_cancelled_at__isnull=True,
     )
     completed_bookings = confirmed_bookings.filter(check_out__lte=today)
+    completed_bookings = [
+        booking for booking in completed_bookings if stay_has_ended(booking, now)
+    ]
+    completed_booking_ids = [booking.id for booking in completed_bookings]
     booking = (
-        completed_bookings.exclude(review__isnull=False)
+        confirmed_bookings.filter(id__in=completed_booking_ids)
+        .exclude(review__isnull=False)
         .order_by("-check_out", "-id")
         .first()
     )
 
     if booking:
         return booking, "", "eligible"
-    if completed_bookings.exists():
+    if confirmed_bookings.filter(id__in=completed_booking_ids).exists():
         return None, "Та энэ захиалгад аль хэдийн сэтгэгдэл үлдээсэн байна.", "already_reviewed"
-    if confirmed_bookings.filter(check_out__gt=today).exists():
-        return None, "Сэтгэгдэл бичих эрх буцах өдрөөс эхлэн нээгдэнэ.", "stay_not_completed"
+    if confirmed_bookings.exists():
+        return None, "Сэтгэгдэл бичих эрх гарах өдрийн 12:00 цагаас хойш нээгдэнэ.", "stay_not_completed"
     return None, "Зөвхөн энэ байранд байрласан зочин сэтгэгдэл үлдээх боломжтой.", "no_completed_stay"
 
 

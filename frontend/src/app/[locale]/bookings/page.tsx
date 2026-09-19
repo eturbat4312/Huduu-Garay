@@ -7,6 +7,7 @@ import Link from "next/link";
 import api from "@/lib/axios";
 import { t } from "@/lib/i18n";
 import Image from "next/image"; // ✅ next/image ашиглаж байна
+import { CHECK_IN_TIME, CHECK_OUT_TIME } from "@/lib/bookingTimes";
 
 const statusLabels: Record<string, string> = {
   confirmed: "Батлагдлаа", cancelled: "Цуцлагдсан", pending_payment: "Төлбөр хүлээгдэж байна",
@@ -94,6 +95,9 @@ export default function MyBookingsPage() {
                     {booking.check_out
                       ? new Date(booking.check_out).toLocaleDateString()
                       : t(locale, "no_date")}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Орох {CHECK_IN_TIME} · Гарах {CHECK_OUT_TIME}
                   </p>
                   <p className="text-sm text-gray-700">
                     💰{" "}

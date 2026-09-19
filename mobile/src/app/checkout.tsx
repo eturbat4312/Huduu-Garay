@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
+import { CHECK_IN_TIME, CHECK_OUT_TIME } from '@/constants/booking-times';
 import { ApiError, createPayment, createPaymentIntent, fetchListing } from '@/lib/api';
 import { datesBetweenNights, isDateString } from '@/lib/dates';
 import type { ListingDetail } from '@/types/api';
@@ -224,6 +225,9 @@ export default function CheckoutScreen() {
           <ThemedText type="smallBold">Огноо</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {params.check_in} - {params.check_out} ({selectedNights.length} хоног)
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            Орох {CHECK_IN_TIME} · Гарах {CHECK_OUT_TIME}
           </ThemedText>
         </View>
 

@@ -1,154 +1,168 @@
 {% extends "admin/base_site.html" %}
+{% load tz %}
+{% block content_title %}{% endblock %}
 {% block content %}
 <style>
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
-  .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; }
-  .stat-card .label { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
-  .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
-  .stat-card .sub { font-size: 12px; color: #94a3b8; margin-top: 2px; }
-  .green { color: #16a34a; }
-  .blue { color: #2563eb; }
-  .purple { color: #7c3aed; }
-  .orange { color: #ea580c; }
-  .section-title { font-size: 16px; font-weight: 600; margin: 24px 0 12px; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; }
-  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
-  th { background: #f8fafc; padding: 10px 14px; text-align: left; font-size: 12px; text-transform: uppercase; color: #64748b; }
-  td { padding: 10px 14px; border-top: 1px solid #f1f5f9; font-size: 14px; }
-  .bar-wrap { background: #f1f5f9; border-radius: 4px; height: 8px; margin-top: 4px; }
-  .bar { background: #16a34a; height: 8px; border-radius: 4px; }
+  :root { --line:#d8dee7; --muted:#5f6b7a; --surface:#fff; --surface-soft:#f6f8fa; --text:#17202a; --amber:#9a6700; --red:#b42318; --blue:#175cd3; }
+  .finance-page { color:var(--text); }
+  .page-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:20px; }
+  .page-heading h1 { margin:0; font-size:24px; }
+  .page-heading p { margin:4px 0 0; color:var(--muted); }
+  .quick-links { display:flex; gap:8px; flex-wrap:wrap; }
+  .quick-links a,.action-link,.filter-actions button,.filter-actions a { display:inline-flex; align-items:center; min-height:34px; padding:0 12px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--blue); font-weight:600; text-decoration:none; }
+  .summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin:14px 0 24px; }
+  .summary-card { border:1px solid var(--line); border-radius:8px; padding:16px; background:var(--surface); }
+  .summary-label { color:var(--muted); font-size:12px; font-weight:700; }
+  .summary-value { font-size:25px; font-weight:750; margin-top:6px; }
+  .summary-note { color:var(--muted); font-size:12px; margin-top:4px; }
+  .section { margin:28px 0; }
+  .section-head { display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:2px solid var(--line); padding-bottom:8px; margin-bottom:12px; }
+  .section-head h2 { margin:0; font-size:17px; }
+  .section-head p { margin:0; color:var(--muted); }
+  .notice { border-left:4px solid var(--amber); background:#fff8e6; padding:12px 14px; margin:12px 0; }
+  .notice.danger { border-color:var(--red); background:#fff1f0; }
+  .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:8px; background:var(--surface); }
+  table.finance-table { width:100%; border-collapse:collapse; min-width:980px; }
+  .finance-table th { background:var(--surface-soft); color:#465466; padding:10px 12px; text-align:left; white-space:nowrap; font-size:12px; }
+  .finance-table th a { color:inherit; text-decoration:none; }
+  .finance-table td { border-top:1px solid #edf0f3; padding:10px 12px; vertical-align:top; }
+  .finance-table tbody tr[data-href] { cursor:pointer; }
+  .finance-table tbody tr[data-href]:hover { background:#f8fbff; }
+  .primary { font-weight:700; color:var(--text); }
+  .secondary { color:var(--muted); font-size:12px; margin-top:2px; }
+  .amount { font-weight:700; white-space:nowrap; }
+  .badge { display:inline-block; border-radius:4px; padding:3px 7px; font-size:12px; font-weight:700; white-space:nowrap; }
+  .badge.ready { color:#05603a; background:#e8f7ef; }
+  .badge.waiting { color:#7a4d00; background:#fff4d6; }
+  .badge.review { color:#8b2c00; background:#ffeadf; }
+  .badge.hold,.badge.danger { color:var(--red); background:#feeceb; }
+  .badge.paid { color:#155eef; background:#eaf2ff; }
+  .badge.neutral { color:#475467; background:#eef1f4; }
+  .filters { display:grid; grid-template-columns:minmax(220px,2fr) repeat(4,minmax(150px,1fr)); gap:10px; align-items:end; margin-bottom:12px; }
+  .filters label { display:block; color:var(--muted); font-size:12px; font-weight:700; margin-bottom:4px; }
+  .filters input,.filters select { box-sizing:border-box; width:100%; min-height:36px; border:1px solid var(--line); border-radius:6px; padding:6px 9px; background:var(--surface); color:var(--text); }
+  .overview-filter { display:grid; grid-template-columns:repeat(5,minmax(145px,1fr)); gap:10px; align-items:end; margin:12px 0; }
+  .overview-filter label { display:block; color:var(--muted); font-size:12px; font-weight:700; margin-bottom:4px; }
+  .overview-filter input,.overview-filter select { box-sizing:border-box; width:100%; min-height:36px; border:1px solid var(--line); border-radius:6px; padding:6px 9px; background:var(--surface); color:var(--text); }
+  .overview-filter button { min-height:36px; padding:0 14px; border:1px solid #175cd3; border-radius:6px; background:#175cd3; color:#fff; font-weight:700; cursor:pointer; }
+  .filter-actions { display:flex; gap:8px; margin-bottom:14px; }
+  .filter-actions button { background:#175cd3; border-color:#175cd3; color:#fff; cursor:pointer; }
+  .pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; }
+  .pagination-links { display:flex; gap:6px; }
+  .pagination a { padding:6px 10px; border:1px solid var(--line); border-radius:5px; text-decoration:none; }
+  @media (max-width:1100px) { .filters,.overview-filter { grid-template-columns:repeat(2,minmax(180px,1fr)); } }
+  @media (max-width:700px) { .page-heading { align-items:flex-start; flex-direction:column; } .filters,.overview-filter { grid-template-columns:1fr; } }
 </style>
 
-<h1 style="margin-bottom:8px">📊 Статистик тайлан</h1>
-<p style="color:#64748b;margin-bottom:24px">Бүх цагийн нийт болон энэ сарын мэдээлэл</p>
+{% timezone "Asia/Ulaanbaatar" %}
+<div class="finance-page">
+  <div class="page-heading">
+    <div><h1>Ерөнхий хяналтын самбар</h1><p>Үйл ажиллагаа, хандалт, захиалга, орлого болон гар шилжүүлгийн нэгтгэл.</p></div>
+    <div class="quick-links"><a href="/admin/core/hostpayout/">Түрээслүүлэгчийн төлбөр</a><a href="/admin/core/guestrefund/">Зочны буцаалт</a><a href="/admin/core/financialauditlog/">Хяналтын түүх</a></div>
+  </div>
 
-<p class="section-title">💰 Санхүүгийн тайлан — нийт</p>
-<div class="stats-grid">
-  <div class="stat-card">
-    <div class="label">Нийт захиалгын дүн</div>
-    <div class="value green">₮{{ total_revenue|floatformat:0 }}</div>
-    <div class="sub">Цуцлагдаагүй захиалга</div>
+  <section class="section">
+    <div class="section-head"><div><h2>Бүх хугацааны нийлбэр</h2><p>Админы нүүрэнд тогтмол харагдах үндсэн үзүүлэлт.</p></div></div>
+    <div class="summary-grid">
+      <div class="summary-card"><div class="summary-label">Нийт хэрэглэгч</div><div class="summary-value">{{ total_users }}</div><div class="summary-note">Түрээслүүлэгч {{ total_hosts }} · зочин {{ total_guests }}</div></div>
+      <div class="summary-card"><div class="summary-label">Нийт зар</div><div class="summary-value">{{ total_listings }}</div><div class="summary-note">Идэвхтэй {{ active_listings }}</div></div>
+      <div class="summary-card"><div class="summary-label">Нийт захиалга</div><div class="summary-value">{{ total_bookings }}</div><div class="summary-note">Баталгаажсан {{ active_bookings }} · цуцлагдсан {{ cancelled_bookings }}</div></div>
+      <div class="summary-card"><div class="summary-label">Зочдын нийт төлбөр</div><div class="summary-value">₮{{ total_received|floatformat:0 }}</div><div class="summary-note">QPay шимтгэл ₮{{ qpay_fees|floatformat:0 }}</div></div>
+      <div class="summary-card"><div class="summary-label">Вэб хуудас үзэлт</div><div class="summary-value">{{ all_page_views }}</div><div class="summary-note">Давтагдаагүй зочлогч {{ all_unique_visitors }}</div></div>
+      <div class="summary-card"><div class="summary-label">Аппын анхны нээлт</div><div class="summary-value">{{ all_app_installs }}</div><div class="summary-note">Нийт нээлт {{ all_app_opens }}</div></div>
+      <div class="summary-card"><div class="summary-label">Хүлээгдэж буй хүсэлт</div><div class="summary-value">{{ pending_applications }}</div><div class="summary-note"><a href="/admin/core/hostapplication/?status__exact=pending">Хүсэлтүүдийг харах</a></div></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div><h2>Хугацааны тайлан</h2><p>{{ overview.label }} · {{ overview.start_date|date:"Y-m-d" }} - {{ overview.end_date|date:"Y-m-d" }}</p></div></div>
+    <form method="get" action="/admin/">
+      <div class="overview-filter">
+        <div><label for="overview_period">Хугацаа</label><select id="overview_period" name="overview_period"><option value="today"{% if overview.period == 'today' %} selected{% endif %}>Өнөөдөр</option><option value="7d"{% if overview.period == '7d' %} selected{% endif %}>Сүүлийн 7 хоног</option><option value="30d"{% if overview.period == '30d' %} selected{% endif %}>Сүүлийн 30 хоног</option><option value="month"{% if overview.period == 'month' %} selected{% endif %}>Энэ сар</option><option value="year"{% if overview.period == 'year' %} selected{% endif %}>Энэ жил</option><option value="all"{% if overview.period == 'all' %} selected{% endif %}>Бүх хугацаа</option><option value="custom"{% if overview.period == 'custom' %} selected{% endif %}>Огноо сонгох</option></select></div>
+        <div><label for="overview_from">Эхлэх огноо</label><input id="overview_from" type="date" name="overview_from" value="{{ overview.start_date|date:'Y-m-d' }}"></div>
+        <div><label for="overview_to">Дуусах огноо</label><input id="overview_to" type="date" name="overview_to" value="{{ overview.end_date|date:'Y-m-d' }}"></div>
+        <div><label for="group_by">Бүлэглэх</label><select id="group_by" name="group_by"><option value="day"{% if overview.group_by == 'day' %} selected{% endif %}>Өдрөөр</option><option value="month"{% if overview.group_by == 'month' %} selected{% endif %}>Сараар</option></select></div>
+        <div><label for="overview_order">Эрэмбэ</label><select id="overview_order" name="overview_order"><option value="desc"{% if overview.order == 'desc' %} selected{% endif %}>Шинэ эхэнд</option><option value="asc"{% if overview.order == 'asc' %} selected{% endif %}>Хуучин эхэнд</option></select></div>
+        <button type="submit">Тайлан харах</button>
+      </div>
+    </form>
+    <div class="summary-grid">
+      <div class="summary-card"><div class="summary-label">Шинэ хэрэглэгч</div><div class="summary-value">{{ period_new_users }}</div></div>
+      <div class="summary-card"><div class="summary-label">Шинэ захиалга</div><div class="summary-value">{{ period_booking_count }}</div><div class="summary-note">Баталгаажсан {{ period_confirmed_count }} · цуцлагдсан {{ period_cancelled_count }}</div></div>
+      <div class="summary-card"><div class="summary-label">Зочдын нийт төлбөр</div><div class="summary-value">₮{{ period_total_received|floatformat:0 }}</div><div class="summary-note">QPay шимтгэл ₮{{ period_qpay_fees|floatformat:0 }}</div></div>
+      <div class="summary-card"><div class="summary-label">Дансанд цэвэр орсон</div><div class="summary-value">₮{{ period_net_received|floatformat:0 }}</div></div>
+      <div class="summary-card"><div class="summary-label">Тооцоолсон платформын орлого</div><div class="summary-value">₮{{ period_estimated_platform_income|floatformat:0 }}</div><div class="summary-note">Зочны шимтгэл + 10% − QPay 1%</div></div>
+      <div class="summary-card"><div class="summary-label">Вэб хуудас үзэлт</div><div class="summary-value">{{ period_page_views }}</div></div>
+      <div class="summary-card"><div class="summary-label">Давтагдаагүй зочлогч</div><div class="summary-value">{{ period_unique_visitors }}</div></div>
+      <div class="summary-card"><div class="summary-label">Аппын анхны нээлт</div><div class="summary-value">{{ period_app_installs }}</div><div class="summary-note">Нийт нээлт {{ period_app_opens }}</div></div>
+    </div>
+    <div class="notice">Хандалт энэ хувилбарыг байршуулснаас хойш тоологдоно. “Аппын анхны нээлт” нь төхөөрөмж дээрх анхны амжилттай нээлт тул дэлгүүрийн албан ёсны таталтын тооны ойролцоо үзүүлэлт юм.</div>
+    <div class="table-wrap"><table class="finance-table"><thead><tr><th>{% if overview.group_by == 'day' %}Өдөр{% else %}Сар{% endif %}</th><th>Шинэ хэрэглэгч</th><th>Захиалга</th><th>Баталгаажсан</th><th>Цуцлагдсан</th><th>Төлөгдсөн захиалга</th><th>Нийт төлбөр</th><th>QPay шимтгэл</th><th>Цэвэр орсон</th><th>Хуудас үзэлт</th><th>Зочлогч</th><th>Апп анх нээсэн</th><th>Апп нээсэн</th></tr></thead><tbody>{% for row in overview_rows %}<tr><td class="primary">{{ row.label }}</td><td>{{ row.new_users }}</td><td>{{ row.bookings }}</td><td>{{ row.confirmed }}</td><td>{{ row.cancelled }}</td><td>{{ row.paid_bookings }}</td><td class="amount">₮{{ row.gross|floatformat:0 }}</td><td class="amount">₮{{ row.qpay_fees|floatformat:0 }}</td><td class="amount">₮{{ row.net_received|floatformat:0 }}</td><td>{{ row.page_views }}</td><td>{{ row.unique_visitors }}</td><td>{{ row.app_installs }}</td><td>{{ row.app_opens }}</td></tr>{% empty %}<tr><td colspan="13">Сонгосон хугацаанд мэдээлэл алга.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div><h2>Санхүүгийн үлдэгдэл ба гар шилжүүлэг</h2><p>Орох 14:00, гарах 12:00. Түрээслүүлэгчийн төлбөр гарах цагаас 72 цагийн дараа бэлэн болно.</p></div></div>
+
+  {% if missing_accounting_count or review_payout_count or review_refund_count %}<div class="notice{% if missing_accounting_count %} danger{% endif %}">Шалгах ажил: бүртгэлгүй {{ missing_accounting_count }} захиалга, төлбөрийн хяналт {{ review_payout_count }}, буцаалтын хяналт {{ review_refund_count }}.</div>{% endif %}
+
+  <div class="summary-grid">
+    <div class="summary-card"><div class="summary-label">Зочдын нийт төлбөр</div><div class="summary-value">₮{{ total_received|floatformat:0 }}</div><div class="summary-note">Төлөгдсөн бүх QPay гүйлгээ</div></div>
+    <div class="summary-card"><div class="summary-label">QPay шимтгэл</div><div class="summary-value">₮{{ qpay_fees|floatformat:0 }}</div><div class="summary-note">Гүйлгээ тус бүрийн 1%</div></div>
+    <div class="summary-card"><div class="summary-label">Дансанд цэвэр орсон</div><div class="summary-value">₮{{ net_received|floatformat:0 }}</div><div class="summary-note">Нийт төлбөр − QPay шимтгэл</div></div>
+    <div class="summary-card"><div class="summary-label">Түрээслүүлэгчид шилжүүлсэн</div><div class="summary-value">₮{{ paid_to_hosts|floatformat:0 }}</div><div class="summary-note">Баримттай баталгаажсан шилжүүлэг</div></div>
+    <div class="summary-card"><div class="summary-label">Зочинд буцаасан</div><div class="summary-value">₮{{ refunded_to_guests|floatformat:0 }}</div><div class="summary-note">Буцаан шилжүүлсэн нийт дүн</div></div>
+    <div class="summary-card"><div class="summary-label">Бүртгэлийн үлдэгдэл</div><div class="summary-value">₮{{ book_cash_balance|floatformat:0 }}</div><div class="summary-note">Хүлээн авсан − хоёр төрлийн шилжүүлэг</div></div>
   </div>
-  <div class="stat-card">
-    <div class="label">Guest-ийн шимтгэл</div>
-    <div class="value blue">₮{{ total_guest_fees|floatformat:0 }}</div>
-    <div class="sub">Guest-ээс авсан 10%</div>
+  <div class="summary-grid">
+    <div class="summary-card"><div class="summary-label">Одоо шилжүүлэхэд бэлэн</div><div class="summary-value">₮{{ ready_amount|floatformat:0 }}</div><div class="summary-note">{{ ready_count }} захиалга</div></div>
+    <div class="summary-card"><div class="summary-label">72 цаг хүлээж буй</div><div class="summary-value">₮{{ waiting_amount|floatformat:0 }}</div><div class="summary-note">{{ waiting_count }} захиалга</div></div>
+    <div class="summary-card"><div class="summary-label">Саатуулсан төлбөр</div><div class="summary-value">{{ held_payout_count }}</div><div class="summary-note">Шалтгааныг дэлгэрэнгүй бүртгэлээс харна</div></div>
+    <div class="summary-card"><div class="summary-label">Баталсан буцаалт</div><div class="summary-value">₮{{ approved_refund_amount|floatformat:0 }}</div><div class="summary-note">{{ approved_refund_count }} шилжүүлэг хүлээж байна</div></div>
   </div>
-  <div class="stat-card">
-    <div class="label">Host-ийн шимтгэл</div>
-    <div class="value purple">₮{{ total_host_fees|floatformat:0 }}</div>
-    <div class="sub">Host-оос авсан 10%</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Платформын нийт орлого</div>
-    <div class="value orange">₮{{ platform_total|floatformat:0 }}</div>
-    <div class="sub">Guest + Host шимтгэл</div>
-  </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div><h2>Түрээслүүлэгчид шилжүүлэх ажлын дараалал</h2><p>Хугацаа дууссан, шалгах, саатуулсан, хүлээж буй дарааллаар.</p></div><a class="action-link" href="/admin/core/hostpayout/">Бүгдийг харах</a></div>
+    <div class="table-wrap"><table class="finance-table"><thead><tr><th>Захиалга</th><th>Түрээслүүлэгч</th><th>Гарах цаг</th><th>72 цаг дуусах</th><th>Үлдсэн хугацаа</th><th>Шилжүүлэх дүн</th><th>Банк, данс</th><th>Төлөв</th><th></th></tr></thead><tbody>
+      {% for row in payout_rows %}<tr data-href="/admin/stats/bookings/{{ row.payout.booking_id }}/"><td><a class="primary" href="/admin/stats/bookings/{{ row.payout.booking_id }}/">#{{ row.payout.booking_id }}</a><div class="secondary">{{ row.payout.booking.listing.title }}</div></td><td><span class="primary">{{ row.payout.account_holder_name|default:row.payout.host.username }}</span><div class="secondary">@{{ row.payout.host.username }}</div></td><td>{{ row.payout.booking.check_out|date:"Y-m-d" }} 12:00</td><td>{{ row.payout.eligible_at|date:"Y-m-d H:i" }}</td><td>{{ row.remaining }}</td><td class="amount">₮{{ row.payout.net_amount|floatformat:0 }}</td><td>{{ row.payout.bank_name|default:"—" }}<div class="secondary">{{ row.payout.account_number|default:"—" }}</div></td><td><span class="badge {{ row.class }}">{{ row.label }}</span></td><td><a class="action-link" href="/admin/core/hostpayout/{{ row.payout.id }}/change/">Хянах</a></td></tr>
+      {% empty %}<tr><td colspan="9">Хүлээгдэж буй шилжүүлэг байхгүй.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div><h2>Зочны буцаалтын дараалал</h2><p>Буцаалт автоматаар шилжихгүй; ажилтан шийдвэр, дүн, баримтыг бүртгэнэ.</p></div><a class="action-link" href="/admin/core/guestrefund/">Бүгдийг харах</a></div>
+    <div class="table-wrap"><table class="finance-table"><thead><tr><th>Захиалга</th><th>Зочин</th><th>Шалтгаан</th><th>Хүлээн авсан</th><th>Санал болгосон</th><th>Баталсан</th><th>Төлөв</th><th></th></tr></thead><tbody>
+      {% for refund in refund_rows %}<tr data-href="/admin/stats/bookings/{{ refund.booking_id }}/"><td><a class="primary" href="/admin/stats/bookings/{{ refund.booking_id }}/">#{{ refund.booking_id }}</a><div class="secondary">{{ refund.booking.listing.title }}</div></td><td>{{ refund.booking.full_name }}<div class="secondary">{{ refund.booking.phone_number }}</div></td><td>{{ refund.get_reason_display }}</td><td class="amount">₮{{ refund.received_amount|floatformat:0 }}</td><td class="amount">₮{{ refund.suggested_amount|floatformat:0 }}</td><td class="amount">₮{{ refund.approved_amount|floatformat:0 }}</td><td><span class="badge {% if refund.status == 'approved' %}ready{% else %}review{% endif %}">{{ refund.get_status_display }}</span></td><td><a class="action-link" href="/admin/core/guestrefund/{{ refund.id }}/change/">Хянах</a></td></tr>
+      {% empty %}<tr><td colspan="8">Хүлээгдэж буй буцаалт байхгүй.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="section" id="bookings">
+    <div class="section-head"><div><h2>Бүх захиалга</h2><p>{{ booking_page.paginator.count }} үр дүн. Мөр дээр дарж бүх дэлгэрэнгүй мэдээллийг харна.</p></div></div>
+    <form method="get">
+      <div class="filters">
+        <div><label for="q">Нэр, утас, байр, байршил, дугаар</label><input id="q" name="q" value="{{ q }}" placeholder="Хайх"></div>
+        <div><label for="status">Захиалгын төлөв</label><select id="status" name="status"><option value="">Бүгд</option><option value="confirmed"{% if status_filter == 'confirmed' %} selected{% endif %}>Баталгаажсан</option><option value="cancelled"{% if status_filter == 'cancelled' %} selected{% endif %}>Цуцлагдсан</option><option value="pending_payment"{% if status_filter == 'pending_payment' %} selected{% endif %}>Төлбөр хүлээж байна</option><option value="expired"{% if status_filter == 'expired' %} selected{% endif %}>Хугацаа дууссан</option><option value="payment_failed"{% if status_filter == 'payment_failed' %} selected{% endif %}>Төлбөр амжилтгүй</option></select></div>
+        <div><label for="finance">Санхүүгийн төлөв</label><select id="finance" name="finance"><option value="">Бүгд</option><option value="ready"{% if finance_filter == 'ready' %} selected{% endif %}>Шилжүүлэхэд бэлэн</option><option value="waiting"{% if finance_filter == 'waiting' %} selected{% endif %}>72 цаг хүлээж байна</option><option value="review"{% if finance_filter == 'review' %} selected{% endif %}>Шалгах шаардлагатай</option><option value="hold"{% if finance_filter == 'hold' %} selected{% endif %}>Саатуулсан</option><option value="paid"{% if finance_filter == 'paid' %} selected{% endif %}>Шилжүүлсэн</option><option value="refund"{% if finance_filter == 'refund' %} selected{% endif %}>Буцаалт хүлээж буй</option><option value="missing"{% if finance_filter == 'missing' %} selected{% endif %}>Бүртгэлгүй</option></select></div>
+        <div><label for="date_from">Орох огноо, эхлэх</label><input id="date_from" type="date" name="date_from" value="{{ date_from }}"></div>
+        <div><label for="date_to">Гарах огноо, дуусах</label><input id="date_to" type="date" name="date_to" value="{{ date_to }}"></div>
+        <div><label for="sort">Эрэмбэ</label><select id="sort" name="sort"><option value="created_desc"{% if sort_value == 'created_desc' %} selected{% endif %}>Шинэ захиалга эхэнд</option><option value="created_asc"{% if sort_value == 'created_asc' %} selected{% endif %}>Хуучин захиалга эхэнд</option><option value="check_in_asc"{% if sort_value == 'check_in_asc' %} selected{% endif %}>Орох огноо өсөх</option><option value="check_in_desc"{% if sort_value == 'check_in_desc' %} selected{% endif %}>Орох огноо буурах</option><option value="check_out_asc"{% if sort_value == 'check_out_asc' %} selected{% endif %}>Гарах огноо өсөх</option><option value="check_out_desc"{% if sort_value == 'check_out_desc' %} selected{% endif %}>Гарах огноо буурах</option><option value="duration_desc"{% if sort_value == 'duration_desc' %} selected{% endif %}>Урт хугацаа эхэнд</option><option value="duration_asc"{% if sort_value == 'duration_asc' %} selected{% endif %}>Богино хугацаа эхэнд</option><option value="guest_asc"{% if sort_value == 'guest_asc' %} selected{% endif %}>Зочны нэр А-Я</option><option value="host_asc"{% if sort_value == 'host_asc' %} selected{% endif %}>Түрээслүүлэгч А-Я</option><option value="listing_asc"{% if sort_value == 'listing_asc' %} selected{% endif %}>Байрны нэр А-Я</option><option value="location_asc"{% if sort_value == 'location_asc' %} selected{% endif %}>Байршил А-Я</option><option value="amount_desc"{% if sort_value == 'amount_desc' %} selected{% endif %}>Өндөр дүн эхэнд</option><option value="amount_asc"{% if sort_value == 'amount_asc' %} selected{% endif %}>Бага дүн эхэнд</option></select></div>
+      </div>
+      <div class="filter-actions"><button type="submit">Шүүх, эрэмбэлэх</button><a href="/admin/stats/#bookings">Цэвэрлэх</a></div>
+    </form>
+    <div class="table-wrap"><table class="finance-table"><thead><tr><th><a href="{{ sort_urls.created_desc }}">Дугаар</a></th><th><a href="{{ sort_urls.guest_asc }}">Зочин</a></th><th><a href="{{ sort_urls.listing_asc }}">Байр</a></th><th><a href="{{ sort_urls.host_asc }}">Түрээслүүлэгч</a></th><th><a href="{{ sort_urls.location_asc }}">Байршил</a></th><th><a href="{{ sort_urls.check_in_asc }}">Орох</a></th><th><a href="{{ sort_urls.check_out_asc }}">Гарах</a></th><th><a href="{{ sort_urls.duration_desc }}">Хугацаа</a></th><th><a href="{{ sort_urls.amount_desc }}">Төлсөн</a></th><th>Захиалга</th><th>Түрээслүүлэгчийн төлбөр</th><th>Буцаалт</th></tr></thead><tbody>
+      {% for row in booking_rows %}<tr data-href="/admin/stats/bookings/{{ row.booking.id }}/"><td><a class="primary" href="/admin/stats/bookings/{{ row.booking.id }}/">#{{ row.booking.id }}</a><div class="secondary">{{ row.booking.created_at|date:"Y-m-d H:i" }}</div></td><td><span class="primary">{{ row.booking.full_name }}</span><div class="secondary">{{ row.booking.phone_number }}</div></td><td>{{ row.booking.listing.title }}</td><td><span class="primary">{{ row.host_name }}</span><div class="secondary">@{{ row.booking.listing.host.username }}</div></td><td>{{ row.location }}</td><td>{{ row.booking.check_in|date:"Y-m-d" }}<div class="secondary">14:00</div></td><td>{{ row.booking.check_out|date:"Y-m-d" }}<div class="secondary">12:00</div></td><td>{{ row.duration }} хоног</td><td class="amount">₮{{ row.received_amount|floatformat:0 }}</td><td><span class="badge neutral">{{ row.status_label }}</span></td><td><span class="badge {{ row.payout_class }}">{{ row.payout_label }}</span>{% if row.payout %}<div class="secondary">₮{{ row.payout.net_amount|floatformat:0 }} · {{ row.remaining }}</div>{% endif %}</td><td><span class="badge {{ row.refund_class }}">{{ row.refund_label }}</span>{% if row.refund %}<div class="secondary">₮{{ row.refund.approved_amount|floatformat:0 }}</div>{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="12">Шүүлтэд тохирох захиалга олдсонгүй.</td></tr>{% endfor %}
+    </tbody></table></div>
+    <div class="pagination"><div>Хуудас {{ booking_page.number }} / {{ booking_page.paginator.num_pages }}</div><div class="pagination-links">{% if booking_page.has_previous %}<a href="?{% if page_query %}{{ page_query }}&{% endif %}page={{ booking_page.previous_page_number }}#bookings">Өмнөх</a>{% endif %}{% if booking_page.has_next %}<a href="?{% if page_query %}{{ page_query }}&{% endif %}page={{ booking_page.next_page_number }}#bookings">Дараах</a>{% endif %}</div></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div><h2>Сүүлийн 6 сарын мөнгөн хөдөлгөөн</h2><p>Энэ нь ашиг биш; бодитоор орж, бүртгэлтэйгээр гарсан мөнгө.</p></div></div>
+    <div class="table-wrap"><table class="finance-table"><thead><tr><th>Сар</th><th>Төлөгдсөн захиалга</th><th>Зочдын нийт төлбөр</th><th>QPay шимтгэл</th><th>Дансанд цэвэр орсон</th><th>Түрээслүүлэгчид</th><th>Зочинд буцаасан</th><th>Цэвэр хөдөлгөөн</th></tr></thead><tbody>{% for row in monthly_data %}<tr><td>{{ row.month }}</td><td>{{ row.booking_count }}</td><td class="amount">₮{{ row.received|floatformat:0 }}</td><td class="amount">₮{{ row.provider_fees|floatformat:0 }}</td><td class="amount">₮{{ row.net_received|floatformat:0 }}</td><td class="amount">₮{{ row.host_out|floatformat:0 }}</td><td class="amount">₮{{ row.refund_out|floatformat:0 }}</td><td class="amount">₮{{ row.net_flow|floatformat:0 }}</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+
 </div>
-
-<p class="section-title">📅 Энэ сарын тайлан</p>
-<div class="stats-grid">
-  <div class="stat-card">
-    <div class="label">Захиалгын дүн</div>
-    <div class="value green">₮{{ month_revenue|floatformat:0 }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Guest шимтгэл</div>
-    <div class="value blue">₮{{ month_guest_fees|floatformat:0 }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Host шимтгэл</div>
-    <div class="value purple">₮{{ month_host_fees|floatformat:0 }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Платформын орлого</div>
-    <div class="value orange">₮{{ month_platform|floatformat:0 }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Захиалгын тоо</div>
-    <div class="value blue">{{ month_booking_count }}</div>
-  </div>
-</div>
-
-<p class="section-title">👥 Хэрэглэгч</p>
-<div class="stats-grid">
-  <div class="stat-card">
-    <div class="label">Нийт хэрэглэгч</div>
-    <div class="value blue">{{ total_users }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Host</div>
-    <div class="value green">{{ total_hosts }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Guest</div>
-    <div class="value purple">{{ total_guests }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Энэ сарын шинэ бүртгэл</div>
-    <div class="value orange">{{ new_users_month }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Хүлээгдэж буй host хүсэлт</div>
-    <div class="value orange">{{ pending_applications }}</div>
-    {% if pending_applications > 0 %}
-    <div class="sub"><a href="/admin/core/hostapplication/?status__exact=pending">Харах →</a></div>
-    {% endif %}
-  </div>
-</div>
-
-<p class="section-title">📋 Захиалга</p>
-<div class="stats-grid">
-  <div class="stat-card">
-    <div class="label">Нийт захиалга</div>
-    <div class="value blue">{{ total_bookings }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Идэвхтэй</div>
-    <div class="value green">{{ active_bookings }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="label">Цуцлагдсан</div>
-    <div class="value" style="color:#dc2626">{{ cancelled_bookings }}</div>
-  </div>
-</div>
-
-<p class="section-title">📈 Сүүлийн 6 сарын захиалга</p>
-<table>
-  <thead>
-    <tr>
-      <th>Сар</th>
-      <th>Захиалгын тоо</th>
-      <th>Нийт дүн</th>
-      <th>Платформын орлого (20%)</th>
-      <th>График</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in monthly_data %}
-    {% with max_revenue=monthly_data.0.revenue %}
-    <tr>
-      <td>{{ row.month }}</td>
-      <td>{{ row.count }}</td>
-      <td>₮{{ row.revenue|floatformat:0 }}</td>
-      <td>₮{{ row.platform|floatformat:0 }}</td>
-      <td style="min-width:120px">
-        <div class="bar-wrap">
-          {% if row.revenue > 0 %}
-          <div class="bar" style="width:{{ row.count|default:0 }}0%"></div>
-          {% endif %}
-        </div>
-      </td>
-    </tr>
-    {% endwith %}
-    {% empty %}
-    <tr><td colspan="5" style="color:#94a3b8;text-align:center">Мэдээлэл байхгүй</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-<div style="margin-top:24px">
-  <a href="/admin/core/booking/" style="margin-right:12px; color:#2563eb">→ Бүх захиалга харах</a>
-  <a href="/admin/core/customuser/" style="margin-right:12px; color:#2563eb">→ Хэрэглэгчид</a>
-  <a href="/admin/core/hostapplication/" style="color:#2563eb">→ Host хүсэлтүүд</a>
-</div>
+<script>document.querySelectorAll('tr[data-href]').forEach(function(row){row.addEventListener('click',function(event){if(event.target.closest('a,button,input,select'))return;window.location.href=row.dataset.href;});});</script>
+{% endtimezone %}
 {% endblock %}

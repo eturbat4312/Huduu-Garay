@@ -19,6 +19,7 @@ import MapView, { Marker, UrlTile } from 'react-native-maps';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
+import { CHECK_IN_TIME, CHECK_OUT_TIME } from '@/constants/booking-times';
 import { useAuth } from '@/context/auth';
 import {
   createFavorite,
@@ -691,7 +692,7 @@ export default function ListingDetailScreen() {
             {!isOwner && (
               <View style={styles.dateSummaryRow}>
                 <View style={styles.dateSummaryCell}>
-                  <ThemedText type="small" themeColor="textSecondary">Орох</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">Орох · {CHECK_IN_TIME}</ThemedText>
                   <ThemedText type="smallBold" style={checkIn ? {} : { opacity: 0.4 }}>
                     {checkIn || '—'}
                   </ThemedText>
@@ -700,7 +701,7 @@ export default function ListingDetailScreen() {
                   <ThemedText themeColor="textSecondary">→</ThemedText>
                 </View>
                 <View style={styles.dateSummaryCell}>
-                  <ThemedText type="small" themeColor="textSecondary">Гарах</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">Гарах · {CHECK_OUT_TIME}</ThemedText>
                   <ThemedText type="smallBold" style={normalizedCheckOut ? {} : { opacity: 0.4 }}>
                     {normalizedCheckOut || '—'}
                   </ThemedText>

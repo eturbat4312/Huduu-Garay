@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
 import { Booking } from "@/types";
 import GuestCancellationAction from "@/components/GuestCancellationAction";
+import { CHECK_IN_TIME, CHECK_OUT_TIME } from "@/lib/bookingTimes";
 
 interface BookingSuccessPageProps {
   booking: Booking;
@@ -89,6 +90,7 @@ export default function BookingSuccessPage({
               {displayCheckOut.toLocaleDateString()} ({nights}{" "}
               {t(locale, "nights")})
             </p>
+            <p>Орох {CHECK_IN_TIME} · Гарах {CHECK_OUT_TIME}</p>
             <p>
               💸 {t(locale, "price_per_night")}: ₮
               {Math.floor(totalPrice / nights).toLocaleString()}

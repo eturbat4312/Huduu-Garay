@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import api from "@/lib/axios";
 import { t } from "@/lib/i18n";
+import { CHECK_IN_TIME, CHECK_OUT_TIME } from "@/lib/bookingTimes";
 import { Listing } from "@/types";
 import axios from "axios";
 
@@ -299,6 +300,9 @@ export default function CheckoutContent() {
                   📅 {df.format(checkInDate!)} →{" "}
                   {df.format(displayCheckOutDate!)} ({totalNights}{" "}
                   {t(locale, "nights")})
+                </div>
+                <div className="text-xs text-gray-500">
+                  Орох {CHECK_IN_TIME} · Гарах {CHECK_OUT_TIME}
                 </div>
                 {checkInDate &&
                   checkOutDate &&

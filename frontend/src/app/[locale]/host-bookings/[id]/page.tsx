@@ -9,6 +9,7 @@ import { t } from "@/lib/i18n";
 import Image from "next/image";
 import HostCancellationAction from "@/components/HostCancellationAction";
 import type { Booking } from "@/types";
+import { CHECK_IN_TIME, CHECK_OUT_TIME } from "@/lib/bookingTimes";
 
 export default function HostBookingDetailPage() {
   const { id, locale } = useParams() as { id: string; locale: string };
@@ -96,8 +97,8 @@ export default function HostBookingDetailPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <p>📅 Check-in: {booking.check_in}</p>
-            <p>📅 Check-out: {booking.check_out}</p>
+            <p>Орох: {booking.check_in} · {CHECK_IN_TIME}</p>
+            <p>Гарах: {booking.check_out} · {CHECK_OUT_TIME}</p>
             <p>
               🛏 {t(locale, "booking_detail.nights")}: {nights}
             </p>

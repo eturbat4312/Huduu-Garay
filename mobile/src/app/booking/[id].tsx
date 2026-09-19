@@ -15,6 +15,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { GuestCancellationAction } from '@/components/guest-cancellation-action';
 import { Colors, Spacing } from '@/constants/theme';
+import { CHECK_IN_TIME, CHECK_OUT_TIME } from '@/constants/booking-times';
 import { fetchBooking } from '@/lib/api';
 import type { BookingDetail } from '@/types/api';
 
@@ -134,8 +135,8 @@ export default function BookingDetailScreen() {
             {/* Огноо / үнэ */}
             <View style={[styles.card, { backgroundColor: C.backgroundElement }]}>
               <ThemedText type="smallBold" style={styles.cardTitle}>📅 Захиалгын мэдээлэл</ThemedText>
-              <Row label="Ирэх огноо"  value={fmtDate(booking.check_in)} />
-              <Row label="Гарах огноо" value={fmtDate(booking.check_out)} />
+              <Row label="Орох" value={`${fmtDate(booking.check_in)} · ${CHECK_IN_TIME}`} />
+              <Row label="Гарах" value={`${fmtDate(booking.check_out)} · ${CHECK_OUT_TIME}`} />
               <Row label="Зочдын тоо"  value={String(booking.guest_count)} />
               <View style={[styles.divider, { backgroundColor: C.backgroundSelected }]} />
               <Row label="Өрөөний үнэ" value={`₮${Number(booking.total_price).toLocaleString()}`} />

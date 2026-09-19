@@ -124,7 +124,9 @@ class GuestCancellationTests(TestCase):
     def test_same_day_cancellation_keeps_paid_money_for_manual_review(self):
         self.booking.check_in = self.now.date()
         self.booking.save(update_fields=["check_in"])
-        self.assertEqual(self.cancel().status_code, 200)
+        before_check_in = self.now.replace(hour=5)
+        with patch("django.utils.timezone.now", return_value=before_check_in):
+            self.assertEqual(self.cancel().status_code, 200)
         self.payment.refresh_from_db()
         self.assertEqual(self.payment.status, "paid")
 
@@ -170,12 +172,14 @@ class GuestCancellationTests(TestCase):
             }, format="json")
         self.assertEqual(response.status_code, 400)
 
-    def test_guest_cancelled_booking_does_not_block_listing_deletion(self):
+    def test_guest_cancelled_booking_is_hidden_without_deleting_financial_history(self):
         self.cancel()
         self.client.force_authenticate(self.host)
         response = self.client.delete(f"/api/listings/{self.listing.pk}/delete/")
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(Listing.objects.filter(pk=self.listing.pk).exists())
+        self.listing.refresh_from_db()
+        self.assertFalse(self.listing.is_active)
+        self.assertTrue(Booking.objects.filter(pk=self.booking.pk).exists())
 
     @patch("core.views.QPayClient.check_payment", return_value={"count": 1})
     def test_repeated_payment_callback_does_not_revive_cancelled_booking(self, check_payment):

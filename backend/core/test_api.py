@@ -1,8 +1,8 @@
 """huduu_garay backend — бүрэн тест"""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from unittest.mock import patch
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -502,6 +502,7 @@ class AvailabilityTests(TestCase):
 
 # ── 6. BOOKING ────────────────────────────────────────────────
 
+@override_settings(DEBUG=True)
 class BookingTests(TestCase):
     def setUp(self):
         self.host = make_user("bh", is_host=True)
@@ -827,8 +828,8 @@ class ReviewTests(TestCase):
         second_booking = Booking.objects.create(
             listing=self.listing,
             guest=self.guest,
-            check_in=date.today() - timedelta(days=1),
-            check_out=date.today(),
+            check_in=date.today() - timedelta(days=2),
+            check_out=date.today() - timedelta(days=1),
             full_name="RG",
             phone_number="9900",
             total_price=100000,
@@ -841,6 +842,35 @@ class ReviewTests(TestCase):
 
         self.assertEqual(r.status_code, 201)
         self.assertEqual(Review.objects.get(comment="Хоёр дахь удаа").booking, second_booking)
+
+    def test_review_opens_at_checkout_noon_mongolia_time(self):
+        checkout_date = date(2030, 6, 1)
+        listing = make_listing(
+            self.host,
+            category=self.listing.category,
+            title="12 цагийн шалгалт",
+        )
+        booking = Booking.objects.create(
+            listing=listing,
+            guest=self.guest,
+            check_in=checkout_date - timedelta(days=1),
+            check_out=checkout_date,
+            full_name="RG",
+            phone_number="9900",
+            total_price=100000,
+        )
+        before_checkout = datetime(2030, 6, 1, 3, 59, tzinfo=dt_timezone.utc)
+        at_checkout = datetime(2030, 6, 1, 4, 0, tzinfo=dt_timezone.utc)
+
+        with patch("core.views.timezone.now", return_value=before_checkout):
+            before = self.gc.get(f"/api/listings/{listing.id}/review-eligibility/")
+        with patch("core.views.timezone.now", return_value=at_checkout):
+            after = self.gc.get(f"/api/listings/{listing.id}/review-eligibility/")
+
+        self.assertFalse(before.data["can_review"])
+        self.assertEqual(before.data["reason_code"], "stay_not_completed")
+        self.assertTrue(after.data["can_review"])
+        self.assertEqual(after.data["booking_id"], booking.id)
 
     def test_host_cannot_review_own_listing(self):
         Booking.objects.create(
@@ -926,7 +956,7 @@ class HostApplicationTests(TestCase):
         self.assertEqual(r.status_code, 201)
         app = HostApplication.objects.get(user=self.user)
         self.assertIsNotNone(app.host_terms_accepted_at)
-        self.assertEqual(app.host_terms_version, "2026-09-15")
+        self.assertEqual(app.host_terms_version, "2026-09-19")
         self.assertEqual(str(app.host_commission_rate), "10.00")
 
     def test_apply_notifies_staff_users(self):
@@ -1084,6 +1114,7 @@ class AmenityTests(TestCase):
 
 # ── 13. HOST BOOKING VIEWS ────────────────────────────────────
 
+@override_settings(DEBUG=True)
 class HostBookingViewTests(TestCase):
     def setUp(self):
         self.host = make_user("hbh", is_host=True)
