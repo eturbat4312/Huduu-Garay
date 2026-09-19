@@ -154,8 +154,60 @@ class CategoryAdmin(admin.ModelAdmin):
 # ── Amenity ───────────────────────────────────────────────────────────────────
 @admin.register(Amenity)
 class AmenityAdmin(admin.ModelAdmin):
-    list_display = ("name", "translation_key")
+    list_display = (
+        "name",
+        "amenity_type",
+        "is_common",
+        "is_active",
+        "sort_order",
+        "category_list",
+    )
+    list_filter = ("amenity_type", "is_common", "is_active", "categories")
     search_fields = ("name", "translation_key")
+    filter_horizontal = ("categories",)
+    ordering = ("-amenity_type", "sort_order", "name")
+    actions = ("activate_options", "deactivate_options")
+
+    @admin.display(description="Ангилал")
+    def category_list(self, obj):
+        if obj.is_common:
+            return "Бүх ангилал"
+        return ", ".join(obj.categories.values_list("name", flat=True)) or "Сонгоогүй"
+
+    @admin.action(description="Сонгосныг идэвхтэй болгох")
+    def activate_options(self, request, queryset):
+        queryset.update(is_active=True)
+
+    @admin.action(description="Сонгосныг идэвхгүй болгох")
+    def deactivate_options(self, request, queryset):
+        queryset.update(is_active=False)
+
+    def delete_model(self, request, obj):
+        if obj.listing_set.exists():
+            obj.is_active = False
+            obj.save(update_fields=["is_active"])
+            self.message_user(
+                request,
+                "Энэ сонголтыг зар ашиглаж байгаа тул устгалгүй идэвхгүй болголоо.",
+            )
+            return
+        super().delete_model(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        deactivated = 0
+        deleted = 0
+        for option in queryset:
+            if option.listing_set.exists():
+                option.is_active = False
+                option.save(update_fields=["is_active"])
+                deactivated += 1
+            else:
+                option.delete()
+                deleted += 1
+        self.message_user(
+            request,
+            f"{deleted} сонголтыг устгаж, ашиглагдаж буй {deactivated} сонголтыг идэвхгүй болголоо.",
+        )
 
 
 # ── Other models ──────────────────────────────────────────────────────────────

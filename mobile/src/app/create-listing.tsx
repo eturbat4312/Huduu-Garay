@@ -197,8 +197,42 @@ export default function CreateListingScreen() {
 
   useEffect(() => {
     fetchCategories().then(setCategories).catch(() => {});
-    fetchAmenities().then(setAmenityOptions).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!categoryId) {
+      return;
+    }
+
+    let active = true;
+    fetchAmenities(categoryId)
+      .then((options) => {
+        if (!active) return;
+        setAmenityOptions(options);
+        const allowedIds = new Set(options.map((option) => option.id));
+        setAmenityIds((current) => current.filter((id) => allowedIds.has(id)));
+      })
+      .catch(() => {
+        if (active) setAmenityOptions([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [categoryId]);
+
+  const amenityGroups = [
+    {
+      key: 'amenity',
+      label: 'Тохижилт, үйлчилгээ',
+      options: amenityOptions.filter((option) => option.amenity_type === 'amenity'),
+    },
+    {
+      key: 'activity',
+      label: 'Үйл ажиллагаа',
+      options: amenityOptions.filter((option) => option.amenity_type === 'activity'),
+    },
+  ].filter((group) => group.options.length > 0);
 
   // ─── Image picker ─────────────────────────────────────────────────────────────
   const pickImages = async () => {
@@ -477,29 +511,38 @@ export default function CreateListingScreen() {
           </Pressable>
         </View>
 
-        {/* ── Тав тухт нөхцөл ── */}
+        {/* ── Тохижилт ба үйл ажиллагаа ── */}
         {amenityOptions.length > 0 && (
           <View style={[styles.section, { backgroundColor: C.backgroundElement }]}>
-            <Text style={[styles.sectionTitle, { color: C.text }]}>✨ Тав тухт нөхцөл</Text>
-            <View style={styles.amenityGrid}>
-              {amenityOptions.map((a) => {
-                const sel = amenityIds.includes(a.id);
-                return (
-                  <Pressable
-                    key={a.id}
-                    onPress={() => toggleAmenity(a.id)}
-                    style={[
-                      styles.amenityChip,
-                      {
-                        backgroundColor: sel ? '#16A34A' : inputBg,
-                        borderColor: sel ? '#16A34A' : borderCol,
-                      },
-                    ]}>
-                    <Text style={{ color: sel ? '#fff' : C.text, fontSize: 13 }}>{a.name}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <Text style={[styles.sectionTitle, { color: C.text }]}>Тохижилт ба үйл ажиллагаа</Text>
+            {amenityGroups.map((group) => (
+              <View key={group.key} style={styles.amenityGroup}>
+                <Text style={[styles.amenityGroupTitle, { color: C.textSecondary }]}>
+                  {group.label}
+                </Text>
+                <View style={styles.amenityGrid}>
+                  {group.options.map((option) => {
+                    const selected = amenityIds.includes(option.id);
+                    return (
+                      <Pressable
+                        key={option.id}
+                        onPress={() => toggleAmenity(option.id)}
+                        style={[
+                          styles.amenityChip,
+                          {
+                            backgroundColor: selected ? '#16A34A' : inputBg,
+                            borderColor: selected ? '#16A34A' : borderCol,
+                          },
+                        ]}>
+                        <Text style={{ color: selected ? '#fff' : C.text, fontSize: 13 }}>
+                          {option.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
           </View>
         )}
 
@@ -587,7 +630,12 @@ export default function CreateListingScreen() {
           {categories.map((cat) => (
             <Pressable
               key={cat.id}
-              onPress={() => { setCategoryId(cat.id); setCatModalVisible(false); }}
+              onPress={() => {
+                setCategoryId(cat.id);
+                setAmenityOptions([]);
+                setAmenityIds([]);
+                setCatModalVisible(false);
+              }}
               style={[
                 styles.catItem,
                 {
@@ -664,6 +712,8 @@ const styles = StyleSheet.create({
   },
 
   amenityGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  amenityGroup: { gap: Spacing.one, marginTop: Spacing.one },
+  amenityGroupTitle: { fontSize: 13, fontWeight: '700' },
   amenityChip: {
     borderWidth: 1,
     borderRadius: 20,

@@ -117,6 +117,20 @@ export default function BookingDetailScreen() {
               </Pressable>
             </View>
 
+            {/* Түрээслүүлэгчийн мэдээлэл */}
+            <View style={[styles.card, { backgroundColor: C.backgroundElement }]}>
+              <ThemedText type="smallBold" style={styles.cardTitle}>Түрээслүүлэгч</ThemedText>
+              <Row label="Нэр" value={booking.host_name || 'Тодорхойгүй'} />
+              {booking.host_phone ? (
+                <Row label="Утас" value={booking.host_phone} />
+              ) : (
+                <ThemedText type="small" themeColor="textSecondary">
+                  Утас, имэйл захиалга баталгаажсаны дараа харагдана.
+                </ThemedText>
+              )}
+              {booking.host_email ? <Row label="Имэйл" value={booking.host_email} /> : null}
+            </View>
+
             {/* Огноо / үнэ */}
             <View style={[styles.card, { backgroundColor: C.backgroundElement }]}>
               <ThemedText type="smallBold" style={styles.cardTitle}>📅 Захиалгын мэдээлэл</ThemedText>

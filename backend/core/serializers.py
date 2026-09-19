@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from datetime import timedelta
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.utils import timezone
 from .models import (
     Category,
@@ -124,9 +125,21 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class AmenitySerializer(serializers.ModelSerializer):
+    categories = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+
     class Meta:
         model = Amenity
-        fields = "__all__"
+        fields = [
+            "id",
+            "name",
+            "icon",
+            "translation_key",
+            "amenity_type",
+            "is_common",
+            "categories",
+            "is_active",
+            "sort_order",
+        ]
 
 
 # -------------------- LISTING IMAGE --------------------
@@ -177,7 +190,7 @@ class ListingSerializer(serializers.ModelSerializer):
     is_favorited = serializers.SerializerMethodField()
     favorite_id = serializers.SerializerMethodField()
     thumbnail = serializers.SerializerMethodField()  # 🟢 ШИНЭЭР НЭМНЭ
-    host = UserSerializer(read_only=True)  # 👈 заавал энэ байх хэрэгтэй
+    host = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
     can_view_private_location = serializers.SerializerMethodField()
 
@@ -185,7 +198,10 @@ class ListingSerializer(serializers.ModelSerializer):
         queryset=Category.objects.all(), source="category", write_only=True
     )
     amenity_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Amenity.objects.all(), many=True, write_only=True, required=False
+        queryset=Amenity.objects.all(),
+        many=True,
+        write_only=True,
+        required=False,
     )
 
     class Meta:
@@ -226,6 +242,32 @@ class ListingSerializer(serializers.ModelSerializer):
     def get_can_view_private_location(self, obj):
         return can_view_private_listing_location(obj, self.context.get("request"))
 
+    def get_host(self, obj):
+        if not obj.host:
+            return None
+
+        request = self.context.get("request")
+        can_view_contact = can_view_private_listing_location(obj, request)
+        avatar = obj.host.avatar.url if obj.host.avatar else None
+        if avatar and request:
+            avatar = request.build_absolute_uri(avatar)
+
+        data = {
+            "id": obj.host.id,
+            "username": obj.host.username,
+            "is_host": obj.host.is_host,
+            "avatar": avatar,
+            "can_view_private_contact": can_view_contact,
+        }
+        if can_view_contact:
+            host_app = getattr(obj.host, "hostapplication", None)
+            data.update({
+                "email": obj.host.email or "",
+                "phone": obj.host.phone or "",
+                "host_phone_number": host_app.phone_number if host_app else "",
+            })
+        return data
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         if not data["can_view_private_location"]:
@@ -253,6 +295,46 @@ class ListingSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(image.url) if request else image.url
         return None
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        category = attrs.get("category")
+        if category is None and self.instance is not None:
+            category = self.instance.category
+
+        amenities = attrs.get("amenity_ids")
+        if amenities is None or category is None:
+            return attrs
+
+        selected_ids = {amenity.id for amenity in amenities}
+        existing_ids = set()
+        category_is_unchanged = False
+        if self.instance is not None:
+            existing_ids = set(self.instance.amenities.values_list("id", flat=True))
+            category_is_unchanged = self.instance.category_id == category.id
+
+        allowed_ids = set(
+            Amenity.objects.filter(id__in=selected_ids)
+            .filter(Q(is_common=True) | Q(categories=category))
+            .filter(Q(is_active=True) | Q(id__in=existing_ids))
+            .values_list("id", flat=True)
+        )
+        if category_is_unchanged:
+            allowed_ids.update(selected_ids & existing_ids)
+        invalid_names = sorted(
+            amenity.name for amenity in amenities if amenity.id not in allowed_ids
+        )
+        if invalid_names:
+            raise serializers.ValidationError(
+                {
+                    "amenity_ids": (
+                        "Сонгосон ангилалд тохирохгүй сонголт байна: "
+                        + ", ".join(invalid_names)
+                    )
+                }
+            )
+
+        return attrs
+
     def create(self, validated_data):
         amenity_ids = validated_data.pop("amenity_ids", [])
         listing = Listing.objects.create(**validated_data)
@@ -261,11 +343,17 @@ class ListingSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         amenity_ids = validated_data.pop("amenity_ids", None)
+        previous_category_id = instance.category_id
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
         if amenity_ids is not None:
             instance.amenities.set(amenity_ids)
+        elif previous_category_id != instance.category_id and instance.category_id:
+            compatible_ids = instance.amenities.filter(
+                Q(is_common=True) | Q(categories=instance.category)
+            ).values_list("id", flat=True)
+            instance.amenities.set(compatible_ids)
         return instance
 
     def get_average_rating(self, obj):
@@ -340,6 +428,7 @@ class BookingSerializer(serializers.ModelSerializer):
     is_unread = serializers.SerializerMethodField()
     host_name = serializers.SerializerMethodField()
     host_phone = serializers.SerializerMethodField()
+    host_email = serializers.SerializerMethodField()
     guest_cancellation = serializers.SerializerMethodField()
     host_cancellation = serializers.SerializerMethodField()
 
@@ -368,6 +457,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "is_unread",
             "host_name",
             "host_phone",
+            "host_email",
             "service_fee",
             "guest_cancelled_at",
             "guest_cancellation_reason",
@@ -457,12 +547,26 @@ class BookingSerializer(serializers.ModelSerializer):
         ).exists()
 
     def get_host_name(self, obj):
+        request = self.context.get("request")
+        if not can_view_private_listing_location(obj.listing, request):
+            return obj.listing.host.username
         host_app = getattr(obj.listing.host, "hostapplication", None)
-        return host_app.full_name if host_app else None
+        return host_app.full_name if host_app else obj.listing.host.username
 
     def get_host_phone(self, obj):
+        request = self.context.get("request")
+        if not can_view_private_listing_location(obj.listing, request):
+            return None
         host_app = getattr(obj.listing.host, "hostapplication", None)
-        return host_app.phone_number if host_app else None
+        if host_app and host_app.phone_number:
+            return host_app.phone_number
+        return obj.listing.host.phone or None
+
+    def get_host_email(self, obj):
+        request = self.context.get("request")
+        if not can_view_private_listing_location(obj.listing, request):
+            return None
+        return obj.listing.host.email or None
 
 
 class PendingBookingCreateSerializer(serializers.Serializer):

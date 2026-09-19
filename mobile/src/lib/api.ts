@@ -337,8 +337,9 @@ export function applyToBeHostFormData(formData: FormData): Promise<HostApplicati
 
 // ─── Listings (Host) ──────────────────────────────────────────────────────────
 
-export function fetchAmenities(): Promise<import('@/types/api').ListingAmenity[]> {
-  return request<import('@/types/api').ListingAmenity[]>('/amenities/');
+export function fetchAmenities(categoryId?: number): Promise<import('@/types/api').ListingAmenity[]> {
+  const query = categoryId ? `?category=${encodeURIComponent(String(categoryId))}` : '?common=true';
+  return request<import('@/types/api').ListingAmenity[]>(`/amenities/${query}`);
 }
 
 export type ListingCreatePayload = {

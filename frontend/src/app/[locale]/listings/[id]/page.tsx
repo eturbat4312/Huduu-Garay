@@ -207,6 +207,13 @@ export default function ListingDetailPage() {
   // ---------- Render ----------
   if (!listing) return <p className="p-6">{t(locale as string, "loading")}</p>;
 
+  const amenities = listing.amenities.filter(
+    (option) => option.amenity_type !== "activity"
+  );
+  const activities = listing.amenities.filter(
+    (option) => option.amenity_type === "activity"
+  );
+
   const canViewPrivateLocation = listing.can_view_private_location || !!isOwner;
   const visibleLocation = [
     listing.location_city,
@@ -218,6 +225,8 @@ export default function ListingDetailPage() {
       ? `${listing.location_apartment} тоот`
       : "",
   ].filter(Boolean).join(", ");
+  const canViewHostContact = listing.host?.can_view_private_contact || !!isOwner;
+  const hostPhone = listing.host?.host_phone_number || listing.host?.phone;
 
   return (
     <main className="max-w-6xl mx-auto px-4 md:px-6 py-10 space-y-10">
@@ -470,17 +479,29 @@ export default function ListingDetailPage() {
             </li>
           </ul>
           {listing.amenities?.length > 0 && (
-            <div className="mt-4">
-              <h3 className="text-md font-bold mb-2">
-                {t(locale as string, "amenities_title")}
-              </h3>
-              <ul className="list-disc pl-5 text-sm text-gray-600">
-                {listing.amenities.map((a, i) => (
-                  <li key={i}>
-                    {t(locale as string, a.translation_key ?? a.name)}
-                  </li>
-                ))}
-              </ul>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              {amenities.length > 0 && (
+                <div>
+                  <h3 className="text-md mb-2 font-bold">
+                    Тохижилт, үйлчилгээ
+                  </h3>
+                  <ul className="list-disc pl-5 text-sm text-gray-600">
+                    {amenities.map((option) => (
+                      <li key={option.id}>{option.name}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {activities.length > 0 && (
+                <div>
+                  <h3 className="text-md mb-2 font-bold">Үйл ажиллагаа</h3>
+                  <ul className="list-disc pl-5 text-sm text-gray-600">
+                    {activities.map((option) => (
+                      <li key={option.id}>{option.name}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
           <p className="font-bold text-green-700 text-lg mt-4">
@@ -490,6 +511,29 @@ export default function ListingDetailPage() {
               Number(listing.price_per_night).toLocaleString()
             )}
           </p>
+
+          <div className="mt-6 border-t pt-4 space-y-1">
+            <h3 className="text-md font-bold">Түрээслүүлэгч</h3>
+            <p>{listing.host?.username || listing.host_username || "Тодорхойгүй"}</p>
+            {canViewHostContact ? (
+              <>
+                {hostPhone && (
+                  <p>
+                    Утас: <a className="text-green-700 underline" href={`tel:${hostPhone}`}>{hostPhone}</a>
+                  </p>
+                )}
+                {listing.host?.email && (
+                  <p>
+                    Имэйл: <a className="text-green-700 underline" href={`mailto:${listing.host.email}`}>{listing.host.email}</a>
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-500">
+                Утас, имэйл захиалга баталгаажсаны дараа харагдана.
+              </p>
+            )}
+          </div>
         </div>
       </div>
 

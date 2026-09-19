@@ -46,6 +46,11 @@ export type ListingImage = {
 export type ListingAmenity = {
   id: number;
   name: string;
+  amenity_type: 'amenity' | 'activity';
+  is_common: boolean;
+  categories: number[];
+  is_active: boolean;
+  sort_order: number;
 };
 
 export type ListingHost = {
@@ -53,6 +58,10 @@ export type ListingHost = {
   username: string;
   is_host: boolean;
   avatar?: string | null;
+  can_view_private_contact?: boolean;
+  email?: string;
+  phone?: string;
+  host_phone_number?: string;
 };
 
 export type ListingDetail = ListingSummary & {
@@ -131,6 +140,9 @@ export type BookingDetail = BookingSummary & {
   guest_count: number;
   service_fee: number | string;
   is_cancelled_by_host: boolean;
+  host_name?: string | null;
+  host_phone?: string | null;
+  host_email?: string | null;
   host_cancelled_at?: string | null;
   host_cancellation_reason?: string;
   host_cancellation_policy_version?: string;

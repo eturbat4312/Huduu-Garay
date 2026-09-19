@@ -26,6 +26,7 @@ from decimal import Decimal
 from google.oauth2 import id_token
 import uuid
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 # Claude: password reset imports
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -187,8 +188,26 @@ class CategoryListCreateView(generics.ListCreateAPIView):
 
 
 class AmenityListView(generics.ListAPIView):
-    queryset = Amenity.objects.all()
     serializer_class = AmenitySerializer
+
+    def get_queryset(self):
+        queryset = Amenity.objects.filter(is_active=True).prefetch_related("categories")
+        category = self.request.query_params.get("category", "").strip()
+        amenity_type = self.request.query_params.get("type", "").strip()
+        common_only = self.request.query_params.get("common", "").lower()
+
+        if category:
+            category_filter = Q(categories__name__iexact=category)
+            if category.isdigit():
+                category_filter |= Q(categories__id=int(category))
+            queryset = queryset.filter(Q(is_common=True) | category_filter).distinct()
+        elif common_only in {"1", "true", "yes"}:
+            queryset = queryset.filter(is_common=True)
+
+        if amenity_type in {Amenity.TYPE_AMENITY, Amenity.TYPE_ACTIVITY}:
+            queryset = queryset.filter(amenity_type=amenity_type)
+
+        return queryset.order_by("-amenity_type", "sort_order", "name")
 
 
 # ---------------------- LISTING ----------------------

@@ -91,6 +91,8 @@ export default function EditListingScreen() {
   // ── Amenities ──
   const [amenityOptions, setAmenityOptions] = useState<ListingAmenity[]>([]);
   const [amenityIds, setAmenityIds] = useState<number[]>([]);
+  const [initialCategoryId, setInitialCategoryId] = useState<number | null>(null);
+  const [initialAmenities, setInitialAmenities] = useState<ListingAmenity[]>([]);
 
   // ── Images ──
   const [existingImages, setExistingImages] = useState<ListingImage[]>([]);
@@ -106,9 +108,8 @@ export default function EditListingScreen() {
     Promise.all([
       fetchListing(id),
       fetchCategories(),
-      fetchAmenities(),
     ])
-      .then(([listing, cats, amenities]) => {
+      .then(([listing, cats]) => {
         // Pre-fill form
         setTitle(listing.title ?? '');
         setDescription(listing.description ?? '');
@@ -125,18 +126,51 @@ export default function EditListingScreen() {
         setPrice(rawPrice > 0 ? formatPrice(String(rawPrice)) : '');
         setBeds(listing.beds ?? 1);
         setMaxGuests(listing.max_guests ?? 1);
-        setCategoryId(listing.category?.id ?? null);
-        setAmenityIds(listing.amenities?.map((a) => a.id) ?? []);
+        const listingCategoryId = listing.category?.id ?? null;
+        const listingAmenities = listing.amenities ?? [];
+        setInitialCategoryId(listingCategoryId);
+        setInitialAmenities(listingAmenities);
+        setCategoryId(listingCategoryId);
+        setAmenityIds(listingAmenities.map((option) => option.id));
         setExistingImages(listing.images ?? []);
 
         setCategories(cats);
-        setAmenityOptions(amenities);
       })
       .catch((err: unknown) => {
         setInitError(err instanceof Error ? err.message : 'Мэдээлэл татахад алдаа гарлаа.');
       })
       .finally(() => setInitializing(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!categoryId) {
+      return;
+    }
+
+    let active = true;
+    fetchAmenities(categoryId)
+      .then((options) => {
+        if (!active) return;
+        const merged = [...options];
+        if (categoryId === initialCategoryId) {
+          for (const existing of initialAmenities) {
+            if (!merged.some((option) => option.id === existing.id)) {
+              merged.push(existing);
+            }
+          }
+        }
+        setAmenityOptions(merged);
+        const allowedIds = new Set(merged.map((option) => option.id));
+        setAmenityIds((current) => current.filter((optionId) => allowedIds.has(optionId)));
+      })
+      .catch(() => {
+        if (active) setAmenityOptions([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [categoryId, initialAmenities, initialCategoryId]);
 
   // ── Helpers ──
   const plainPrice = Number(price.replace(/,/g, ''));
@@ -237,6 +271,18 @@ export default function EditListingScreen() {
   };
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
+  const amenityGroups = [
+    {
+      key: 'amenity',
+      label: 'Тохижилт, үйлчилгээ',
+      options: amenityOptions.filter((option) => option.amenity_type === 'amenity'),
+    },
+    {
+      key: 'activity',
+      label: 'Үйл ажиллагаа',
+      options: amenityOptions.filter((option) => option.amenity_type === 'activity'),
+    },
+  ].filter((group) => group.options.length > 0);
   const inp = [S.input, { backgroundColor: inputBg, borderColor: borderCol, color: C.text }];
 
   // ── Loading / error ──
@@ -376,23 +422,35 @@ export default function EditListingScreen() {
           {/* Amenities */}
           {amenityOptions.length > 0 && (
             <>
-              <Text style={[S.label, { color: C.textSecondary, marginTop: Spacing.three }]}>Тохиромж</Text>
-              <View style={S.amenityGrid}>
-                {amenityOptions.map((a) => {
-                  const active = amenityIds.includes(a.id);
-                  return (
-                    <Pressable
-                      key={a.id}
-                      onPress={() => toggleAmenity(a.id)}
-                      style={[
-                        S.amenityChip,
-                        { borderColor: active ? '#16A34A' : borderCol, backgroundColor: active ? '#DCFCE7' : inputBg },
-                      ]}>
-                      <Text style={{ fontSize: 13, color: active ? '#166534' : C.text }}>{a.name}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <Text style={[S.label, { color: C.textSecondary, marginTop: Spacing.three }]}>Тохижилт ба үйл ажиллагаа</Text>
+              {amenityGroups.map((group) => (
+                <View key={group.key} style={S.amenityGroup}>
+                  <Text style={[S.amenityGroupTitle, { color: C.textSecondary }]}>
+                    {group.label}
+                  </Text>
+                  <View style={S.amenityGrid}>
+                    {group.options.map((option) => {
+                      const selected = amenityIds.includes(option.id);
+                      return (
+                        <Pressable
+                          key={option.id}
+                          onPress={() => toggleAmenity(option.id)}
+                          style={[
+                            S.amenityChip,
+                            {
+                              borderColor: selected ? '#16A34A' : borderCol,
+                              backgroundColor: selected ? '#DCFCE7' : inputBg,
+                            },
+                          ]}>
+                          <Text style={{ fontSize: 13, color: selected ? '#166534' : C.text }}>
+                            {option.name}{!option.is_active ? ' (идэвхгүй)' : ''}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
             </>
           )}
         </View>
@@ -505,7 +563,12 @@ export default function EditListingScreen() {
               {categories.map((cat) => (
                 <Pressable
                   key={cat.id}
-                  onPress={() => { setCategoryId(cat.id); setCatModalVisible(false); }}
+                  onPress={() => {
+                    setCategoryId(cat.id);
+                    setAmenityOptions([]);
+                    setAmenityIds([]);
+                    setCatModalVisible(false);
+                  }}
                   style={[
                     S.modalItem,
                     { borderBottomColor: borderCol },
@@ -563,6 +626,8 @@ const S = StyleSheet.create({
     alignItems: 'center', justifyContent: 'space-between',
   },
   amenityGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  amenityGroup: { gap: Spacing.one, marginTop: Spacing.one },
+  amenityGroupTitle: { fontSize: 13, fontWeight: '700' },
   amenityChip: {
     borderWidth: 1, borderRadius: 20,
     paddingHorizontal: 12, paddingVertical: 6,

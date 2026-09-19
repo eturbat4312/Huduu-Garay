@@ -21,14 +21,33 @@ type Props = {
   setFilters: (v: FilterValues) => void;
 };
 
-type AmenityOption = { name: string; translation_key: string };
+type AmenityOption = {
+  id: number;
+  name: string;
+  amenity_type: "amenity" | "activity";
+};
 
 export default function FilterBar({ locale, filters, setFilters }: Props) {
   const [amenities, setAmenities] = useState<AmenityOption[]>([]);
 
   useEffect(() => {
-    api.get<AmenityOption[]>("/amenities/").then((r) => setAmenities(r.data));
-  }, []);
+    let active = true;
+    api
+      .get<AmenityOption[]>("/amenities/", {
+        params: filters.category
+          ? { category: filters.category }
+          : { common: true },
+      })
+      .then((response) => {
+        if (active) setAmenities(response.data);
+      })
+      .catch(() => {
+        if (active) setAmenities([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [filters.category]);
 
   const toggleAmenity = (name: string) => {
     setFilters({
@@ -207,19 +226,26 @@ function AmenityPicker({
   const list = useMemo(() => {
     if (!q.trim()) return amenities;
     const s = q.toLowerCase();
-    return amenities.filter(
-      (a: AmenityOption) =>
-        (a.translation_key &&
-          (t(locale, a.translation_key) || "").toLowerCase().includes(s)) ||
-        a.name.toLowerCase().includes(s)
-    );
-  }, [q, amenities, locale]);
+    return amenities.filter((option) => option.name.toLowerCase().includes(s));
+  }, [q, amenities]);
   const count = selected.length;
+  const groups = [
+    {
+      key: "amenity",
+      label: "Тохижилт, үйлчилгээ",
+      options: list.filter((option) => option.amenity_type === "amenity"),
+    },
+    {
+      key: "activity",
+      label: "Үйл ажиллагаа",
+      options: list.filter((option) => option.amenity_type === "activity"),
+    },
+  ].filter((group) => group.options.length > 0);
 
   return (
     <div className="flex flex-col relative">
       <label className="text-xs font-medium mb-1 text-gray-600">
-        {t(locale, "amenities_label") || "Давуу талууд"}
+        Тохижилт, үйл ажиллагаа
       </label>
       <button
         ref={btnRef}
@@ -229,7 +255,7 @@ function AmenityPicker({
         <span>
           {count > 0
             ? `${t(locale, "selected") || "Сонгосон"}: ${count}`
-            : t(locale, "choose_amenities") || "Давуу тал сонгох"}
+            : "Сонголт хийх"}
         </span>
         <span className="ml-2 text-gray-500">▾</span>
       </button>
@@ -244,7 +270,7 @@ function AmenityPicker({
               type="text"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder={t(locale, "search_amenities") || "Давуу тал хайх..."}
+              placeholder="Тохижилт, үйл ажиллагаа хайх..."
               className="border rounded-lg px-3 py-2 flex-1"
             />
             <button
@@ -255,22 +281,32 @@ function AmenityPicker({
             </button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
-            {list.map((a) => {
-              const label = t(locale, a.translation_key) || a.name;
-              const checked = selected.includes(a.name);
-              return (
-                <label key={a.name} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => onToggle(a.name)}
-                  />
-                  <span className={checked ? "font-medium" : ""}>{label}</span>
-                </label>
-              );
-            })}
-            {list.length === 0 && (
+          <div className="max-h-64 space-y-4 overflow-y-auto pr-1">
+            {groups.map((group) => (
+              <div key={group.key}>
+                <h3 className="mb-2 text-sm font-semibold text-gray-700">
+                  {group.label}
+                </h3>
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                  {group.options.map((option) => {
+                    const checked = selected.includes(option.name);
+                    return (
+                      <label key={option.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => onToggle(option.name)}
+                        />
+                        <span className={checked ? "font-medium" : ""}>
+                          {option.name}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {groups.length === 0 && (
               <div className="col-span-full text-sm text-gray-500">
                 {t(locale, "no_results") || "Үр дүн олдсонгүй"}
               </div>

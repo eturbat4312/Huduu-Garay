@@ -17,7 +17,7 @@ export default function BookingSuccessScreen() {
           <Text style={styles.emoji}>🎉</Text>
           <Text style={[styles.title, { color: C.text }]}>Захиалга амжилттай!</Text>
           <Text style={[styles.sub, { color: C.textSecondary }]}>
-            Таны захиалга баталгаажлаа. Хост тантай холбогдох болно.
+            Таны захиалга баталгаажлаа. Түрээслүүлэгчийн холбоо барих мэдээллийг захиалгын дэлгэрэнгүйгээс харна уу.
           </Text>
 
           {booking_id && (

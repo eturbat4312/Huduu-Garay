@@ -12,7 +12,12 @@ import LoadingButton from "@/components/LoadingButton";
 import NumberStepper from "@/components/NumberStepper";
 import LocationField from "@/components/LocationField";
 
-type Amenity = { id: number; name: string; translation_key?: string };
+type Amenity = {
+  id: number;
+  name: string;
+  amenity_type: "amenity" | "activity";
+  is_active: boolean;
+};
 type Category = { id: number; name: string };
 type ListingImage = { id: number; image: string };
 
@@ -36,6 +41,12 @@ const getApiErrorMessage = (err: unknown, fallback: string) => {
   if (typeof data === "object" && data !== null && "detail" in data) {
     const message = (data as { detail?: unknown }).detail;
     if (typeof message === "string") return message;
+  }
+  if (typeof data === "object" && data !== null) {
+    const firstError = Object.values(data)[0];
+    if (Array.isArray(firstError) && typeof firstError[0] === "string") {
+      return firstError[0];
+    }
   }
 
   return fallback;
@@ -83,6 +94,8 @@ export default function EditListingPage() {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [allAmenities, setAllAmenities] = useState<Amenity[]>([]);
+  const [initialCategoryId, setInitialCategoryId] = useState<number | null>(null);
+  const [initialAmenities, setInitialAmenities] = useState<Amenity[]>([]);
   const [images, setImages] = useState<ListingImage[]>([]);
   const [newImages, setNewImages] = useState<File[]>([]);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
@@ -103,19 +116,19 @@ export default function EditListingPage() {
     const fetchData = async () => {
       const [
         listingRes,
-        amenitiesRes,
         categoriesRes,
         availabilityRes,
         bookingsRes,
       ] = await Promise.all([
         api.get(`/listings/${id}/`),
-        api.get("/amenities/"),
         api.get("/categories/"),
         api.get(`/availability/?listing=${id}`),
         api.get("/host-bookings/"),
       ]);
 
       const listing = listingRes.data;
+      const listingCategoryId = listing.category?.id || null;
+      const listingAmenities = (listing.amenities || []) as Amenity[];
       setForm({
         title: listing.title,
         description: listing.description,
@@ -130,12 +143,13 @@ export default function EditListingPage() {
         location_lng: listing.location_lng,
         beds: listing.beds,
         max_guests: listing.max_guests,
-        category_id: listing.category?.id || null,
-        amenity_ids: listing.amenities.map((a: Amenity) => a.id),
+        category_id: listingCategoryId,
+        amenity_ids: listingAmenities.map((a) => a.id),
       });
 
       setImages(listing.images || []);
-      setAllAmenities(amenitiesRes.data);
+      setInitialCategoryId(listingCategoryId);
+      setInitialAmenities(listingAmenities);
       setCategories(categoriesRes.data);
 
       const available = availabilityRes.data.map(
@@ -168,6 +182,56 @@ export default function EditListingPage() {
 
     if (id) fetchData();
   }, [id]);
+
+  useEffect(() => {
+    const categoryId = form.category_id;
+    if (!categoryId) {
+      return;
+    }
+
+    let active = true;
+    api
+      .get<Amenity[]>("/amenities/", { params: { category: categoryId } })
+      .then((res) => {
+        if (!active) return;
+        const merged = [...res.data];
+        if (categoryId === initialCategoryId) {
+          for (const existing of initialAmenities) {
+            if (!merged.some((option) => option.id === existing.id)) {
+              merged.push(existing);
+            }
+          }
+        }
+        setAllAmenities(merged);
+        const allowedIds = new Set(merged.map((option) => option.id));
+        setForm((current) => ({
+          ...current,
+          amenity_ids: current.amenity_ids.filter((optionId) =>
+            allowedIds.has(optionId)
+          ),
+        }));
+      })
+      .catch(() => {
+        if (active) setAllAmenities([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [form.category_id, initialAmenities, initialCategoryId]);
+
+  const amenityGroups = [
+    {
+      key: "amenity",
+      label: "Тохижилт, үйлчилгээ",
+      options: allAmenities.filter((option) => option.amenity_type === "amenity"),
+    },
+    {
+      key: "activity",
+      label: "Үйл ажиллагаа",
+      options: allAmenities.filter((option) => option.amenity_type === "activity"),
+    },
+  ].filter((group) => group.options.length > 0);
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -500,7 +564,16 @@ export default function EditListingPage() {
             <select
               name="category_id"
               value={form.category_id || ""}
-              onChange={handleInputChange}
+              onChange={(event) => {
+                setAllAmenities([]);
+                setForm((current) => ({
+                  ...current,
+                  category_id: event.target.value
+                    ? Number(event.target.value)
+                    : null,
+                  amenity_ids: [],
+                }));
+              }}
               className="border p-2 rounded w-full"
             >
               <option value="">Сонгох...</option>
@@ -515,18 +588,40 @@ export default function EditListingPage() {
           {/* Amenities */}
           <div>
             <h2 className="font-semibold mb-2">
-              {t(locale, "form_amenities")}
+              Тохижилт ба үйл ажиллагаа
             </h2>
-            <div className="grid grid-cols-2 gap-2">
-              {allAmenities.map((a) => (
-                <label key={a.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.amenity_ids.includes(a.id)}
-                    onChange={() => handleAmenityToggle(a.id)}
-                  />
-                  {a.name}
-                </label>
+            <div className="space-y-4">
+              {!form.category_id && (
+                <p className="text-sm text-gray-500">
+                  Эхлээд байрны ангиллаа сонгоно уу.
+                </p>
+              )}
+              {form.category_id && amenityGroups.length === 0 && (
+                <p className="text-sm text-gray-500">
+                  Энэ ангилалд сонгох тохижилт одоогоор алга.
+                </p>
+              )}
+              {amenityGroups.map((group) => (
+                <div key={group.key}>
+                  <h3 className="mb-2 text-sm font-semibold text-gray-700">
+                    {group.label}
+                  </h3>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {group.options.map((a) => (
+                      <label key={a.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={form.amenity_ids.includes(a.id)}
+                          onChange={() => handleAmenityToggle(a.id)}
+                        />
+                        <span>
+                          {a.name}
+                          {!a.is_active ? " (идэвхгүй)" : ""}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

@@ -23,8 +23,9 @@ type Props = {
 };
 
 type AmenityOption = {
+  id: number;
   name: string;
-  translation_key: string;
+  amenity_type: "amenity" | "activity";
 };
 
 export default function FilterSidebar({
@@ -36,10 +37,36 @@ export default function FilterSidebar({
   const [amenityOptions, setAmenityOptions] = useState<AmenityOption[]>([]);
 
   useEffect(() => {
-    api.get<AmenityOption[]>("/amenities/").then((res) => {
-      setAmenityOptions(res.data);
-    });
-  }, []);
+    let active = true;
+    api
+      .get<AmenityOption[]>("/amenities/", {
+        params: filters.category
+          ? { category: filters.category }
+          : { common: true },
+      })
+      .then((res) => {
+        if (active) setAmenityOptions(res.data);
+      })
+      .catch(() => {
+        if (active) setAmenityOptions([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [filters.category]);
+
+  const amenityGroups = [
+    {
+      key: "amenity",
+      label: "Тохижилт, үйлчилгээ",
+      options: amenityOptions.filter((option) => option.amenity_type === "amenity"),
+    },
+    {
+      key: "activity",
+      label: "Үйл ажиллагаа",
+      options: amenityOptions.filter((option) => option.amenity_type === "activity"),
+    },
+  ].filter((group) => group.options.length > 0);
 
   const handleAmenityToggle = (value: string) => {
     setFilters({
@@ -140,19 +167,28 @@ export default function FilterSidebar({
 
       {/* Amenities */}
       <div>
-        <label className="block mb-1 font-medium">
-          {t(locale, "amenities_label")}
+        <label className="block mb-2 font-medium">
+          Тохижилт, үйл ажиллагаа
         </label>
-        <div className="flex flex-col gap-1">
-          {amenityOptions.map((a) => (
-            <label key={a.name} className="flex gap-2 items-center text-sm">
-              <input
-                type="checkbox"
-                checked={filters.amenities.includes(a.name)}
-                onChange={() => handleAmenityToggle(a.name)}
-              />
-              {t(locale, a.translation_key) || a.name}
-            </label>
+        <div className="space-y-4">
+          {amenityGroups.map((group) => (
+            <div key={group.key}>
+              <h3 className="mb-1 text-sm font-semibold text-gray-700">
+                {group.label}
+              </h3>
+              <div className="flex flex-col gap-1">
+                {group.options.map((option) => (
+                  <label key={option.id} className="flex gap-2 items-center text-sm">
+                    <input
+                      type="checkbox"
+                      checked={filters.amenities.includes(option.name)}
+                      onChange={() => handleAmenityToggle(option.name)}
+                    />
+                    {option.name}
+                  </label>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>

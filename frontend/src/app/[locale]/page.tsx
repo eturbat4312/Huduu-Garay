@@ -127,6 +127,7 @@ export default function HomePage() {
               setFilters((f) => ({
                 ...f,
                 category: "",
+                amenities: [],
                 __refresh: Date.now(),
               }))
             }
@@ -152,6 +153,7 @@ export default function HomePage() {
                   setFilters((f) => ({
                     ...f,
                     category: c.name, // ✅ зөвхөн name хадгалж байна
+                    amenities: [],
                     __refresh: Date.now(),
                   }))
                 }

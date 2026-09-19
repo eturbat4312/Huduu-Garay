@@ -136,6 +136,103 @@ class CategoryTests(TestCase):
         self.assertEqual(r.status_code, 403)
 
 
+class CategoryAmenityTests(TestCase):
+    def setUp(self):
+        Amenity.objects.all().delete()
+        self.apartment = make_category("Орон Сууц")
+        self.ger = make_category("Гэр")
+        self.common = Amenity.objects.create(
+            name="Нийтлэг тест сонголт",
+            translation_key="test_common_amenity",
+            is_common=True,
+            sort_order=10,
+        )
+        self.elevator = Amenity.objects.create(
+            name="Орон сууцны тест сонголт",
+            translation_key="test_apartment_amenity",
+            sort_order=20,
+        )
+        self.elevator.categories.add(self.apartment)
+        self.horse = Amenity.objects.create(
+            name="Гэрийн тест үйл ажиллагаа",
+            translation_key="test_ger_activity",
+            amenity_type="activity",
+            sort_order=10,
+        )
+        self.horse.categories.add(self.ger)
+        self.inactive = Amenity.objects.create(
+            name="Хуучин сонголт",
+            is_common=True,
+            is_active=False,
+        )
+
+    def test_category_filter_returns_common_and_matching_options(self):
+        r = APIClient().get(f"/api/amenities/?category={self.apartment.id}")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(
+            {item["name"] for item in r.data},
+            {"Нийтлэг тест сонголт", "Орон сууцны тест сонголт"},
+        )
+
+    def test_category_filter_accepts_category_name(self):
+        r = APIClient().get("/api/amenities/", {"category": "Гэр"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(
+            {item["name"] for item in r.data},
+            {"Нийтлэг тест сонголт", "Гэрийн тест үйл ажиллагаа"},
+        )
+
+    def test_common_and_type_filters_exclude_inactive_options(self):
+        common = APIClient().get("/api/amenities/?common=true")
+        activities = APIClient().get("/api/amenities/?type=activity")
+        self.assertEqual(
+            [item["name"] for item in common.data],
+            ["Нийтлэг тест сонголт"],
+        )
+        self.assertEqual(
+            [item["name"] for item in activities.data],
+            ["Гэрийн тест үйл ажиллагаа"],
+        )
+
+    def test_listing_rejects_option_from_another_category(self):
+        host = make_user("amenity-host", email="amenity-host@x.com", is_host=True)
+        r = auth_client(host).post(
+            "/api/listings/",
+            {
+                "title": "Ангилалтай зар",
+                "description": "Тайлбар",
+                "price_per_night": 80000,
+                "max_guests": 3,
+                "beds": 2,
+                "category_id": self.apartment.id,
+                "amenity_ids": [self.horse.id],
+                "location_city": "УБ",
+                "location_district": "СБД",
+            },
+            format="json",
+        )
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("amenity_ids", r.data)
+
+    def test_existing_inactive_option_survives_unrelated_edit(self):
+        host = make_user("legacy-host", email="legacy-host@x.com", is_host=True)
+        listing = make_listing(host, self.apartment)
+        listing.amenities.add(self.inactive)
+
+        r = auth_client(host).patch(
+            f"/api/listings/{listing.id}/edit/",
+            {
+                "title": "Шинэ гарчиг",
+                "category_id": self.apartment.id,
+                "amenity_ids": [self.inactive.id],
+            },
+            format="json",
+        )
+
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(listing.amenities.filter(id=self.inactive.id).exists())
+
+
 # ── 4. LISTINGS ───────────────────────────────────────────────
 
 class ListingTests(TestCase):
@@ -174,8 +271,21 @@ class ListingTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data["id"], listing.id)
 
-    def test_private_location_requires_confirmed_booking(self):
+    def test_private_listing_details_require_confirmed_booking(self):
         listing = make_listing(self.host, self.cat)
+        self.host.phone = "88001122"
+        self.host.save(update_fields=["phone"])
+        with patch("core.models.send_notification_email"):
+            HostApplication.objects.create(
+                user=self.host,
+                full_name="Тест Түрээслүүлэгч",
+                phone_number="99112233",
+                bank_name="Хаан Банк",
+                account_number="12345678",
+                id_card_image="id_cards/test.jpg",
+                selfie_with_id="selfies/test.jpg",
+                status="approved",
+            )
         listing.location_khoroo = "1-р хороо"
         listing.location_extra = "Төв хороолол"
         listing.location_building = "15-р байр"
@@ -192,11 +302,31 @@ class ListingTests(TestCase):
         self.assertEqual(public.data["location_building"], "")
         self.assertEqual(public.data["location_apartment"], "")
         self.assertFalse(public.data["can_view_private_location"])
+        self.assertFalse(public.data["host"]["can_view_private_contact"])
+        self.assertNotIn("email", public.data["host"])
+        self.assertNotIn("phone", public.data["host"])
+        self.assertNotIn("host_phone_number", public.data["host"])
+        self.assertNotIn("address", public.data["host"])
+        self.assertNotIn("bio", public.data["host"])
+        self.assertNotIn("full_name", public.data["host"])
         self.assertEqual(guest_before_booking.data["location_building"], "")
         self.assertFalse(guest_before_booking.data["can_view_private_location"])
+        self.assertNotIn("email", guest_before_booking.data["host"])
         self.assertEqual(owner.data["location_building"], "15-р байр")
         self.assertEqual(owner.data["location_apartment"], "42")
         self.assertTrue(owner.data["can_view_private_location"])
+        self.assertTrue(owner.data["host"]["can_view_private_contact"])
+        self.assertEqual(owner.data["host"]["email"], self.host.email)
+        self.assertEqual(owner.data["host"]["phone"], "88001122")
+        self.assertEqual(owner.data["host"]["host_phone_number"], "99112233")
+
+        staff = make_user("listing-staff", email="listing-staff@x.com")
+        staff.is_staff = True
+        staff.save(update_fields=["is_staff"])
+        staff_response = auth_client(staff).get(f"/api/listings/{listing.id}/")
+        self.assertTrue(staff_response.data["host"]["can_view_private_contact"])
+        self.assertEqual(staff_response.data["host"]["email"], self.host.email)
+        self.assertEqual(staff_response.data["host"]["host_phone_number"], "99112233")
 
         booking = Booking.objects.create(
             listing=listing,
@@ -212,7 +342,10 @@ class ListingTests(TestCase):
         pending_booking = self.gc.get(f"/api/bookings/{booking.id}/")
         self.assertEqual(pending.data["location_building"], "")
         self.assertFalse(pending.data["can_view_private_location"])
+        self.assertNotIn("host_phone_number", pending.data["host"])
         self.assertEqual(pending_booking.data["listing"]["location_building"], "")
+        self.assertIsNone(pending_booking.data["host_phone"])
+        self.assertIsNone(pending_booking.data["host_email"])
 
         booking.status = "confirmed"
         booking.save(update_fields=["status"])
@@ -222,8 +355,15 @@ class ListingTests(TestCase):
         self.assertEqual(confirmed.data["location_building"], "15-р байр")
         self.assertEqual(confirmed.data["location_apartment"], "42")
         self.assertTrue(confirmed.data["can_view_private_location"])
+        self.assertTrue(confirmed.data["host"]["can_view_private_contact"])
+        self.assertEqual(confirmed.data["host"]["email"], self.host.email)
+        self.assertEqual(confirmed.data["host"]["phone"], "88001122")
+        self.assertEqual(confirmed.data["host"]["host_phone_number"], "99112233")
         self.assertEqual(booking_detail.data["listing"]["location_building"], "15-р байр")
         self.assertEqual(booking_detail.data["listing"]["location_apartment"], "42")
+        self.assertEqual(booking_detail.data["host_name"], "Тест Түрээслүүлэгч")
+        self.assertEqual(booking_detail.data["host_phone"], "99112233")
+        self.assertEqual(booking_detail.data["host_email"], self.host.email)
 
         booking.status = "cancelled"
         booking.guest_cancelled_at = timezone.now()
@@ -233,7 +373,10 @@ class ListingTests(TestCase):
 
         self.assertEqual(cancelled.data["location_building"], "")
         self.assertFalse(cancelled.data["can_view_private_location"])
+        self.assertNotIn("email", cancelled.data["host"])
         self.assertEqual(cancelled_booking.data["listing"]["location_apartment"], "")
+        self.assertIsNone(cancelled_booking.data["host_phone"])
+        self.assertIsNone(cancelled_booking.data["host_email"])
 
     def test_filter_by_category(self):
         cat2 = make_category("Гэр")
@@ -931,6 +1074,7 @@ class PasswordResetTests(TestCase):
 
 class AmenityTests(TestCase):
     def test_list(self):
+        Amenity.objects.all().delete()
         Amenity.objects.create(name="WiFi", translation_key="wifi")
         Amenity.objects.create(name="Паркинг", translation_key="parking")
         r = APIClient().get("/api/amenities/")

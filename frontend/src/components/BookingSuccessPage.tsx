@@ -103,8 +103,11 @@ export default function BookingSuccessPage({
           </p>
           <p>
             📱 {t(locale, "host_phone")}:{" "}
-            {booking.host_phone || t(locale, "none")}
+            {booking.host_phone || (confirmed
+              ? t(locale, "none")
+              : "Захиалга баталгаажсаны дараа харагдана")}
           </p>
+          {booking.host_email && <p>✉️ Имэйл: {booking.host_email}</p>}
         </div>
 
         <hr />

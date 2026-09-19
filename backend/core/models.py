@@ -52,10 +52,35 @@ class Category(models.Model):
 
 
 class Amenity(models.Model):
+    TYPE_AMENITY = "amenity"
+    TYPE_ACTIVITY = "activity"
+    TYPE_CHOICES = [
+        (TYPE_AMENITY, "Тохижилт, үйлчилгээ"),
+        (TYPE_ACTIVITY, "Үйл ажиллагаа"),
+    ]
+
     name = models.CharField(max_length=100, unique=True)
     icon = models.CharField(max_length=50, blank=True, null=True)
-    # translation_key = models.CharField(max_length=100, blank=True)
     translation_key = models.CharField(max_length=100, blank=True)
+    amenity_type = models.CharField(
+        "Төрөл",
+        max_length=20,
+        choices=TYPE_CHOICES,
+        default=TYPE_AMENITY,
+        db_index=True,
+    )
+    is_common = models.BooleanField("Бүх ангилалд нийтлэг", default=False, db_index=True)
+    categories = models.ManyToManyField(
+        Category,
+        blank=True,
+        related_name="amenity_options",
+        verbose_name="Хамаарах ангилал",
+    )
+    is_active = models.BooleanField("Идэвхтэй", default=True, db_index=True)
+    sort_order = models.PositiveIntegerField("Эрэмбэ", default=0)
+
+    class Meta:
+        ordering = ["-amenity_type", "sort_order", "name"]
 
     def __str__(self):
         return self.name

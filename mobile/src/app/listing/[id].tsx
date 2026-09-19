@@ -624,6 +624,14 @@ export default function ListingDetailScreen() {
       ? `${listing.location_apartment} тоот`
       : '',
   ].filter(Boolean).join(', ');
+  const canViewHostContact = listing.host?.can_view_private_contact || isOwner;
+  const hostPhone = listing.host?.host_phone_number || listing.host?.phone;
+  const amenities = listing.amenities.filter(
+    (option) => option.amenity_type !== 'activity'
+  );
+  const activities = listing.amenities.filter(
+    (option) => option.amenity_type === 'activity'
+  );
 
   return (
     <ThemedView style={styles.container}>
@@ -752,12 +760,26 @@ export default function ListingDetailScreen() {
 
           {listing.amenities.length > 0 ? (
             <View style={styles.section}>
-              <ThemedText type="smallBold">Тохижилт</ThemedText>
-              <View style={styles.amenities}>
-                {listing.amenities.map((amenity) => (
-                  <InfoPill key={amenity.id} label={amenity.name} />
-                ))}
-              </View>
+              {amenities.length > 0 ? (
+                <View style={styles.amenityGroup}>
+                  <ThemedText type="smallBold">Тохижилт, үйлчилгээ</ThemedText>
+                  <View style={styles.amenities}>
+                    {amenities.map((option) => (
+                      <InfoPill key={option.id} label={option.name} />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+              {activities.length > 0 ? (
+                <View style={styles.amenityGroup}>
+                  <ThemedText type="smallBold">Үйл ажиллагаа</ThemedText>
+                  <View style={styles.amenities}>
+                    {activities.map((option) => (
+                      <InfoPill key={option.id} label={option.name} />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
             </View>
           ) : null}
 
@@ -803,6 +825,20 @@ export default function ListingDetailScreen() {
             <View style={styles.section}>
               <ThemedText type="smallBold">Түрээслүүлэгч</ThemedText>
               <ThemedText themeColor="textSecondary">{listing.host_username}</ThemedText>
+              {canViewHostContact ? (
+                <>
+                  {hostPhone ? (
+                    <ThemedText selectable themeColor="textSecondary">Утас: {hostPhone}</ThemedText>
+                  ) : null}
+                  {listing.host?.email ? (
+                    <ThemedText selectable themeColor="textSecondary">Имэйл: {listing.host.email}</ThemedText>
+                  ) : null}
+                </>
+              ) : (
+                <ThemedText type="small" themeColor="textSecondary">
+                  Утас, имэйл захиалга баталгаажсаны дараа харагдана.
+                </ThemedText>
+              )}
             </View>
           ) : null}
 
@@ -964,6 +1000,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.two,
   },
+  amenityGroup: { gap: Spacing.two },
   pill: {
     borderWidth: 1,
     borderColor: '#E1E4EA',

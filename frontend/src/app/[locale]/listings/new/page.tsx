@@ -14,7 +14,11 @@ import LoadingButton from "@/components/LoadingButton";
 import LocationField from "@/components/LocationField"; // 🆕 MAP-PIN КОМПОНЕНТ
 
 type Category = { id: number; name: string };
-type Amenity = { id: number; name: string };
+type Amenity = {
+  id: number;
+  name: string;
+  amenity_type: "amenity" | "activity";
+};
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const IMAGE_TYPE_ERROR =
@@ -36,6 +40,12 @@ const getApiErrorMessage = (err: unknown, fallback: string) => {
   if (typeof data === "object" && data !== null && "detail" in data) {
     const message = (data as { detail?: unknown }).detail;
     if (typeof message === "string") return message;
+  }
+  if (typeof data === "object" && data !== null) {
+    const firstError = Object.values(data)[0];
+    if (Array.isArray(firstError) && typeof firstError[0] === "string") {
+      return firstError[0];
+    }
   }
 
   return fallback;
@@ -76,8 +86,43 @@ export default function CreateListingPage() {
   // ─── Load options ───────────────────────────────────────────────────────────
   useEffect(() => {
     api.get("/categories/").then((res) => setCategories(res.data));
-    api.get("/amenities/").then((res) => setAmenityOptions(res.data));
   }, []);
+
+  useEffect(() => {
+    if (!categoryId) {
+      return;
+    }
+
+    let active = true;
+    api
+      .get<Amenity[]>("/amenities/", { params: { category: categoryId } })
+      .then((res) => {
+        if (!active) return;
+        setAmenityOptions(res.data);
+        const allowedIds = new Set(res.data.map((option) => option.id));
+        setAmenityIds((current) => current.filter((id) => allowedIds.has(id)));
+      })
+      .catch(() => {
+        if (active) setAmenityOptions([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [categoryId]);
+
+  const amenityGroups = [
+    {
+      key: "amenity",
+      label: "Тохижилт, үйлчилгээ",
+      options: amenityOptions.filter((option) => option.amenity_type === "amenity"),
+    },
+    {
+      key: "activity",
+      label: "Үйл ажиллагаа",
+      options: amenityOptions.filter((option) => option.amenity_type === "activity"),
+    },
+  ].filter((group) => group.options.length > 0);
 
   // ─── Images ─────────────────────────────────────────────────────────────────
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -321,7 +366,11 @@ export default function CreateListingPage() {
                 <select
                   className="w-full border p-2 mt-1 rounded-md"
                   value={categoryId ?? ""}
-                  onChange={(e) => setCategoryId(Number(e.target.value))}
+                  onChange={(e) => {
+                    setCategoryId(e.target.value ? Number(e.target.value) : null);
+                    setAmenityOptions([]);
+                    setAmenityIds([]);
+                  }}
                   required
                 >
                   <option value="">
@@ -337,29 +386,45 @@ export default function CreateListingPage() {
 
               <div className="block">
                 <span className="block text-sm font-medium">
-                  {t(locale as string, "amenities_label")}
+                  Тохижилт ба үйл ажиллагаа
                 </span>
-                <div className="grid grid-cols-2 gap-2 mt-2 border rounded-md p-3 max-h-44 overflow-auto">
-                  {amenityOptions.map((a) => (
-                    <label
-                      key={a.id}
-                      className="flex items-center gap-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        value={a.id}
-                        checked={amenityIds.includes(a.id)}
-                        onChange={(e) => {
-                          const id = Number(e.target.value);
-                          setAmenityIds((prev) =>
-                            prev.includes(id)
-                              ? prev.filter((x) => x !== id)
-                              : [...prev, id]
-                          );
-                        }}
-                      />
-                      <span>{a.name}</span>
-                    </label>
+                <div className="mt-2 border rounded-md p-3 max-h-64 overflow-auto space-y-4">
+                  {!categoryId && (
+                    <p className="text-sm text-gray-500">
+                      Эхлээд байрны ангиллаа сонгоно уу.
+                    </p>
+                  )}
+                  {categoryId && amenityGroups.length === 0 && (
+                    <p className="text-sm text-gray-500">
+                      Энэ ангилалд сонгох тохижилт одоогоор алга.
+                    </p>
+                  )}
+                  {amenityGroups.map((group) => (
+                    <div key={group.key}>
+                      <h3 className="mb-2 text-sm font-semibold text-gray-700">
+                        {group.label}
+                      </h3>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        {group.options.map((a) => (
+                          <label key={a.id} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              value={a.id}
+                              checked={amenityIds.includes(a.id)}
+                              onChange={(e) => {
+                                const optionId = Number(e.target.value);
+                                setAmenityIds((current) =>
+                                  current.includes(optionId)
+                                    ? current.filter((id) => id !== optionId)
+                                    : [...current, optionId]
+                                );
+                              }}
+                            />
+                            <span>{a.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>

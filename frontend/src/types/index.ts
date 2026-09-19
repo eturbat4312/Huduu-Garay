@@ -9,6 +9,11 @@ export type Category = {
     id: number;
     name: string;
     translation_key?: string;
+    amenity_type: "amenity" | "activity";
+    is_common: boolean;
+    categories: number[];
+    is_active: boolean;
+    sort_order: number;
   };
   
   export type ListingImage = {
@@ -18,6 +23,13 @@ export type Category = {
 
   export type Host = {
     id: number;
+    username?: string;
+    is_host?: boolean;
+    avatar?: string | null;
+    can_view_private_contact?: boolean;
+    email?: string;
+    phone?: string;
+    host_phone_number?: string;
   };
   
   export type Listing = {
@@ -110,6 +122,7 @@ export type Category = {
     is_unread: boolean;
     host_name?: string | null;
     host_phone?: string | null;
+    host_email?: string | null;
   };
 
   export type PaymentStatus =
