@@ -64,6 +64,7 @@ export type Category = {
   };
   
   export type User = {
+    facebook_connected?: boolean;
     id: number;
     username: string;
     email: string;

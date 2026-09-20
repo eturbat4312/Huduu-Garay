@@ -169,11 +169,17 @@ DB_HOST=localhost python manage.py test core.test_api --verbosity=2
 ## Деплой
 
 ```bash
-# Production
-docker compose up -d
+# Production (local override-ийг автоматаар ашиглахгүй)
+docker compose -f docker-compose.yml up -d --build
 
-# Local dev (override автомат apply)
-docker compose up
+# Local dev
+make local-up
+
+# Зөвхөн web container-ийг clean rebuild хийх
+make web-rebuild
+
+# Web log
+make web-logs
 ```
 
 - Backend: port 8010 (production: 127.0.0.1 only)

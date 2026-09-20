@@ -11,10 +11,10 @@ class EmailOrUsernameBackend(ModelBackend):
         # Try email first, then username
         try:
             if "@" in username:
-                user = User.objects.get(email=username)
+                user = User.objects.get(email__iexact=username.strip())
             else:
                 user = User.objects.get(username=username)
-        except User.DoesNotExist:
+        except (User.DoesNotExist, User.MultipleObjectsReturned):
             return None
 
         if user.check_password(password) and self.user_can_authenticate(user):

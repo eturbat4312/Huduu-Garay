@@ -1,5 +1,6 @@
 "use client";
 
+import axios from "axios";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import api from "@/lib/axios";
@@ -18,10 +19,14 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError("");
     try {
-      await api.post("/password-reset/", { email });
+      await api.post("/password-reset/", { email: email.trim(), locale });
       setSubmitted(true);
-    } catch {
-      setError("Алдаа гарлаа. Дахин оролдоно уу.");
+    } catch (err) {
+      setError(axios.isAxiosError(err)
+        ? err.response?.data?.error || (err.response?.status === 429
+          ? "Хэт олон хүсэлт илгээсэн байна. Түр хүлээгээд дахин оролдоно уу."
+          : "Хүсэлт илгээхэд алдаа гарлаа. Дахин оролдоно уу.")
+        : "Сүлжээний холболтоо шалгаад дахин оролдоно уу.");
     } finally {
       setLoading(false);
     }
@@ -32,12 +37,15 @@ export default function ForgotPasswordPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
         <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 w-full max-w-md text-center space-y-4">
           <div className="text-5xl">📧</div>
-          <h2 className="text-xl font-bold text-green-700">Имэйл илгээгдлээ!</h2>
+          <h2 className="text-xl font-bold text-green-700">Имэйлээ шалгана уу</h2>
           <p className="text-gray-600 text-sm">
-            <strong>{email}</strong> хаяг руу нууц үг сэргээх холбоос илгээгдлээ.
+            <strong>{email.trim()}</strong> хаяг бүртгэлтэй бол нууц үг сэргээх холбоос очно.
             Имэйлээ шалгаад холбоосоор орно уу.
           </p>
-          <p className="text-xs text-gray-400">Имэйл ирэхгүй байвал spam хавтсаа шалгана уу.</p>
+          <p className="text-xs text-gray-400">Имэйл ирэхгүй байвал Spam/Junk хавтас болон хаягаа шалгана уу. Асуудал үргэлжилбэл тусламжийн багтай холбогдоно уу.</p>
+          <button type="button" onClick={() => setSubmitted(false)} className="text-green-600 hover:underline text-sm">
+            Хаягаа засах / дахин илгээх
+          </button>
           <Link href={`/${locale}/login`} className="block text-green-600 hover:underline text-sm">
             ← Нэвтрэх хуудас руу буцах
           </Link>
@@ -52,6 +60,10 @@ export default function ForgotPasswordPage() {
         <h2 className="text-2xl font-bold text-center mb-2">Нууц үг сэргээх</h2>
         <p className="text-sm text-gray-500 text-center mb-6">
           Бүртгэлтэй имэйл хаягаа оруулна уу. Сэргээх холбоос явуулна.
+        </p>
+
+        <p className="text-sm text-gray-500 mb-4">
+          Google-ээр бүртгүүлсэн бол Google товчоор нэвтэрч болно. Эсвэл бүртгэлтэй имэйлээрээ холбоос авч, тухайн аккаунтдаа нууц үг тохируулна уу.
         </p>
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}

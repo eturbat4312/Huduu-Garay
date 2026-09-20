@@ -5,16 +5,9 @@ import { notFound } from "next/navigation";
 import { ReactNode } from "react";
 import Script from "next/script";
 
-import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import Navbar from "@/components/Navbar";
-
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Танайд Хоноё",
@@ -48,9 +41,7 @@ export default async function LocaleLayout({
           strategy="beforeInteractive"
         />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-pattern`}
-      >
+      <body className="antialiased bg-pattern">
         <AuthProvider>
           <NotificationProvider>
             <Navbar />

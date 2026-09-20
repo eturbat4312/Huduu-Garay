@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { facebookReturnPath } from "@/lib/facebook";
 import api from "@/lib/axios";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -49,7 +50,7 @@ export default function GoogleLoginButton() {
             localStorage.setItem("refresh_token", res.data.refresh);
 
             await login();
-            router.replace(`/${locale}`);
+            router.replace(facebookReturnPath(locale));
           } catch (err: unknown) {
             console.error("Google login error:", err);
             const responseError =

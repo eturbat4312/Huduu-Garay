@@ -27,17 +27,46 @@ User = get_user_model()
 # -------------------- AUTH --------------------
 
 
+def validate_unique_email(value, instance=None):
+    email = value.strip().lower()
+    users = User.objects.filter(email__iexact=email)
+    if instance is not None:
+        users = users.exclude(pk=instance.pk)
+    if users.exists():
+        raise serializers.ValidationError(
+            "Энэ имэйлээр бүртгэл байна. Нэвтрэх эсвэл нууц үгээ сэргээнэ үү."
+        )
+    return email
+
+
 class SignupSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(required=True, allow_blank=False)
+
+    def validate_email(self, value):
+        return validate_unique_email(value)
+
     class Meta:
         model = User
         fields = ["username", "email", "password"]
         extra_kwargs = {"password": {"write_only": True}}
 
     def create(self, validated_data):
-        return User.objects.create_user(**validated_data)
+        try:
+            with transaction.atomic():
+                return User.objects.create_user(**validated_data)
+        except IntegrityError:
+            raise serializers.ValidationError({"email": "Бүртгэлийн мэдээлэл давхардсан байна. Нэвтрэх эсвэл нууц үгээ сэргээнэ үү."})
 
 
 class UserSerializer(serializers.ModelSerializer):
+    facebook_connected = serializers.SerializerMethodField()
+
+    def get_facebook_connected(self, obj):
+        return hasattr(obj, "facebook_account")
+
+    def validate_email(self, value):
+        return validate_unique_email(value, self.instance)
+
     host_application_status = serializers.SerializerMethodField()
     # avatar = serializers.SerializerMethodField()
     avatar = serializers.ImageField(required=False, allow_null=True)
@@ -55,6 +84,7 @@ class UserSerializer(serializers.ModelSerializer):
             "email",
             "is_host",
             "host_application_status",
+            "facebook_connected",
             "avatar",
             "phone",
             "address",
@@ -89,7 +119,11 @@ class UserSerializer(serializers.ModelSerializer):
         # 🟢 User model талбаруудыг шинэчлэх
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        instance.save()
+        try:
+            with transaction.atomic():
+                instance.save()
+        except IntegrityError:
+            raise serializers.ValidationError({"email": "Энэ имэйлээр бүртгэл байна."})
 
         # 🟢 HostApplication update хийх
         # if instance.is_host and hostapp_data:

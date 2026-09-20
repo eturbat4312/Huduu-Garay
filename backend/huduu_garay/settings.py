@@ -136,6 +136,8 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
+    "CHECK_REVOKE_TOKEN": True,
+    "TOKEN_REFRESH_SERIALIZER": "core.auth_serializers.PasswordAwareTokenRefreshSerializer",
 }
 
 SOCIALACCOUNT_PROVIDERS = {
@@ -237,6 +239,10 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://www.tanaid-honoy.mn").rstrip("/")
+PASSWORD_RESET_TIMEOUT = 24 * 60 * 60
+EMAIL_TIMEOUT = 15
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL") or os.getenv("EMAIL_HOST_USER") or "webmaster@localhost"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
@@ -270,3 +276,11 @@ SITE_ID = 1  # 🔹 заавал байх ёстой
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# Facebook authorization-code flow: credentials are backend-only.
+FACEBOOK_ENABLED = os.getenv("FACEBOOK_ENABLED", "False").lower() in {"true", "1", "yes"}
+FACEBOOK_APP_ID = os.getenv("FACEBOOK_APP_ID", "")
+FACEBOOK_APP_SECRET = os.getenv("FACEBOOK_APP_SECRET", "")
+FACEBOOK_GRAPH_VERSION = os.getenv("FACEBOOK_GRAPH_VERSION", "v24.0")
+FACEBOOK_REDIRECT_URI = os.getenv("FACEBOOK_REDIRECT_URI", "https://www.tanaid-honoy.mn/api/auth/facebook/callback/")

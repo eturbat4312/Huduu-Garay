@@ -26,4 +26,5 @@ exec gunicorn huduu_garay.wsgi:application \
   --threads "${GUNICORN_THREADS}" \
   --timeout "${GUNICORN_TIMEOUT}" \
   --access-logfile - \
+  --access-logformat '%(h)s %(l)s %(u)s %(t)s "%(m)s %(U)s %(H)s" %(s)s %(b)s' \
   --error-logfile -

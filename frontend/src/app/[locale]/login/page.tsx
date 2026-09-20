@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { facebookReturnPath } from "@/lib/facebook";
 import api from "@/lib/axios";
 import { useAuth } from "@/context/AuthContext";
+import FacebookLoginButton from "@/components/FacebookLoginButton";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import { t } from "@/lib/i18n";
 import LoadingButton from "@/components/LoadingButton"; // ⭐ CHANGE: импорт нэмсэн
@@ -32,7 +34,7 @@ export default function LoginPage() {
       localStorage.setItem("refresh_token", data.refresh);
 
       await login();
-      router.replace(`/${locale}`);
+      router.replace(facebookReturnPath(locale));
     } catch (err: unknown) {
       const status =
         typeof err === "object" &&
@@ -106,6 +108,7 @@ export default function LoginPage() {
         </div>
 
         <GoogleLoginButton />
+        <FacebookLoginButton />
       </div>
     </div>
   );

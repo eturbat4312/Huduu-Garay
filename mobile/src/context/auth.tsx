@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from 'rea
 
 import { fetchMe, googleLogin as apiGoogleLogin, login as apiLogin, logout as apiLogout, signup as apiSignup, ACCESS_TOKEN_KEY } from '@/lib/api';
 import { getItem } from '@/lib/storage';
+import { storeFacebookTokens } from '@/lib/facebook';
 import type { UserProfile } from '@/types/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -21,6 +22,7 @@ type AuthContextValue = {
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  acceptFacebookSession: (tokens: { access: string; refresh: string }) => Promise<void>;
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -79,6 +81,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState({ status: 'authenticated', user });
   }, []);
 
+  const acceptFacebookSession = useCallback(async (tokens: { access: string; refresh: string }) => {
+    await storeFacebookTokens(tokens);
+    const user = await fetchMe();
+    setState({ status: 'authenticated', user });
+  }, []);
+
   const logout = useCallback(async () => {
     await apiLogout();
     setState({ status: 'guest' });
@@ -98,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     refresh,
     loginWithGoogle,
+    acceptFacebookSession,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

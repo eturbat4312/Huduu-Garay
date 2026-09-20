@@ -3,6 +3,7 @@
 
 import { useEffect, useState, ChangeEvent } from "react";
 import api from "@/lib/axios";
+import FacebookLoginButton from "@/components/FacebookLoginButton";
 import HostBankInfoSection from "@/components/HostBankInfoSection";
 import { User, HostApplication } from "@/types";
 import { useRefreshUser } from "@/context/AuthContext";
@@ -146,6 +147,7 @@ export default function ProfilePage() {
       <h1 className="text-3xl font-bold text-green-700">
         {t(locale, "profile_title")}
       </h1>
+      {user.facebook_connected ? <p className="text-sm text-green-700">✓ Facebook холбогдсон</p> : <FacebookLoginButton intent="connect" />}
 
       {errorMsg && <p className="text-red-600">{errorMsg}</p>}
       {successMsg && <p className="text-green-600">{successMsg}</p>}

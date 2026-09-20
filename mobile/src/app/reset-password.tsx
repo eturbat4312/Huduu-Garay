@@ -25,6 +25,7 @@ export default function ResetPasswordScreen() {
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async () => {
+    if (submitting) return;
     if (!uid || !token) {
       setError('Нууц үг шинэчлэх холбоос буруу байна. Шинэ холбоос авна уу.');
       return;
@@ -45,7 +46,7 @@ export default function ResetPasswordScreen() {
       setSuccess(true);
     } catch (err) {
       setError(err instanceof ApiError
-        ? err.message
+        ? (err.status === 429 ? "Хэт олон хүсэлт илгээсэн байна. Түр хүлээгээд дахин оролдоно уу." : err.message)
         : 'Нууц үг шинэчлэхэд алдаа гарлаа. Дахин оролдоно уу.');
     } finally {
       setSubmitting(false);
@@ -81,7 +82,7 @@ export default function ResetPasswordScreen() {
                 <View style={styles.header}>
                   <ThemedText type="subtitle">Нууц үг шинэчлэх</ThemedText>
                   <ThemedText themeColor="textSecondary">
-                    Шинэ нууц үгээ хоёр удаа оруулна уу.
+                    8–128 тэмдэгттэй, түгээмэл биш, дан тооноос бүрдээгүй нууц үгээ хоёр удаа оруулна уу.
                   </ThemedText>
                 </View>
 
@@ -97,6 +98,7 @@ export default function ResetPasswordScreen() {
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry
+                    maxLength={128}
                     autoCapitalize="none"
                     autoComplete="new-password"
                     placeholder="Хамгийн багадаа 8 тэмдэгт"
@@ -110,6 +112,7 @@ export default function ResetPasswordScreen() {
                     value={confirmation}
                     onChangeText={setConfirmation}
                     secureTextEntry
+                    maxLength={128}
                     autoCapitalize="none"
                     autoComplete="new-password"
                     returnKeyType="done"

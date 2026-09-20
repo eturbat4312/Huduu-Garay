@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     domains: ["localhost", "127.0.0.1", "tanaid-honoy.mn", "www.tanaid-honoy.mn"],
     remotePatterns: [
       { protocol: "http", hostname: "localhost", port: "8010", pathname: "/media/**" },
+      { protocol: "http", hostname: "localhost", port: "8011", pathname: "/media/**" },
       { protocol: "https", hostname: "tanaid-honoy.mn", pathname: "/media/**" },
       { protocol: "https", hostname: "www.tanaid-honoy.mn", pathname: "/media/**" },
     ],
@@ -29,7 +30,7 @@ const nextConfig: NextConfig = {
 
       // Хэрвээ зарим зураг DB-д "filename.jpg" шиг үндсэн root-т хадгалагдсан бол:
       // root-ын зураг файлуудыг /media руу чиглүүлж өгнө
-      { source: "/:file(.*\\.(?:png|jpe?g|webp|gif|avif))", destination: "http://localhost:8010/media/:file" },
+      { source: "/:file(.*\\.(?:png|jpe?g|webp|gif|avif))", destination: "http://backend:8010/media/:file" },
     ];
   },
 };

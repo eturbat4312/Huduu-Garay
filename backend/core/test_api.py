@@ -16,8 +16,8 @@ from core.services.cancellations import HOST_CANCELLATION_POLICY_VERSION
 User = get_user_model()
 
 
-def make_user(username="testuser", password="pass1234!", email="test@example.com", is_host=False):
-    u = User.objects.create_user(username=username, password=password, email=email)
+def make_user(username="testuser", password="pass1234!", email=None, is_host=False):
+    u = User.objects.create_user(username=username, password=password, email=email if email is not None else f"{username}@example.com")
     u.is_host = is_host
     u.save()
     return u

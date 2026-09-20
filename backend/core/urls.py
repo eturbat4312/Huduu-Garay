@@ -1,6 +1,10 @@
 from django.urls import path
 from django.conf.urls.static import static
 from django.conf import settings
+from .facebook_views import (
+    FacebookConfigView, FacebookStartView, FacebookCallbackView, FacebookExchangeView,
+    FacebookRegisterView, FacebookConnectView, FacebookSendCodeView,
+)
 from .views import (
     CategoryListCreateView,
     ListingListCreateView,
@@ -154,6 +158,13 @@ urlpatterns = [
     ),
     path("host/apply/", HostApplicationCreateView.as_view(), name="host-apply"),
     path("host/application/me/", HostApplicationMeView.as_view()),
+    path("auth/facebook/config/", FacebookConfigView.as_view()),
+    path("auth/facebook/start/", FacebookStartView.as_view()),
+    path("auth/facebook/callback/", FacebookCallbackView.as_view()),
+    path("auth/facebook/exchange/", FacebookExchangeView.as_view()),
+    path("auth/facebook/send-code/", FacebookSendCodeView.as_view()),
+    path("auth/facebook/register/", FacebookRegisterView.as_view()),
+    path("auth/facebook/connect/", FacebookConnectView.as_view()),
     path("auth/google/", GoogleLogin.as_view(), name="google_login"),
     # Claude: password reset
     path("password-reset/", PasswordResetRequestView.as_view(), name="password-reset"),

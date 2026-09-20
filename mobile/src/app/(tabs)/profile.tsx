@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
+import { FacebookSignInButton } from '@/components/facebook-sign-in-button';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { BottomTabInset, Colors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
@@ -104,6 +105,7 @@ export default function ProfileScreen() {
                 label="Google-ээр нэвтрэх"
                 onError={(msg) => setGoogleError(msg)}
               />
+              <FacebookSignInButton />
               {googleError ? (
                 <Text style={styles.errorText}>{googleError}</Text>
               ) : null}
@@ -162,6 +164,10 @@ export default function ProfileScreen() {
                 <Text style={styles.hostBadgeText}>🏠 Хост</Text>
               </View>
             )}
+
+            {user.facebook_connected
+              ? <Text style={{ color: '#16A34A', marginVertical: 8 }}>✓ Facebook холбогдсон</Text>
+              : <FacebookSignInButton intent="connect" />}
 
             {/* Профайл засах */}
             <Pressable

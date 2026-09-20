@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import FacebookLoginButton from "@/components/FacebookLoginButton";
 import GoogleLoginButton from "@/components/GoogleLoginButton";
 import { t } from "@/lib/i18n";
 import api from "@/lib/axios";
@@ -313,6 +314,7 @@ export default function SignupPage() {
         </p>
         <div className="flex justify-center">
           <GoogleLoginButton />
+        <FacebookLoginButton />
         </div>
       </form>
     </div>

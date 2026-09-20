@@ -4,6 +4,7 @@ import uuid
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models.functions import Lower, Trim
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
@@ -36,6 +37,13 @@ class CustomUser(AbstractUser):
     full_name = models.CharField(max_length=255, blank=True, null=True)
 
     class Meta(AbstractUser.Meta):
+        constraints = [
+            models.UniqueConstraint(
+                Lower(Trim("email")),
+                condition=~models.Q(email=""),
+                name="unique_user_email_case_insensitive",
+            ),
+        ]
         verbose_name = "Хэрэглэгч"
         verbose_name_plural = "Хэрэглэгчид"
 
@@ -989,3 +997,32 @@ class HostApplication(models.Model):
                     message="Таны түрээслүүлэгч болох өргөдөл татгалзагдлаа. Дэлгэрэнгүйг имэйлээс харна уу.",
                     type="host_rejected",
                 )
+
+
+class FacebookAccount(models.Model):
+    """An app-scoped Facebook identity belongs to exactly one local account."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="facebook_account")
+    facebook_id = models.CharField(max_length=128, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class FacebookAuthFlow(models.Model):
+    """Short-lived OAuth handshake; never stores Facebook or application access tokens."""
+
+    state_hash = models.CharField(max_length=64, primary_key=True)
+    challenge = models.CharField(max_length=64)
+    client = models.CharField(max_length=10)
+    locale = models.CharField(max_length=2, default="mn")
+    intent = models.CharField(max_length=10, default="login")
+    status = models.CharField(max_length=16, default="started")
+    exchange_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    pending_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    facebook_id = models.CharField(max_length=128, blank=True)
+    email = models.EmailField(blank=True)
+    email_code_hash = models.CharField(max_length=64, blank=True)
+    email_sent_at = models.DateTimeField(null=True, blank=True)
+    email_attempts = models.PositiveSmallIntegerField(default=0)
+    name = models.CharField(max_length=150, blank=True)
+    error = models.CharField(max_length=32, blank=True)
+    expires_at = models.DateTimeField(db_index=True)

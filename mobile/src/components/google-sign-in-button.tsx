@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Platform, Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { facebookReturnPath } from '@/lib/facebook';
 import { useAuth } from '@/context/auth';
 
 export const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
@@ -53,7 +54,7 @@ export function GoogleSignInButton({ label = 'Google-ээр нэвтрэх', onE
       if (!idToken) throw new Error('Google таних мэдээлэл ирсэнгүй.');
 
       await loginWithGoogle(idToken);
-      router.replace('/(tabs)/profile');
+      router.replace(await facebookReturnPath());
     } catch (err) {
       const googleModule = await import('@react-native-google-signin/google-signin');
       if (googleModule.isErrorWithCode(err)) {

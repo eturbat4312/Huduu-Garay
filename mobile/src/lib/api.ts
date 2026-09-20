@@ -557,3 +557,9 @@ export function mockConfirmPayment(paymentId: number | string): Promise<import('
     method: 'POST',
   });
 }
+
+export function connectFacebook(pendingToken: string): Promise<{ status: string }> {
+  return request('/auth/facebook/connect/', {
+    method: 'POST', body: { pending_token: pendingToken, confirm_link: true },
+  });
+}

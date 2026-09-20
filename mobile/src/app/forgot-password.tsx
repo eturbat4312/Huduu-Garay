@@ -35,7 +35,7 @@ export default function ForgotPasswordScreen() {
       setSent(true);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        setError(err.status === 429 ? "Хэт олон хүсэлт илгээсэн байна. Түр хүлээгээд дахин оролдоно уу." : err.message);
       } else {
         setError('Хүсэлт илгээхэд алдаа гарлаа. Дахин оролдоно уу.');
       }
@@ -70,18 +70,18 @@ export default function ForgotPasswordScreen() {
                   Имэйлээ шалгана уу
                 </ThemedText>
                 <ThemedText themeColor="textSecondary" style={styles.center}>
-                  <ThemedText type="smallBold">{email}</ThemedText> хаяг руу нууц үг
-                  шинэчлэх холбоос илгээгдлээ. Холбоосоор орж нууц үгээ шинэчилнэ үү.
+                  <ThemedText type="smallBold">{email}</ThemedText> хаяг бүртгэлтэй бол нууц үг
+                  шинэчлэх холбоос очно. Холбоосоор орж нууц үгээ шинэчилнэ үү.
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
-                  Имэйл ирэхгүй бол Spam/Junk хавтсыг шалгана уу.
+                  Имэйл ирэхгүй бол Spam/Junk хавтас болон хаягаа шалгана уу. Асуудал үргэлжилбэл тусламжийн багтай холбогдоно уу.
                 </ThemedText>
 
                 <Pressable
-                  onPress={() => { setSent(false); setEmail(''); }}
+                  onPress={() => { setSent(false); }}
                   style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
                   <ThemedText type="smallBold" style={styles.secondaryButtonText}>
-                    Өөр имэйл ашиглах
+                    Хаягаа засах / дахин илгээх
                   </ThemedText>
                 </Pressable>
 
@@ -100,7 +100,7 @@ export default function ForgotPasswordScreen() {
                   <ThemedText type="title">Нууц үг мартсан</ThemedText>
                   <ThemedText themeColor="textSecondary">
                     Бүртгэлтэй имэйл хаягаа оруулна уу. Нууц үг шинэчлэх холбоос
-                    илгээгдэх болно.
+                    илгээгдэх болно. Google-ээр бүртгүүлсэн бол Google товчоор нэвтэрч болно. Эсвэл энэ холбоосоор тухайн аккаунтдаа нууц үг тохируулна уу.
                   </ThemedText>
                 </View>
 

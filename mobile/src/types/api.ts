@@ -117,6 +117,7 @@ export type BookingCreatePayload = {
 };
 
 export type UserProfile = {
+  facebook_connected?: boolean;
   id: number;
   email: string;
   username: string;

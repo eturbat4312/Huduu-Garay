@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FacebookSignInButton } from '@/components/facebook-sign-in-button';
+import { facebookReturnPath } from '@/lib/facebook';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -49,7 +51,7 @@ export default function SignupScreen() {
     setIsSubmitting(true);
     try {
       await signup(email.trim(), username.trim(), password);
-      router.replace('/(tabs)/profile');
+      router.replace(await facebookReturnPath());
     } catch (err) {
       if (err instanceof ApiError) {
         const data = err.data as Record<string, unknown> | undefined;
@@ -94,6 +96,7 @@ export default function SignupScreen() {
                 label="Google-ээр бүртгүүлэх"
                 onError={(msg) => setError(msg)}
               />
+              <FacebookSignInButton />
 
               <View style={styles.divider}>
                 <View style={styles.dividerLine} />

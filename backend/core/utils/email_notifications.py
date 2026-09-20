@@ -211,8 +211,10 @@ def send_notification_email(user, notif_type, context):
             f"Таны бүртгэлд нууц үг сэргээх хүсэлт ирлээ.\n\n"
             f"Доорх холбоосоор орж нууц үгээ шинэчлэнэ үү:\n"
             f"{context['reset_link']}\n\n"
-            f"Энэ холбоос 24 цагийн дотор хүчинтэй байна.\n\n"
-            f"Хэрэв та хүсэлт илгээгээгүй бол энэ имэйлийг үл тоомсорлоно уу."
+            f"Энэ холбоос {settings.PASSWORD_RESET_TIMEOUT // 3600} цагийн дотор хүчинтэй бөгөөд нэг удаа ашиглана.\n\n"
+            + (f"Апп нээгдэхгүй бол вэбээр орно уу:\n{context['web_link']}\n\n"
+               if context.get("web_link") and context["web_link"] != context["reset_link"] else "")
+            + f"Хэрэв та хүсэлт илгээгээгүй бол энэ имэйлийг үл тоомсорлоно уу."
         )
 
     else:
@@ -220,10 +222,13 @@ def send_notification_email(user, notif_type, context):
         message = context.get("message", "Системээс шинэ мэдэгдэл ирлээ.")
 
     # Илгээх
-    send_mail(
+    sent = send_mail(
         subject=subject,
         message=message,
         from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email],
-        fail_silently=True,
+        fail_silently=notif_type != "password_reset",
     )
+
+    if notif_type == "password_reset" and sent != 1:
+        raise RuntimeError("Password recovery email was not sent")

@@ -1,5 +1,6 @@
 "use client";
 
+import axios from "axios";
 import { Suspense, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import api from "@/lib/axios";
@@ -38,13 +39,11 @@ function ResetPasswordForm() {
       await api.post("/password-reset/confirm/", { uid, token, new_password: password });
       setSuccess(true);
     } catch (err: unknown) {
-      const detail =
-        typeof err === "object" &&
-        err !== null &&
-        "response" in err
-          ? (err as { response?: { data?: { error?: string } } }).response?.data?.error
-          : undefined;
-      setError(detail || "Холбоос хүчингүй эсвэл хугацаа дууссан байна.");
+      setError(axios.isAxiosError(err)
+        ? err.response?.data?.error || (err.response?.status === 429
+          ? "Хэт олон хүсэлт илгээсэн байна. Түр хүлээгээд дахин оролдоно уу."
+          : "Хүсэлт илгээхэд алдаа гарлаа. Дахин оролдоно уу.")
+        : "Сүлжээний холболтоо шалгаад дахин оролдоно уу.");
     } finally {
       setLoading(false);
     }
@@ -70,9 +69,10 @@ function ResetPasswordForm() {
       <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 w-full max-w-md">
         <h2 className="text-2xl font-bold text-center mb-2">Нууц үг шинэчлэх</h2>
         <p className="text-sm text-gray-500 text-center mb-6">
-          Шинэ нууц үгээ оруулна уу.
+          8–128 тэмдэгттэй, түгээмэл биш, дан тооноос бүрдээгүй нууц үг оруулна уу.
         </p>
 
+        {(!uid || !token) && <p className="text-red-500 text-sm mb-4">Холбоосын мэдээлэл дутуу байна. Шинэ холбоос авна уу.</p>}
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
         <form onSubmit={handleSubmit}>
@@ -81,6 +81,9 @@ function ResetPasswordForm() {
           </label>
           <input
             type="password"
+            autoComplete="new-password"
+            minLength={8}
+            maxLength={128}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             className="w-full border border-gray-300 rounded px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -93,6 +96,9 @@ function ResetPasswordForm() {
           </label>
           <input
             type="password"
+            autoComplete="new-password"
+            minLength={8}
+            maxLength={128}
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             className="w-full border border-gray-300 rounded px-3 py-2 mb-6 focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -102,14 +108,17 @@ function ResetPasswordForm() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !uid || !token}
             className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-bold py-2 px-4 rounded"
           >
             {loading ? "Шинэчилж байна..." : "Нууц үг шинэчлэх"}
           </button>
         </form>
 
-        <div className="mt-4 text-center">
+        <div className="mt-4 text-center space-y-3">
+          <Link href={`/${locale}/forgot-password`} className="block text-sm text-green-600 hover:underline">
+            Шинэ холбоос авах
+          </Link>
           <Link href={`/${locale}/login`} className="text-sm text-green-600 hover:underline">
             ← Нэвтрэх хуудас руу буцах
           </Link>

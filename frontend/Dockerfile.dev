@@ -1,6 +1,15 @@
 # filename: frontend/Dockerfile.dev
-FROM node:18
+FROM node:20.19.4-bookworm-slim
+
 WORKDIR /app
+
+ENV NEXT_TELEMETRY_DISABLED=1
+
 COPY package*.json ./
-RUN npm install
+RUN npm ci --no-audit --no-fund \
+    && sha256sum package-lock.json | cut -d ' ' -f 1 > node_modules/.package-lock.sha256
+
+COPY docker/start-dev.sh /usr/local/bin/start-frontend-dev
+RUN chmod +x /usr/local/bin/start-frontend-dev
+
 # Кодыг run үед bind-mount-оор авна

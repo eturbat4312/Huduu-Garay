@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:20.19.4-alpine AS builder
 
 RUN apk add --no-cache libc6-compat
 
@@ -14,7 +14,7 @@ COPY . .
 RUN npm run build
 
 # Production image
-FROM node:18-alpine AS runner
+FROM node:20.19.4-alpine AS runner
 
 WORKDIR /app
 

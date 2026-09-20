@@ -7,6 +7,8 @@ from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import AnonRateThrottle
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from datetime import timedelta
 from PIL import Image, UnidentifiedImageError
@@ -160,7 +162,10 @@ class GoogleLogin(APIView):
                 )
 
             with transaction.atomic():
-                user = User.objects.filter(email__iexact=email).order_by("id").first()
+                matches = list(User.objects.filter(email__iexact=email)[:2])
+                if len(matches) > 1:
+                    return Response({"error": "Бүртгэлийн мэдээлэл давхардсан байна. Тусламжийн багтай холбогдоно уу."}, status=400)
+                user = matches[0] if matches else None
                 if user is None:
                     base_username = (email.split("@", 1)[0] or "google-user")[:150]
                     username = base_username
@@ -2055,71 +2060,95 @@ class HostApplicationMeView(APIView):
         return Response(serializer.errors, status=400)
 
 
-# Claude: password reset — request reset link
+class PasswordResetRequestThrottle(AnonRateThrottle):
+    scope = "password_reset_request"
+    rate = "10/hour"
+
+
+class PasswordResetConfirmThrottle(AnonRateThrottle):
+    scope = "password_reset_confirm"
+    rate = "30/hour"
+
+
 class PasswordResetRequestView(APIView):
+    authentication_classes = []
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [PasswordResetRequestThrottle]
 
     def post(self, request):
-        email = request.data.get("email", "").strip()
-        if not email:
-            return Response({"error": "Email шаардлагатай."}, status=400)
+        email = request.data.get("email")
+        if not isinstance(email, str):
+            return Response({"error": "Зөв имэйл хаяг оруулна уу."}, status=400)
+        try:
+            email = serializers.EmailField().run_validation(email).lower()
+        except serializers.ValidationError:
+            return Response({"error": "Зөв имэйл хаяг оруулна уу."}, status=400)
 
         client = request.data.get("client", "web")
-        if client not in {"web", "mobile"}:
-            return Response({"error": "Client төрөл буруу байна."}, status=400)
+        locale = request.data.get("locale", "mn")
+        if client not in ("web", "mobile") or locale not in ("mn", "en", "fr"):
+            return Response({"error": "Хүсэлтийн төрөл эсвэл хэл буруу байна."}, status=400)
 
-        User = get_user_model()
-        try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
-            # Security: always return 200 so attackers can't enumerate emails
+        # Never select an arbitrary account if legacy data contains duplicates.
+        users = list(User.objects.filter(email__iexact=email)[:2])
+        if len(users) != 1:
+            if users:
+                logger.error("Password recovery blocked: duplicate email accounts require review")
+            return Response({"detail": "ok"})
+        user = users[0]
+        if not user.is_active:
             return Response({"detail": "ok"})
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        if client == "mobile":
-            reset_link = f"tanaidhonoy://reset-password?uid={uid}&token={token}"
-        else:
-            frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:3000")
-            reset_link = f"{frontend_url}/mn/reset-password?uid={uid}&token={token}"
-
+        web_link = f"{settings.FRONTEND_URL.rstrip('/')}/{locale}/reset-password?uid={uid}&token={token}"
+        reset_link = (
+            f"tanaidhonoy://reset-password?uid={uid}&token={token}"
+            if client == "mobile" else web_link
+        )
         try:
             send_notification_email(
                 user=user,
                 notif_type="password_reset",
-                context={"reset_link": reset_link, "username": user.username},
+                context={"reset_link": reset_link, "web_link": web_link, "username": user.username},
             )
-        except Exception as e:
-            print(f"❌ Password reset email error: {e}")
-
+        except Exception:
+            logger.error("Password recovery email delivery failed")
+            return Response(
+                {"error": "Имэйл илгээхэд алдаа гарлаа. Түр хүлээгээд дахин оролдоно уу."},
+                status=503,
+            )
         return Response({"detail": "ok"})
 
 
-# Claude: password reset — set new password
 class PasswordResetConfirmView(APIView):
+    authentication_classes = []
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [PasswordResetConfirmThrottle]
 
     def post(self, request):
-        uid = request.data.get("uid", "")
-        token = request.data.get("token", "")
-        new_password = request.data.get("new_password", "")
+        uid = request.data.get("uid")
+        token = request.data.get("token")
+        new_password = request.data.get("new_password")
+        if not all(isinstance(value, str) and value for value in (uid, token, new_password)):
+            return Response({"error": "Бүх талбарыг зөв бөглөнө үү."}, status=400)
+        if len(new_password) > 128:
+            return Response({"error": "Нууц үг 128-аас ихгүй тэмдэгт байх ёстой."}, status=400)
 
-        if not uid or not token or not new_password:
-            return Response({"error": "Бүх талбарыг бөглөнө үү."}, status=400)
+        with transaction.atomic():
+            try:
+                pk = force_str(urlsafe_base64_decode(uid))
+                user = User.objects.select_for_update().get(pk=pk, is_active=True)
+            except (User.DoesNotExist, ValueError, TypeError, OverflowError, UnicodeError):
+                return Response({"error": "Холбоос буруу байна."}, status=400)
 
-        if len(new_password) < 8:
-            return Response({"error": "Нууц үг хамгийн багадаа 8 тэмдэгт байх ёстой."}, status=400)
+            if not default_token_generator.check_token(user, token):
+                return Response({"error": "Холбоос хүчингүй болсон байна. Шинэ холбоос авна уу."}, status=400)
+            try:
+                validate_password(new_password, user=user)
+            except DjangoValidationError as exc:
+                return Response({"error": " ".join(exc.messages)}, status=400)
 
-        User = get_user_model()
-        try:
-            pk = force_str(urlsafe_base64_decode(uid))
-            user = User.objects.get(pk=pk)
-        except (User.DoesNotExist, ValueError, TypeError):
-            return Response({"error": "Холбоос буруу байна."}, status=400)
-
-        if not default_token_generator.check_token(user, token):
-            return Response({"error": "Холбоос хүчингүй болсон байна. Дахин хүсэлт илгээнэ үү."}, status=400)
-
-        user.set_password(new_password)
-        user.save()
+            user.set_password(new_password)
+            user.save(update_fields=["password"])
         return Response({"detail": "Нууц үг амжилттай шинэчлэгдлээ."})

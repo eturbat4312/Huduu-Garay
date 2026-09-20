@@ -1798,3 +1798,18 @@ def booking_finance_detail_view(request, booking_id):
         or booking.guest_cancellation_policy_version,
     }
     return render(request, "admin/booking_finance_detail.html", context)
+
+
+# Read-only identity mapping; support staff may remove a verified user's Facebook link.
+from .models import FacebookAccount
+
+
+@admin.register(FacebookAccount)
+class FacebookAccountAdmin(admin.ModelAdmin):
+    list_display = ("user", "created_at")
+    search_fields = ("user__username", "user__email")
+    readonly_fields = ("user", "facebook_id", "created_at")
+    list_select_related = ("user",)
+
+    def has_add_permission(self, request):
+        return False

@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FacebookSignInButton } from '@/components/facebook-sign-in-button';
+import { facebookReturnPath } from '@/lib/facebook';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -35,7 +37,7 @@ export default function LoginScreen() {
     setIsSubmitting(true);
     try {
       await login(email.trim(), password);
-      router.replace('/(tabs)/profile');
+      router.replace(await facebookReturnPath());
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setError('Имэйл эсвэл нууц үг буруу байна.');
@@ -125,6 +127,7 @@ export default function LoginScreen() {
                 label="Google-ээр нэвтрэх"
                 onError={(msg) => setError(msg)}
               />
+              <FacebookSignInButton />
             </View>
 
             <View style={styles.footer}>
