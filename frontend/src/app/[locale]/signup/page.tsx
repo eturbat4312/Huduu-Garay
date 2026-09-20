@@ -310,11 +310,13 @@ export default function SignupPage() {
         <div className="my-6 border-t border-gray-200" />
 
         <p className="text-center text-gray-500 mb-2">
-          {L("or_with_google", "эсвэл Google-ээр")}
+          {L("or_text", "эсвэл")}
         </p>
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center">
           <GoogleLoginButton />
-        <FacebookLoginButton />
+          <div className="w-full">
+            <FacebookLoginButton />
+          </div>
         </div>
       </form>
     </div>
