@@ -22,6 +22,18 @@ load_dotenv()
 
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_CLIENT_IDS = tuple(
+    dict.fromkeys(
+        client_id.strip()
+        for client_id in (
+            os.getenv("GOOGLE_CLIENT_ID", ""),
+            os.getenv("GOOGLE_IOS_CLIENT_ID", ""),
+            os.getenv("GOOGLE_ANDROID_CLIENT_ID", ""),
+            *os.getenv("GOOGLE_CLIENT_IDS", "").split(","),
+        )
+        if client_id.strip()
+    )
+)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

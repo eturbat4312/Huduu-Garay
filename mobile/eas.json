@@ -1,0 +1,36 @@
+{
+  "cli": {
+    "version": ">= 16.28.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://www.tanaid-honoy.mn/api",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1074205961751-qd87fnoos6b6bjj8d3mdrlv0rjbj9f2u.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "1074205961751-egshclpstvb78p398re4h6noo4kaiake.apps.googleusercontent.com"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://www.tanaid-honoy.mn/api",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1074205961751-qd87fnoos6b6bjj8d3mdrlv0rjbj9f2u.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "1074205961751-egshclpstvb78p398re4h6noo4kaiake.apps.googleusercontent.com"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://www.tanaid-honoy.mn/api",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1074205961751-qd87fnoos6b6bjj8d3mdrlv0rjbj9f2u.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "1074205961751-egshclpstvb78p398re4h6noo4kaiake.apps.googleusercontent.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

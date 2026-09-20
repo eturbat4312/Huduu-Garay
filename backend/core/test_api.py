@@ -96,6 +96,79 @@ class SignupLoginTests(TestCase):
         self.assertEqual(r.status_code, 200)
 
 
+@override_settings(GOOGLE_CLIENT_IDS=("web-client.apps.googleusercontent.com",))
+class GoogleLoginTests(TestCase):
+    def post_google_token(self, token="valid-google-token"):
+        return APIClient().post(
+            "/api/auth/google/",
+            {"id_token": token},
+            format="json",
+        )
+
+    def test_missing_token_is_rejected(self):
+        response = APIClient().post("/api/auth/google/", {}, format="json")
+        self.assertEqual(response.status_code, 400)
+
+    @patch("core.views.id_token.verify_oauth2_token")
+    def test_unapproved_client_is_rejected(self, verify_token):
+        verify_token.return_value = {
+            "aud": "other-client.apps.googleusercontent.com",
+            "email": "google@example.com",
+            "email_verified": True,
+        }
+
+        response = self.post_google_token()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(User.objects.filter(email="google@example.com").exists())
+
+    @patch("core.views.id_token.verify_oauth2_token")
+    def test_unverified_email_is_rejected(self, verify_token):
+        verify_token.return_value = {
+            "aud": "web-client.apps.googleusercontent.com",
+            "email": "google@example.com",
+            "email_verified": False,
+        }
+
+        response = self.post_google_token()
+
+        self.assertEqual(response.status_code, 400)
+
+    @patch("core.views.id_token.verify_oauth2_token")
+    def test_google_login_creates_user_and_returns_tokens(self, verify_token):
+        verify_token.return_value = {
+            "aud": "web-client.apps.googleusercontent.com",
+            "email": "new.user@example.com",
+            "email_verified": True,
+            "given_name": "New",
+            "family_name": "User",
+        }
+
+        response = self.post_google_token()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+        user = User.objects.get(email="new.user@example.com")
+        self.assertEqual(user.first_name, "New")
+        self.assertFalse(user.has_usable_password())
+
+    @patch("core.views.id_token.verify_oauth2_token")
+    def test_google_login_reuses_existing_email(self, verify_token):
+        existing_user = make_user("existing", email="same@example.com")
+        verify_token.return_value = {
+            "aud": "web-client.apps.googleusercontent.com",
+            "email": "SAME@example.com",
+            "email_verified": True,
+        }
+
+        response = self.post_google_token()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(User.objects.filter(email__iexact="same@example.com").count(), 1)
+        self.assertTrue(User.objects.filter(id=existing_user.id).exists())
+
+
 # ── 2. ME ─────────────────────────────────────────────────────
 
 class MeTests(TestCase):

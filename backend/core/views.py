@@ -26,6 +26,7 @@ from core.services.booking_times import local_now, stay_has_ended
 from core.services.settlements import ensure_host_payout, sync_cancellation_settlements
 from decimal import Decimal
 from google.oauth2 import id_token
+import logging
 import uuid
 from django.db import IntegrityError, transaction
 from django.db.models import Q
@@ -83,6 +84,7 @@ from .serializers import (
 )
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 PAYMENT_HOLD_MINUTES = 15
 ALLOWED_LISTING_IMAGE_TYPES = {
     "image/jpeg",
@@ -120,28 +122,67 @@ class SignupView(generics.CreateAPIView):
 
 
 class GoogleLogin(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
     def post(self, request):
-        token = request.data.get("access_token")  # really it's an id_token
+        token = request.data.get("id_token") or request.data.get("access_token")
+        if not token:
+            return Response(
+                {"error": "Google нэвтрэх мэдээлэл дутуу байна."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        allowed_client_ids = set(settings.GOOGLE_CLIENT_IDS)
+        if not allowed_client_ids:
+            logger.error("Google login is enabled without GOOGLE_CLIENT_IDS")
+            return Response(
+                {"error": "Google нэвтрэх тохиргоо бүрэн хийгдээгүй байна."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         try:
             idinfo = id_token.verify_oauth2_token(token, google_requests.Request())
-            email = idinfo.get("email")
-            if not email:
-                return Response({"error": "Email not found in token"}, status=400)
+            audience = idinfo.get("aud")
+            token_audiences = set(audience if isinstance(audience, list) else [audience])
+            if not token_audiences.intersection(allowed_client_ids):
+                return Response(
+                    {"error": "Google нэвтрэх хүсэлт зөвшөөрөгдөөгүй байна."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-            base_username = email.split("@")[0]
-            username = base_username
+            email = (idinfo.get("email") or "").strip().lower()
+            email_verified = idinfo.get("email_verified") in {True, "true"}
+            if not email or not email_verified:
+                return Response(
+                    {"error": "Google имэйл баталгаажаагүй байна."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-            # username давхцахгүй болгож шалгана
-            counter = 1
-            while User.objects.filter(username=username).exists():
-                username = f"{base_username}{counter}"
-                counter += 1
+            with transaction.atomic():
+                user = User.objects.filter(email__iexact=email).order_by("id").first()
+                if user is None:
+                    base_username = (email.split("@", 1)[0] or "google-user")[:150]
+                    username = base_username
+                    counter = 1
+                    while User.objects.filter(username=username).exists():
+                        suffix = str(counter)
+                        username = f"{base_username[:150 - len(suffix)]}{suffix}"
+                        counter += 1
 
-            # хэрэглэгч авах эсвэл үүсгэх
-            user, created = User.objects.get_or_create(
-                email=email, defaults={"username": username}
-            )
+                    user = User.objects.create_user(
+                        username=username,
+                        email=email,
+                        password=None,
+                        first_name=(idinfo.get("given_name") or "")[:150],
+                        last_name=(idinfo.get("family_name") or "")[:150],
+                    )
+
+            if not user.is_active:
+                return Response(
+                    {"error": "Энэ хэрэглэгчийн эрх идэвхгүй байна."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
             refresh = RefreshToken.for_user(user)
             return Response(
@@ -151,10 +192,17 @@ class GoogleLogin(APIView):
                 }
             )
 
-        except IntegrityError as e:
-            return Response({"error": "Username already exists"}, status=400)
-        except Exception as e:
-            return Response({"error": str(e)}, status=400)
+        except (ValueError, IntegrityError):
+            return Response(
+                {"error": "Google нэвтрэх мэдээлэл хүчингүй байна."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception:
+            logger.exception("Google token verification failed")
+            return Response(
+                {"error": "Google нэвтрэх үйлчилгээтэй холбогдож чадсангүй."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
 
 # class GoogleOneTapLoginView(SocialLoginView):
