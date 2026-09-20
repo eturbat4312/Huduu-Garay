@@ -166,6 +166,20 @@ class AnalyticsTests(TestCase):
             session_hash="app-session-a",
             platform="android",
         )
+        previous_event_ids = []
+        for visitor in ("visitor-previous-a", "visitor-previous-b"):
+            event = PlatformAnalyticsEvent.objects.create(
+                event_id=uuid4(),
+                event_type="web_page_view",
+                visitor_hash=visitor,
+                session_hash=f"{visitor}-session",
+                path="/mn",
+                platform="web",
+            )
+            previous_event_ids.append(event.id)
+        PlatformAnalyticsEvent.objects.filter(id__in=previous_event_ids).update(
+            created_at=timezone.now() - timedelta(days=1)
+        )
         self.client.force_login(staff)
 
         response = self.client.get(
@@ -178,7 +192,16 @@ class AnalyticsTests(TestCase):
         self.assertEqual(response.context["period_unique_visitors"], 1)
         self.assertEqual(response.context["period_app_installs"], 1)
         self.assertEqual(len(response.context["overview_rows"]), 1)
+        self.assertEqual(response.context["traffic_metrics"]["visitors"]["value"], 1)
+        self.assertEqual(
+            response.context["traffic_metrics"]["visitors"]["change_label"],
+            "-50%",
+        )
+        self.assertEqual(response.context["traffic_metrics"]["visitors"]["previous"], 2)
+        self.assertEqual(response.context["traffic_chart_rows"][0]["visitors"], 1)
         self.assertContains(response, "Өдрөөр")
+        self.assertContains(response, "Зочлогчийн өөрчлөлт")
+        self.assertContains(response, "Өмнөх ижил хугацаанд 2")
         self.assertContains(response, "Аппын анхны нээлт")
 
     def test_admin_home_groups_the_year_by_month_and_keeps_model_admin_routes(self):

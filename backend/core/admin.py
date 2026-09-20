@@ -1285,6 +1285,48 @@ def _overview_trend(overview, payment_base):
     return rows
 
 
+def _growth_metric(current, previous):
+    if previous == 0:
+        if current > 0:
+            change_label = "Шинээр"
+            change_class = "positive"
+        else:
+            change_label = "0%"
+            change_class = "neutral"
+    else:
+        percent = round(((current - previous) / previous) * 100)
+        change_label = f"{percent:+d}%" if percent else "0%"
+        change_class = (
+            "positive" if percent > 0 else "negative" if percent < 0 else "neutral"
+        )
+    return {
+        "value": current,
+        "previous": previous,
+        "change_label": change_label,
+        "change_class": change_class,
+    }
+
+
+def _traffic_chart_rows(overview_rows):
+    rows = sorted(overview_rows, key=lambda row: row["label"])
+    max_visitors = max((row["unique_visitors"] for row in rows), default=0)
+    label_step = max(1, (len(rows) + 5) // 6)
+    chart_rows = []
+    for index, row in enumerate(rows):
+        visitors = row["unique_visitors"]
+        height = round((visitors / max_visitors) * 100) if max_visitors else 0
+        chart_rows.append(
+            {
+                "label": row["label"],
+                "short_label": row["label"][-5:].replace("-", "/"),
+                "visitors": visitors,
+                "height": max(height, 5) if visitors else 0,
+                "show_label": index % label_step == 0 or index == len(rows) - 1,
+            }
+        )
+    return chart_rows, max_visitors
+
+
 def stats_view(request):
     now = timezone.now()
     this_month_start = _month_start(now)
@@ -1335,6 +1377,46 @@ def stats_view(request):
         period_guest_fees + period_host_commissions - period_qpay_fees
     )
     overview_rows = _overview_trend(overview, payment_base)
+    traffic_chart_rows, traffic_chart_max = _traffic_chart_rows(overview_rows)
+    previous_period_end = overview["start_at"]
+    previous_period_start = previous_period_end - (
+        overview["end_at"] - overview["start_at"]
+    )
+    previous_events = PlatformAnalyticsEvent.objects.filter(
+        created_at__gte=previous_period_start, created_at__lt=previous_period_end
+    )
+    period_page_views = period_events.filter(
+        event_type=PlatformAnalyticsEvent.EVENT_WEB_PAGE_VIEW
+    ).count()
+    period_unique_visitors = (
+        period_events.filter(event_type=PlatformAnalyticsEvent.EVENT_WEB_PAGE_VIEW)
+        .values("visitor_hash")
+        .distinct()
+        .count()
+    )
+    period_app_installs = period_events.filter(
+        event_type=PlatformAnalyticsEvent.EVENT_APP_INSTALL
+    ).count()
+    period_app_opens = period_events.filter(
+        event_type=PlatformAnalyticsEvent.EVENT_APP_OPEN
+    ).count()
+    previous_page_views = previous_events.filter(
+        event_type=PlatformAnalyticsEvent.EVENT_WEB_PAGE_VIEW
+    ).count()
+    previous_unique_visitors = (
+        previous_events.filter(event_type=PlatformAnalyticsEvent.EVENT_WEB_PAGE_VIEW)
+        .values("visitor_hash")
+        .distinct()
+        .count()
+    )
+    previous_app_opens = previous_events.filter(
+        event_type=PlatformAnalyticsEvent.EVENT_APP_OPEN
+    ).count()
+    traffic_metrics = {
+        "visitors": _growth_metric(period_unique_visitors, previous_unique_visitors),
+        "page_views": _growth_metric(period_page_views, previous_page_views),
+        "app_opens": _growth_metric(period_app_opens, previous_app_opens),
+    }
     paid_to_hosts = int(
         HostPayout.objects.filter(status=HostPayout.STATUS_PAID).aggregate(total=Sum("net_amount"))[
             "total"
@@ -1584,21 +1666,13 @@ def stats_view(request):
         "period_confirmed_count": period_bookings.filter(status="confirmed").count(),
         "period_cancelled_count": period_bookings.filter(status="cancelled").count(),
         "period_new_users": period_users.count(),
-        "period_page_views": period_events.filter(
-            event_type=PlatformAnalyticsEvent.EVENT_WEB_PAGE_VIEW
-        ).count(),
-        "period_unique_visitors": period_events.filter(
-            event_type=PlatformAnalyticsEvent.EVENT_WEB_PAGE_VIEW
-        )
-        .values("visitor_hash")
-        .distinct()
-        .count(),
-        "period_app_installs": period_events.filter(
-            event_type=PlatformAnalyticsEvent.EVENT_APP_INSTALL
-        ).count(),
-        "period_app_opens": period_events.filter(
-            event_type=PlatformAnalyticsEvent.EVENT_APP_OPEN
-        ).count(),
+        "period_page_views": period_page_views,
+        "period_unique_visitors": period_unique_visitors,
+        "period_app_installs": period_app_installs,
+        "period_app_opens": period_app_opens,
+        "traffic_metrics": traffic_metrics,
+        "traffic_chart_rows": traffic_chart_rows,
+        "traffic_chart_max": traffic_chart_max,
         "analytics_data_available": PlatformAnalyticsEvent.objects.exists(),
         "all_page_views": all_page_views.count(),
         "all_unique_visitors": all_page_views.values("visitor_hash").distinct().count(),

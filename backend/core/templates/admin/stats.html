@@ -41,7 +41,7 @@
   .filters { display:grid; grid-template-columns:minmax(220px,2fr) repeat(4,minmax(150px,1fr)); gap:10px; align-items:end; margin-bottom:12px; }
   .filters label { display:block; color:var(--muted); font-size:12px; font-weight:700; margin-bottom:4px; }
   .filters input,.filters select { box-sizing:border-box; width:100%; min-height:36px; border:1px solid var(--line); border-radius:6px; padding:6px 9px; background:var(--surface); color:var(--text); }
-  .overview-filter { display:grid; grid-template-columns:repeat(5,minmax(145px,1fr)); gap:10px; align-items:end; margin:12px 0; }
+  .overview-filter { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:10px; align-items:end; margin:12px 0; }
   .overview-filter label { display:block; color:var(--muted); font-size:12px; font-weight:700; margin-bottom:4px; }
   .overview-filter input,.overview-filter select { box-sizing:border-box; width:100%; min-height:36px; border:1px solid var(--line); border-radius:6px; padding:6px 9px; background:var(--surface); color:var(--text); }
   .overview-filter button { min-height:36px; padding:0 14px; border:1px solid #175cd3; border-radius:6px; background:#175cd3; color:#fff; font-weight:700; cursor:pointer; }
@@ -50,8 +50,30 @@
   .pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px; }
   .pagination-links { display:flex; gap:6px; }
   .pagination a { padding:6px 10px; border:1px solid var(--line); border-radius:5px; text-decoration:none; }
+  .traffic-panel { border:1px solid var(--line); border-radius:8px; background:var(--surface); padding:16px; margin-top:12px; }
+  .traffic-metrics { display:grid; grid-template-columns:repeat(3,minmax(160px,1fr)); gap:0; border-bottom:1px solid var(--line); padding-bottom:14px; }
+  .traffic-metric { padding:0 16px; border-right:1px solid var(--line); }
+  .traffic-metric:first-child { padding-left:0; }
+  .traffic-metric:last-child { border-right:0; }
+  .traffic-value-row { display:flex; align-items:baseline; gap:9px; margin-top:5px; }
+  .traffic-value { font-size:25px; font-weight:750; }
+  .traffic-change { font-size:12px; font-weight:750; }
+  .traffic-change.positive { color:#067647; }
+  .traffic-change.negative { color:#b42318; }
+  .traffic-change.neutral { color:var(--muted); }
+  .traffic-chart-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0 8px; }
+  .traffic-chart-head strong { font-size:13px; }
+  .traffic-chart-scroll { overflow-x:auto; }
+  .traffic-chart { display:flex; align-items:stretch; min-width:100%; height:160px; border-bottom:1px solid var(--line); }
+  .traffic-chart-item { flex:1 0 34px; min-width:34px; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; }
+  .traffic-chart-value { height:18px; color:var(--muted); font-size:10px; line-height:18px; }
+  .traffic-chart-bar-space { width:100%; height:116px; display:flex; align-items:flex-end; justify-content:center; }
+  .traffic-chart-bar { width:min(20px,65%); background:#175cd3; border-radius:3px 3px 0 0; min-height:0; }
+  .traffic-chart-label { height:25px; padding-top:5px; color:var(--muted); font-size:10px; white-space:nowrap; }
+  .traffic-empty { height:120px; display:flex; align-items:center; justify-content:center; color:var(--muted); }
+  .traffic-footnote { color:var(--muted); font-size:11px; margin:10px 0 0; }
   @media (max-width:1100px) { .filters,.overview-filter { grid-template-columns:repeat(2,minmax(180px,1fr)); } }
-  @media (max-width:700px) { .page-heading { align-items:flex-start; flex-direction:column; } .filters,.overview-filter { grid-template-columns:1fr; } }
+  @media (max-width:700px) { .page-heading { align-items:flex-start; flex-direction:column; } .filters,.overview-filter { grid-template-columns:1fr; } .traffic-metrics { grid-template-columns:1fr; } .traffic-metric { border-right:0; border-bottom:1px solid var(--line); padding:12px 0; } .traffic-metric:first-child { padding-top:0; } .traffic-metric:last-child { border-bottom:0; padding-bottom:0; } }
 </style>
 
 {% timezone "Asia/Ulaanbaatar" %}
@@ -82,7 +104,6 @@
         <div><label for="overview_from">Эхлэх огноо</label><input id="overview_from" type="date" name="overview_from" value="{{ overview.start_date|date:'Y-m-d' }}"></div>
         <div><label for="overview_to">Дуусах огноо</label><input id="overview_to" type="date" name="overview_to" value="{{ overview.end_date|date:'Y-m-d' }}"></div>
         <div><label for="group_by">Бүлэглэх</label><select id="group_by" name="group_by"><option value="day"{% if overview.group_by == 'day' %} selected{% endif %}>Өдрөөр</option><option value="month"{% if overview.group_by == 'month' %} selected{% endif %}>Сараар</option></select></div>
-        <div><label for="overview_order">Эрэмбэ</label><select id="overview_order" name="overview_order"><option value="desc"{% if overview.order == 'desc' %} selected{% endif %}>Шинэ эхэнд</option><option value="asc"{% if overview.order == 'asc' %} selected{% endif %}>Хуучин эхэнд</option></select></div>
         <button type="submit">Тайлан харах</button>
       </div>
     </form>
@@ -92,12 +113,33 @@
       <div class="summary-card"><div class="summary-label">Зочдын нийт төлбөр</div><div class="summary-value">₮{{ period_total_received|floatformat:0 }}</div><div class="summary-note">QPay шимтгэл ₮{{ period_qpay_fees|floatformat:0 }}</div></div>
       <div class="summary-card"><div class="summary-label">Дансанд цэвэр орсон</div><div class="summary-value">₮{{ period_net_received|floatformat:0 }}</div></div>
       <div class="summary-card"><div class="summary-label">Тооцоолсон платформын орлого</div><div class="summary-value">₮{{ period_estimated_platform_income|floatformat:0 }}</div><div class="summary-note">Зочны шимтгэл + 10% − QPay 1%</div></div>
-      <div class="summary-card"><div class="summary-label">Вэб хуудас үзэлт</div><div class="summary-value">{{ period_page_views }}</div></div>
-      <div class="summary-card"><div class="summary-label">Давтагдаагүй зочлогч</div><div class="summary-value">{{ period_unique_visitors }}</div></div>
-      <div class="summary-card"><div class="summary-label">Аппын анхны нээлт</div><div class="summary-value">{{ period_app_installs }}</div><div class="summary-note">Нийт нээлт {{ period_app_opens }}</div></div>
     </div>
-    <div class="notice">Хандалт энэ хувилбарыг байршуулснаас хойш тоологдоно. “Аппын анхны нээлт” нь төхөөрөмж дээрх анхны амжилттай нээлт тул дэлгүүрийн албан ёсны таталтын тооны ойролцоо үзүүлэлт юм.</div>
-    <div class="table-wrap"><table class="finance-table"><thead><tr><th>{% if overview.group_by == 'day' %}Өдөр{% else %}Сар{% endif %}</th><th>Шинэ хэрэглэгч</th><th>Захиалга</th><th>Баталгаажсан</th><th>Цуцлагдсан</th><th>Төлөгдсөн захиалга</th><th>Нийт төлбөр</th><th>QPay шимтгэл</th><th>Цэвэр орсон</th><th>Хуудас үзэлт</th><th>Зочлогч</th><th>Апп анх нээсэн</th><th>Апп нээсэн</th></tr></thead><tbody>{% for row in overview_rows %}<tr><td class="primary">{{ row.label }}</td><td>{{ row.new_users }}</td><td>{{ row.bookings }}</td><td>{{ row.confirmed }}</td><td>{{ row.cancelled }}</td><td>{{ row.paid_bookings }}</td><td class="amount">₮{{ row.gross|floatformat:0 }}</td><td class="amount">₮{{ row.qpay_fees|floatformat:0 }}</td><td class="amount">₮{{ row.net_received|floatformat:0 }}</td><td>{{ row.page_views }}</td><td>{{ row.unique_visitors }}</td><td>{{ row.app_installs }}</td><td>{{ row.app_opens }}</td></tr>{% empty %}<tr><td colspan="13">Сонгосон хугацаанд мэдээлэл алга.</td></tr>{% endfor %}</tbody></table></div>
+    <div class="traffic-panel">
+      <div class="traffic-metrics">
+        <div class="traffic-metric">
+          <div class="summary-label">Давтагдаагүй зочлогч</div>
+          <div class="traffic-value-row"><span class="traffic-value">{{ traffic_metrics.visitors.value }}</span><span class="traffic-change {{ traffic_metrics.visitors.change_class }}">{{ traffic_metrics.visitors.change_label }}</span></div>
+          <div class="summary-note">Өмнөх ижил хугацаанд {{ traffic_metrics.visitors.previous }}</div>
+        </div>
+        <div class="traffic-metric">
+          <div class="summary-label">Хуудас үзэлт</div>
+          <div class="traffic-value-row"><span class="traffic-value">{{ traffic_metrics.page_views.value }}</span><span class="traffic-change {{ traffic_metrics.page_views.change_class }}">{{ traffic_metrics.page_views.change_label }}</span></div>
+          <div class="summary-note">Өмнөх ижил хугацаанд {{ traffic_metrics.page_views.previous }}</div>
+        </div>
+        <div class="traffic-metric">
+          <div class="summary-label">Апп нээсэн</div>
+          <div class="traffic-value-row"><span class="traffic-value">{{ traffic_metrics.app_opens.value }}</span><span class="traffic-change {{ traffic_metrics.app_opens.change_class }}">{{ traffic_metrics.app_opens.change_label }}</span></div>
+          <div class="summary-note">Анх нээсэн {{ period_app_installs }} · өмнөх нээлт {{ traffic_metrics.app_opens.previous }}</div>
+        </div>
+      </div>
+      <div class="traffic-chart-head"><strong>Зочлогчийн өөрчлөлт</strong><span class="secondary">{% if overview.group_by == 'day' %}Өдрөөр{% else %}Сараар{% endif %}</span></div>
+      {% if traffic_chart_max %}
+      <div class="traffic-chart-scroll"><div class="traffic-chart">
+        {% for row in traffic_chart_rows %}<div class="traffic-chart-item" title="{{ row.label }}: {{ row.visitors }} зочлогч"><div class="traffic-chart-value">{% if row.visitors %}{{ row.visitors }}{% endif %}</div><div class="traffic-chart-bar-space"><div class="traffic-chart-bar" style="height:{{ row.height }}%"></div></div><div class="traffic-chart-label">{% if row.show_label %}{{ row.short_label }}{% endif %}</div></div>{% endfor %}
+      </div></div>
+      {% else %}<div class="traffic-empty">Сонгосон хугацаанд хандалт бүртгэгдээгүй.</div>{% endif %}
+      <p class="traffic-footnote">Хандалт тоологчийг байршуулснаас хойших мэдээлэл. Аппын анхны нээлт нь дэлгүүрийн таталтын тооны ойролцоо үзүүлэлт.</p>
+    </div>
   </section>
 
   <section class="section">
