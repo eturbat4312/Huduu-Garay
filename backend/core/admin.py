@@ -744,10 +744,49 @@ class PlatformAnalyticsEventAdmin(admin.ModelAdmin):
 # ── Listing ───────────────────────────────────────────────────────────────────
 @admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
-    list_display = ("id", "title", "host_username", "location_display", "price_per_night", "is_active", "created_at")
-    list_filter = ("is_active", "category")
+    list_display = (
+        "id",
+        "title",
+        "host_username",
+        "location_display",
+        "price_per_night",
+        "status",
+        "is_active",
+        "created_at",
+    )
+    list_filter = ("status", "is_active", "category")
     search_fields = ("title", "host__username", "location_city", "location_district")
     ordering = ("-created_at",)
+    readonly_fields = ("created_at", "reviewed_at", "reviewed_by")
+    actions = (
+        "approve_listings",
+        "request_listing_changes",
+        "reject_listings",
+        "suspend_listings",
+    )
+
+    STATUS_MESSAGES = {
+        Listing.STATUS_ACTIVE: (
+            "✅ Таны '{title}' зар батлагдаж, нийтэд харагдаж эхэллээ.",
+            "Таны зар батлагдлаа",
+        ),
+        Listing.STATUS_CHANGES_REQUESTED: (
+            "✏️ Таны '{title}' зарт засвар шаардлагатай байна.{notes}",
+            "Таны зарт засвар шаардлагатай",
+        ),
+        Listing.STATUS_REJECTED: (
+            "❌ Таны '{title}' зарын хүсэлтийг баталсангүй.{notes}",
+            "Таны зар батлагдсангүй",
+        ),
+        Listing.STATUS_SUSPENDED: (
+            "⏸ Таны '{title}' зарыг түр хаалаа.{notes}",
+            "Таны зарыг түр хаалаа",
+        ),
+        Listing.STATUS_PENDING_REVIEW: (
+            "Таны '{title}' зар админы хяналт хүлээж байна.",
+            "Таны зар хяналт хүлээж байна",
+        ),
+    }
 
     def host_username(self, obj):
         return obj.host.username
@@ -756,6 +795,90 @@ class ListingAdmin(admin.ModelAdmin):
     def location_display(self, obj):
         return ", ".join(filter(None, [obj.location_city, obj.location_district]))
     location_display.short_description = "Байршил"
+
+    def _notify_host(self, listing):
+        template, subject = self.STATUS_MESSAGES[listing.status]
+        notes = f"\nТайлбар: {listing.review_notes}" if listing.review_notes else ""
+        message = template.format(title=listing.title, notes=notes)
+        Notification.objects.create(
+            user=listing.host,
+            message=message,
+            type=(
+                "listing_published"
+                if listing.status == Listing.STATUS_ACTIVE
+                else "listing_review"
+            ),
+            related_listing=listing,
+        )
+
+        if listing.host.email:
+            transaction.on_commit(
+                lambda: send_notification_email(
+                    listing.host,
+                    "listing_review",
+                    {"subject": subject, "message": message},
+                )
+            )
+
+    def _set_status(self, request, queryset, status):
+        count = 0
+        for listing in queryset.select_related("host"):
+            if listing.status == status:
+                continue
+            listing.status = status
+            listing.is_active = status not in {
+                Listing.STATUS_REJECTED,
+                Listing.STATUS_SUSPENDED,
+            }
+            listing.reviewed_at = timezone.now()
+            listing.reviewed_by = request.user
+            listing.save(
+                update_fields=[
+                    "status",
+                    "is_active",
+                    "reviewed_at",
+                    "reviewed_by",
+                ]
+            )
+            self._notify_host(listing)
+            count += 1
+        self.message_user(request, f"{count} зарын хяналтын төлөвийг шинэчиллээ.")
+
+    @admin.action(description="Сонгосон зарыг баталж нийтлэх")
+    def approve_listings(self, request, queryset):
+        self._set_status(request, queryset, Listing.STATUS_ACTIVE)
+
+    @admin.action(description="Сонгосон зарт засвар шаардах")
+    def request_listing_changes(self, request, queryset):
+        self._set_status(request, queryset, Listing.STATUS_CHANGES_REQUESTED)
+
+    @admin.action(description="Сонгосон зараас татгалзах")
+    def reject_listings(self, request, queryset):
+        self._set_status(request, queryset, Listing.STATUS_REJECTED)
+
+    @admin.action(description="Сонгосон зарыг түр хаах")
+    def suspend_listings(self, request, queryset):
+        self._set_status(request, queryset, Listing.STATUS_SUSPENDED)
+
+    def save_model(self, request, obj, form, change):
+        previous_status = None
+        if change and obj.pk:
+            previous_status = Listing.objects.filter(pk=obj.pk).values_list(
+                "status", flat=True
+            ).first()
+
+        if previous_status != obj.status:
+            obj.is_active = obj.status not in {
+                Listing.STATUS_REJECTED,
+                Listing.STATUS_SUSPENDED,
+            }
+            obj.reviewed_at = timezone.now()
+            obj.reviewed_by = request.user
+
+        super().save_model(request, obj, form, change)
+
+        if change and previous_status != obj.status:
+            self._notify_host(obj)
 
 
 # ── HostApplication ───────────────────────────────────────────────────────────

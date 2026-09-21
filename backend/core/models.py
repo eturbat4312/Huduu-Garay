@@ -112,6 +112,19 @@ class Amenity(models.Model):
 
 
 class Listing(models.Model):
+    STATUS_PENDING_REVIEW = "pending_review"
+    STATUS_ACTIVE = "active"
+    STATUS_CHANGES_REQUESTED = "changes_requested"
+    STATUS_REJECTED = "rejected"
+    STATUS_SUSPENDED = "suspended"
+    STATUS_CHOICES = [
+        (STATUS_PENDING_REVIEW, "Хяналт хүлээж байна"),
+        (STATUS_ACTIVE, "Нийтлэгдсэн"),
+        (STATUS_CHANGES_REQUESTED, "Засвар шаардлагатай"),
+        (STATUS_REJECTED, "Татгалзсан"),
+        (STATUS_SUSPENDED, "Түр хаасан"),
+    ]
+
     host = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="listings"
     )
@@ -135,6 +148,23 @@ class Listing(models.Model):
     location_lng = models.FloatField(blank=True, null=True)
 
     is_active = models.BooleanField(default=True)
+    status = models.CharField(
+        "Хяналтын төлөв",
+        max_length=24,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING_REVIEW,
+        db_index=True,
+    )
+    review_notes = models.TextField("Админы тайлбар", blank=True)
+    reviewed_at = models.DateTimeField("Хянасан огноо", null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_listings",
+        verbose_name="Хянасан ажилтан",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -797,6 +827,8 @@ class Notification(models.Model):
         ("host_rejected", "Түрээслүүлэгчийн хүсэлтээс татгалзсан"),
         ("review", "Сэтгэгдэл"),
         ("listing_published", "Зар нийтлэгдсэн"),
+        ("listing_review", "Зарын хяналтын төлөв"),
+        ("admin_listing_review", "Шалгах шинэ зар"),
         ("payment", "Төлбөр"),
         ("admin_support", "Шинэ тусламжийн хүсэлт (ажилтан)"),
         ("support_reply", "Тусламжийн хүсэлтийн хариу"),

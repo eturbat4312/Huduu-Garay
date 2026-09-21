@@ -118,7 +118,7 @@ class StaffActivityNotificationTests(TestCase):
                 location_city="Улаанбаатар",
                 location_district="Сүхбаатар",
             )
-        self.assert_staff_event("listing_published", send_email)
+        self.assert_staff_event("admin_listing_review", send_email)
 
         Notification.objects.all().delete()
         send_email.reset_mock()

@@ -39,6 +39,7 @@ class HostCancellationTests(TestCase):
             host=self.host,
             title="Host cancellation test",
             price_per_night=100000,
+            status=Listing.STATUS_ACTIVE,
         )
         self.booking = Booking.objects.create(
             listing=self.listing,
@@ -177,7 +178,9 @@ class HostCancellationTests(TestCase):
 
     def test_retry_is_idempotent_and_does_not_reopen_dates(self):
         self.assertEqual(self.cancel().status_code, 200)
-        notification_count = Notification.objects.count()
+        notification_count = Notification.objects.filter(
+            related_booking=self.booking
+        ).count()
         Availability.objects.filter(listing=self.listing).delete()
         Booking.objects.create(
             listing=self.listing,
@@ -190,7 +193,10 @@ class HostCancellationTests(TestCase):
         response = self.cancel()
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(Notification.objects.count(), notification_count)
+        self.assertEqual(
+            Notification.objects.filter(related_booking=self.booking).count(),
+            notification_count,
+        )
         self.assertFalse(Availability.objects.exists())
 
     @patch("core.views.send_notification_email")
@@ -217,7 +223,7 @@ class HostCancellationTests(TestCase):
             self.assertEqual(data[0]["booking_role"], role)
             self.assertEqual(data[0]["related_booking"], self.booking.pk)
             unread = self.client.get("/api/notifications/unread-count/").data
-            self.assertEqual(unread["booking_unread"], 1)
+            self.assertEqual(unread["booking_unread"], 2 if user.is_staff else 1)
 
     def test_host_detail_exposes_current_policy_only_to_host(self):
         response = self.client.get(f"/api/host-bookings/{self.booking.pk}/")

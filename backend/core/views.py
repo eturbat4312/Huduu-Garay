@@ -299,7 +299,10 @@ class ListingListCreateView(generics.ListCreateAPIView):
         return {"request": self.request}
 
     def get_queryset(self):
-        queryset = Listing.objects.all()
+        queryset = Listing.objects.filter(
+            is_active=True,
+            status=Listing.STATUS_ACTIVE,
+        ).prefetch_related("images", "category", "amenities")
 
         category = self.request.query_params.get("category")
         search = self.request.query_params.get("search")
@@ -341,15 +344,26 @@ class ListingListCreateView(generics.ListCreateAPIView):
         listing = serializer.save(host=self.request.user)
         Notification.objects.create(
             user=self.request.user,
-            message=f"🎉 Таны '{listing.title}' зар амжилттай нийтлэгдлээ!",
-            type="listing_published",
+            message=(
+                f"Таны '{listing.title}' зар админы хяналтад амжилттай илгээгдлээ. "
+                "Батлагдсаны дараа нийтэд харагдана."
+            ),
+            type="listing_review",
             related_listing=listing,
         )
 
 
 class ListingRetrieveView(RetrieveAPIView):
-    queryset = Listing.objects.all()
     serializer_class = ListingSerializer
+
+    def get_queryset(self):
+        public_filter = Q(is_active=True, status=Listing.STATUS_ACTIVE)
+        user = self.request.user
+        if user.is_authenticated:
+            if user.is_staff:
+                return Listing.objects.all()
+            return Listing.objects.filter(public_filter | Q(host=user))
+        return Listing.objects.filter(public_filter)
 
     def get_serializer_context(self):
         return {"request": self.request}
@@ -460,7 +474,19 @@ class AvailabilityListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         _release_expired_booking_holds()
-        queryset = Availability.objects.all()
+        public_filter = Q(
+            listing__is_active=True,
+            listing__status=Listing.STATUS_ACTIVE,
+        )
+        user = self.request.user
+        if user.is_authenticated and user.is_staff:
+            queryset = Availability.objects.all()
+        elif user.is_authenticated:
+            queryset = Availability.objects.filter(
+                public_filter | Q(listing__host=user)
+            )
+        else:
+            queryset = Availability.objects.filter(public_filter)
         listing_id = self.request.query_params.get("listing")
         if listing_id:
             queryset = queryset.filter(listing__id=listing_id)
@@ -1453,7 +1479,11 @@ class FavoriteListView(generics.ListAPIView):
     serializer_class = FavoriteSerializer
 
     def get_queryset(self):
-        return Favorite.objects.filter(user=self.request.user)
+        return Favorite.objects.filter(
+            user=self.request.user,
+            listing__is_active=True,
+            listing__status=Listing.STATUS_ACTIVE,
+        )
 
 
 class MyBookingView(generics.ListAPIView):
@@ -1684,7 +1714,7 @@ class NotificationListView(generics.ListAPIView):
         return Notification.objects.filter(user=self.request.user).select_related(
             "user", "related_booking__listing"
         ).order_by(
-            "-created_at"
+            "-created_at", "-id"
         )
 
 

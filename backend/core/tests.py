@@ -193,6 +193,7 @@ class ListingImageUploadTests(TestCase):
             beds=1,
             location_city="Ulaanbaatar",
             location_district="Sukhbaatar",
+            status=Listing.STATUS_ACTIVE,
         )
         self.other_listing = Listing.objects.create(
             host=self.other_host,
@@ -204,6 +205,7 @@ class ListingImageUploadTests(TestCase):
             beds=1,
             location_city="Ulaanbaatar",
             location_district="Sukhbaatar",
+            status=Listing.STATUS_ACTIVE,
         )
         self.client = APIClient()
         self.client.force_authenticate(user=self.host)
@@ -271,6 +273,7 @@ class PaymentFoundationTests(TestCase):
             beds=1,
             location_city="Ulaanbaatar",
             location_district="Sukhbaatar",
+            status=Listing.STATUS_ACTIVE,
         )
 
     def test_booking_defaults_to_confirmed_for_current_checkout_flow(self):
@@ -347,6 +350,7 @@ class BookingCreateRegressionTests(TestCase):
             beds=1,
             location_city="Ulaanbaatar",
             location_district="Sukhbaatar",
+            status=Listing.STATUS_ACTIVE,
         )
         self.check_in = date.today() + timedelta(days=1)
         self.check_out = date.today() + timedelta(days=3)
@@ -423,6 +427,7 @@ class PaymentApiSkeletonTests(TestCase):
             beds=1,
             location_city="Ulaanbaatar",
             location_district="Sukhbaatar",
+            status=Listing.STATUS_ACTIVE,
         )
         self.check_in = date.today() + timedelta(days=1)
         self.check_out = date.today() + timedelta(days=3)

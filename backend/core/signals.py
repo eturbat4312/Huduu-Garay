@@ -26,13 +26,14 @@ def notify_staff_about_new_listing(sender, instance, created, **kwargs):
     if not created:
         return
     notify_staff_activity(
-        notification_type="listing_published",
-        subject=f"Шинэ зар нийтлэгдлээ: {instance.title}",
+        notification_type="admin_listing_review",
+        subject=f"Шалгах шинэ зар ирлээ: {instance.title}",
         message=(
-            f"Шинэ зар #{instance.pk} нийтлэгдлээ. Зар: '{instance.title}'. "
+            f"Шинэ зар #{instance.pk} админы хяналтад ирлээ. Зар: '{instance.title}'. "
             f"Түрээслүүлэгч: {instance.host.username} ({instance.host.email or 'имэйлгүй'}). "
             f"Байршил: {instance.location_city}, {instance.location_district}. "
-            f"Нэг шөнийн үнэ: ₮{instance.price_per_night:,.0f}."
+            f"Нэг шөнийн үнэ: ₮{instance.price_per_night:,.0f}. "
+            "Админ хэсгээс шалгаж батална уу."
         ),
         related_listing=instance,
     )

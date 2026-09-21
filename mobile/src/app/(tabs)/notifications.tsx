@@ -31,6 +31,8 @@ function notifIcon(type: string): string {
     case 'host_rejected':      return '⛔';
     case 'review':             return '⭐';
     case 'listing_published':  return '🏠';
+    case 'listing_review':     return '📝';
+    case 'admin_listing_review': return '🔎';
     case 'payment':            return '💳';
     case 'admin_support':      return '🆘';
     case 'support_reply':      return '💬';

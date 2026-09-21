@@ -47,10 +47,7 @@ function getNotificationLink(n: Notification, locale: string): string {
       return `/${locale}/bookings/${n.related_booking}`;
     }
   }
-  if (n.type === "listing_published" && n.related_listing) {
-    return `/${locale}/listings/${n.related_listing}`;
-  }
-  if ((n.type === "review" || n.type === "comment") && n.related_listing) {
+  if (n.related_listing) {
     return `/${locale}/listings/${n.related_listing}`;
   }
   if (n.type === "host_approved") {

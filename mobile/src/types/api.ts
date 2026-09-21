@@ -19,6 +19,11 @@ export type ListingSummary = {
   average_rating: number | null;
   location_lat?: number | null;
   location_lng?: number | null;
+  is_active: boolean;
+  status: 'pending_review' | 'active' | 'changes_requested' | 'rejected' | 'suspended';
+  status_display?: string;
+  review_notes?: string;
+  created_at: string;
 };
 
 export type ListingCategory = {
@@ -175,6 +180,8 @@ export type NotificationItem = {
     | 'host_rejected'
     | 'review'
     | 'listing_published'
+    | 'listing_review'
+    | 'admin_listing_review'
     | 'payment'
     | 'booking'
     | 'comment'

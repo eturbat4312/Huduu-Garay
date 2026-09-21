@@ -41,6 +41,7 @@ def make_listing(host, category=None, price=50000, title="Тест байр"):
         host=host, category=cat, title=title, description="Тайлбар",
         price_per_night=price, max_guests=4, beds=2,
         location_city="Улаанбаатар", location_district="Баянзүрх",
+        status=Listing.STATUS_ACTIVE,
     )
 
 
@@ -323,6 +324,105 @@ class ListingTests(TestCase):
             "location_city": "УБ", "location_district": "СБД",
         }, format="json")
         self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.data["status"], Listing.STATUS_PENDING_REVIEW)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.host,
+                type="listing_review",
+                related_listing_id=r.data["id"],
+            ).exists()
+        )
+
+        listing_id = r.data["id"]
+        self.assertFalse(
+            any(item["id"] == listing_id for item in APIClient().get("/api/listings/").data)
+        )
+        self.assertEqual(
+            APIClient().get(f"/api/listings/{listing_id}/").status_code,
+            404,
+        )
+        self.assertEqual(
+            self.hc.get(f"/api/listings/{listing_id}/").status_code,
+            200,
+        )
+
+    def test_pending_listing_cannot_be_favorited_or_booked(self):
+        listing = Listing.objects.create(
+            host=self.host,
+            category=self.cat,
+            title="Хянагдаж буй зар",
+            description="x",
+            price_per_night=80000,
+            max_guests=3,
+            beds=2,
+            location_city="УБ",
+            location_district="СБД",
+        )
+
+        favorite = self.gc.post(
+            "/api/favorites/", {"listing_id": listing.id}, format="json"
+        )
+        booking = self.gc.post(
+            "/api/bookings/payment-intent/",
+            {
+                "listing_id": listing.id,
+                "check_in": str(date.today() + timedelta(days=2)),
+                "check_out": str(date.today() + timedelta(days=3)),
+                "full_name": "Зочин",
+                "phone_number": "99001122",
+                "guest_count": 1,
+            },
+            format="json",
+        )
+
+        self.assertEqual(favorite.status_code, 400)
+        self.assertEqual(booking.status_code, 400)
+
+    @patch("core.admin.send_notification_email", return_value=1)
+    def test_admin_approval_publishes_listing_and_notifies_host(self, send_email):
+        listing = Listing.objects.create(
+            host=self.host,
+            category=self.cat,
+            title="Батлуулах зар",
+            description="x",
+            price_per_night=80000,
+            location_city="УБ",
+            location_district="СБД",
+        )
+        staff = make_user("listing-admin", email="admin@x.com")
+        staff.is_staff = True
+        staff.is_superuser = True
+        staff.save(update_fields=["is_staff", "is_superuser"])
+        Notification.objects.filter(user=self.host).delete()
+        self.client.force_login(staff)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                "/admin/core/listing/",
+                {
+                    "action": "approve_listings",
+                    "_selected_action": [listing.id],
+                    "index": 0,
+                },
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        listing.refresh_from_db()
+        self.assertEqual(listing.status, Listing.STATUS_ACTIVE)
+        self.assertEqual(listing.reviewed_by, staff)
+        self.assertTrue(
+            Notification.objects.filter(
+                user=self.host,
+                type="listing_published",
+                related_listing=listing,
+            ).exists()
+        )
+        self.assertEqual(
+            APIClient().get(f"/api/listings/{listing.id}/").status_code,
+            200,
+        )
+        send_email.assert_called_once()
 
     def test_create_as_guest_blocked(self):
         r = self.gc.post("/api/listings/", {

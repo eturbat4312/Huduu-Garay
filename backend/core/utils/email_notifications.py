@@ -218,6 +218,10 @@ def send_notification_email(user, notif_type, context):
         subject = context["subject"]
         message = context["message"]
 
+    elif notif_type == "listing_review":
+        subject = context["subject"]
+        message = context["message"]
+
     # Claude: password reset email
     elif notif_type == "password_reset":
         subject = "🔐 Нууц үг сэргээх хүсэлт"

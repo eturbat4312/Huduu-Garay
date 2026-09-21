@@ -232,6 +232,7 @@ class ListingSerializer(serializers.ModelSerializer):
     host = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
     can_view_private_location = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
 
     category_id = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(), source="category", write_only=True
@@ -272,8 +273,20 @@ class ListingSerializer(serializers.ModelSerializer):
             "average_rating",
             "location_lat",
             "location_lng",
+            "is_active",
+            "status",
+            "status_display",
+            "review_notes",
+            "created_at",
         ]
-        read_only_fields = ("host",)
+        read_only_fields = (
+            "host",
+            "is_active",
+            "status",
+            "status_display",
+            "review_notes",
+            "created_at",
+        )
 
     def get_host_username(self, obj):
         return obj.host.username if obj.host else None
@@ -312,6 +325,14 @@ class ListingSerializer(serializers.ModelSerializer):
         if not data["can_view_private_location"]:
             data["location_building"] = ""
             data["location_apartment"] = ""
+        request = self.context.get("request")
+        can_view_review_notes = bool(
+            request
+            and request.user.is_authenticated
+            and (request.user.is_staff or instance.host_id == request.user.id)
+        )
+        if not can_view_review_notes:
+            data.pop("review_notes", None)
         return data
 
     def get_is_favorited(self, obj):
@@ -416,6 +437,11 @@ class FavoriteSerializer(serializers.ModelSerializer):
         model = Favorite
         fields = ["id", "listing", "listing_id"]
 
+    def validate_listing_id(self, listing):
+        if not listing.is_active or listing.status != Listing.STATUS_ACTIVE:
+            raise serializers.ValidationError("Энэ зар одоогоор нийтлэгдээгүй байна.")
+        return listing
+
 
 # -------------------- AVAILABILITY --------------------
 
@@ -509,6 +535,11 @@ class BookingSerializer(serializers.ModelSerializer):
             "service_fee", "guest_cancelled_at", "guest_cancellation_reason",
             "guest_cancellation_policy_version",
         ]
+
+    def validate_listing_id(self, listing):
+        if not listing.is_active or listing.status != Listing.STATUS_ACTIVE:
+            raise serializers.ValidationError("Энэ зар одоогоор захиалга авахгүй байна.")
+        return listing
 
     def get_guest_cancellation(self, obj):
         from .services.cancellations import (
@@ -624,6 +655,11 @@ class PendingBookingCreateSerializer(serializers.Serializer):
         check_in = attrs["check_in"]
         check_out = attrs["check_out"]
         guest_count = attrs["guest_count"]
+
+        if not listing.is_active or listing.status != Listing.STATUS_ACTIVE:
+            raise serializers.ValidationError(
+                {"listing_id": "Энэ зар одоогоор захиалга авахгүй байна."}
+            )
 
         if check_out < check_in:
             raise serializers.ValidationError(

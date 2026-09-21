@@ -648,6 +648,14 @@ export default function ListingDetailScreen() {
   const activities = listing.amenities.filter(
     (option) => option.amenity_type === 'activity'
   );
+  const moderationMessages: Record<string, string> = {
+    pending_review: 'Энэ зар админы хяналт хүлээж байна. Батлагдсаны дараа нийтэд харагдана.',
+    changes_requested: 'Энэ зарт засвар шаардлагатай байна.',
+    rejected: 'Энэ зар батлагдсангүй.',
+    suspended: 'Энэ зарыг түр хаасан байна.',
+  };
+  const moderationMessage = moderationMessages[listing.status];
+  const isPublished = listing.is_active && listing.status === 'active';
 
   return (
     <ThemedView style={styles.container}>
@@ -700,6 +708,16 @@ export default function ListingDetailScreen() {
         )}
 
         <View style={styles.body}>
+          {moderationMessage ? (
+            <View style={styles.moderationBanner}>
+              <Text style={styles.moderationTitle}>{moderationMessage}</Text>
+              {listing.review_notes ? (
+                <Text style={styles.moderationNotes}>
+                  Админы тайлбар: {listing.review_notes}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
           <View style={styles.header}>
             <View style={styles.titleRow}>
               <ThemedText type="title" style={{ flex: 1 }}>{listing.title}</ThemedText>
@@ -716,7 +734,7 @@ export default function ListingDetailScreen() {
                     <Text style={styles.actionBtnText}>🗑 Устгах</Text>
                   </Pressable>
                 </View>
-              ) : isLoggedIn ? (
+              ) : isLoggedIn && isPublished ? (
                 <Pressable onPress={handleFavorite} style={styles.favoriteBtn}>
                   <Text style={{ fontSize: 26 }}>{isFavorited ? '❤️' : '🤍'}</Text>
                 </Pressable>
@@ -739,7 +757,8 @@ export default function ListingDetailScreen() {
             {listing.average_rating ? <InfoPill label={`${listing.average_rating} үнэлгээ`} /> : null}
           </View>
 
-<View style={[styles.bookingPanel, { backgroundColor: C.backgroundElement, borderColor: C.backgroundSelected }]}>
+          {(isOwner || isPublished) && (
+          <View style={[styles.bookingPanel, { backgroundColor: C.backgroundElement, borderColor: C.backgroundSelected }]}>
             <ThemedText type="smallBold">
               {isOwner ? 'Боломжит огноо' : 'Захиалах өдөр сонгох'}
             </ThemedText>
@@ -809,6 +828,7 @@ export default function ListingDetailScreen() {
               </View>
             )}
           </View>
+          )}
 
           <View style={styles.section}>
             <ThemedText type="smallBold">Тайлбар</ThemedText>
@@ -1031,6 +1051,16 @@ const styles = StyleSheet.create({
     gap: Spacing.four,
     padding: Spacing.three,
   },
+  moderationBanner: {
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    borderRadius: 12,
+    backgroundColor: '#FFFBEB',
+    padding: Spacing.three,
+    gap: 4,
+  },
+  moderationTitle: { color: '#78350F', fontSize: 14, fontWeight: '700' },
+  moderationNotes: { color: '#92400E', fontSize: 13 },
   header: {
     gap: Spacing.two,
   },

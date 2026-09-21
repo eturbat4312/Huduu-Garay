@@ -24,6 +24,7 @@ class GuestCancellationTests(TestCase):
         self.other = User.objects.create_user(username="cancel_other")
         self.listing = Listing.objects.create(
             host=self.host, title="Cancellation test", price_per_night=100000,
+            status=Listing.STATUS_ACTIVE,
         )
         self.booking = Booking.objects.create(
             listing=self.listing, guest=self.guest, full_name="Test Guest",
@@ -159,7 +160,7 @@ class GuestCancellationTests(TestCase):
             self.assertEqual(data[0]["booking_role"], role)
             self.assertEqual(data[0]["related_booking"], self.booking.pk)
             unread = self.client.get("/api/notifications/unread-count/").data
-            self.assertEqual(unread["booking_unread"], 1)
+            self.assertEqual(unread["booking_unread"], 2 if user.is_staff else 1)
 
     def test_cancelled_booking_is_removed_from_calendar_and_cannot_be_reviewed(self):
         self.cancel()

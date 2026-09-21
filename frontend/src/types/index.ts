@@ -53,6 +53,14 @@ export type Category = {
     images: ListingImage[];
     is_active: boolean;
     created_at: string;
+    status:
+      | "pending_review"
+      | "active"
+      | "changes_requested"
+      | "rejected"
+      | "suspended";
+    status_display?: string;
+    review_notes?: string;
     is_favorited?: boolean;
     favorite_id?: number | null;
     host_username?: string;

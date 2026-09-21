@@ -327,8 +327,8 @@ export default function CreateListingScreen() {
       }
 
       Alert.alert(
-        '🎉 Амжилттай!',
-        `"${listing.title}" зар амжилттай нийтлэгдлээ.`,
+        'Амжилттай илгээлээ',
+        `"${listing.title}" зар админы хяналтад орлоо. Батлагдсаны дараа нийтэд харагдана.`,
         [{ text: 'OK', onPress: () => router.back() }]
       );
     } catch (err: unknown) {

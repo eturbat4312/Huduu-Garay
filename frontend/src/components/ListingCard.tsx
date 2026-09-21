@@ -32,6 +32,13 @@ export default function ListingCard({
   const price = Number(listing.price_per_night ?? 0);
   // Claude: null = no reviews yet, number = avg rating with 1 decimal
   const averageRating = listing.average_rating ?? null;
+  const moderationLabel: Record<string, string> = {
+    pending_review: "Админ шалгаж байна",
+    changes_requested: "Засвар шаардлагатай",
+    rejected: "Татгалзсан",
+    suspended: "Түр хаасан",
+  };
+  const statusLabel = moderationLabel[listing.status];
 
   const handleFavoriteToggle = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -70,6 +77,11 @@ export default function ListingCard({
       <div className="rounded-xl border overflow-hidden shadow-md hover:shadow-xl transition-all bg-white">
         {/* 📸 Image Carousel */}
         <div className="relative">
+          {statusLabel && (
+            <div className="absolute left-2 top-2 z-20 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900 shadow">
+              {statusLabel}
+            </div>
+          )}
           <button
             onClick={(e) => {
               e.preventDefault();
@@ -113,6 +125,7 @@ export default function ListingCard({
           </div>
 
           {/* ❤️ Favorite toggle */}
+          {listing.status === "active" && (
           <div className="absolute top-2 right-2 z-20">
             <button
               onClick={handleFavoriteToggle}
@@ -124,6 +137,7 @@ export default function ListingCard({
               {favorited ? "❤️" : "🤍"}
             </button>
           </div>
+          )}
         </div>
 
         {/* 📋 Info */}

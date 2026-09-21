@@ -227,9 +227,24 @@ export default function ListingDetailPage() {
   ].filter(Boolean).join(", ");
   const canViewHostContact = listing.host?.can_view_private_contact || !!isOwner;
   const hostPhone = listing.host?.host_phone_number || listing.host?.phone;
+  const moderationMessages: Record<string, string> = {
+    pending_review: "Энэ зар админы хяналт хүлээж байна. Батлагдсаны дараа нийтэд харагдана.",
+    changes_requested: "Энэ зарт засвар шаардлагатай байна.",
+    rejected: "Энэ зар батлагдсангүй.",
+    suspended: "Энэ зарыг түр хаасан байна.",
+  };
+  const moderationMessage = moderationMessages[listing.status];
 
   return (
     <main className="max-w-6xl mx-auto px-4 md:px-6 py-10 space-y-10">
+      {moderationMessage && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 text-amber-950">
+          <p className="font-semibold">{moderationMessage}</p>
+          {listing.review_notes && (
+            <p className="mt-1 text-sm">Админы тайлбар: {listing.review_notes}</p>
+          )}
+        </div>
+      )}
       {/* Cover image */}
       {listing.images?.[0] && (
         <div
@@ -259,7 +274,7 @@ export default function ListingDetailPage() {
                   <Trash2 size={16} /> {t(locale as string, "delete")}
                 </button>
               </>
-            ) : (
+            ) : listing.status === "active" ? (
               <button
                 onClick={() => setIsFavorited(!isFavorited)}
                 className="text-3xl"
@@ -271,7 +286,7 @@ export default function ListingDetailPage() {
               >
                 {isFavorited ? "❤️" : "🤍"}
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -384,7 +399,7 @@ export default function ListingDetailPage() {
             </div>
           </div>
 
-          {!isOwner && (
+          {!isOwner && listing.status === "active" && (
             <div className="w-full md:w-80 border p-4 rounded-xl bg-white shadow">
               <h2 className="text-lg font-semibold mb-4">
                 {t(locale as string, "booking_title")}

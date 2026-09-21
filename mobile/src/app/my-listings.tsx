@@ -70,6 +70,13 @@ export default function MyListingsScreen() {
             contentContainerStyle={{ gap: Spacing.three, paddingBottom: Spacing.five }}
             renderItem={({ item }) => {
               const thumbUrl = resolveMediaUrl(item.thumbnail);
+              const moderationLabels: Record<string, string> = {
+                pending_review: 'Админ шалгаж байна',
+                changes_requested: 'Засвар шаардлагатай',
+                rejected: 'Татгалзсан',
+                suspended: 'Түр хаасан',
+              };
+              const moderationLabel = moderationLabels[item.status];
               return (
                 <Pressable
                   onPress={() => router.push(`/listing/${item.id}` as never)}
@@ -87,6 +94,11 @@ export default function MyListingsScreen() {
                     </View>
                   )}
                   <View style={styles.cardBody}>
+                    {moderationLabel ? (
+                      <View style={styles.statusBadge}>
+                        <Text style={styles.statusBadgeText}>{moderationLabel}</Text>
+                      </View>
+                    ) : null}
                     <Text style={[styles.cardTitle, { color: C.text }]} numberOfLines={1}>
                       {item.title}
                     </Text>
@@ -141,6 +153,15 @@ const styles = StyleSheet.create({
   cardImage: { width: '100%', height: 180 },
   imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
   cardBody: { padding: Spacing.three, gap: Spacing.one },
+  statusBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  statusBadgeText: { color: '#78350F', fontSize: 12, fontWeight: '700' },
   cardTitle: { fontSize: 16, fontWeight: '700' },
   cardLocation: { fontSize: 13 },
   cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
