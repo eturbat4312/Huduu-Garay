@@ -3,7 +3,8 @@
  *
  * Web-ийн PaymentContent.tsx-тай ижил логик:
  *   • GET /payments/:id/ — эхний мэдээлэл татах
- *   • POST /payments/:id/check/ — 5 секунд тутам polling
+ *   • GET /payments/:id/ — 5 секунд тутам зөвхөн өөрийн database төлөв унших
+ *   • POST /payments/:id/check/ — хэрэглэгчийн гараар шалгах fallback
  *   • status === 'paid' → booking-success руу шилжих
  *   • Dev тест: "Төлбөр баталгаажуулах" товч (mock-confirm)
  */
@@ -42,6 +43,7 @@ export default function PaymentScreen() {
   const [error, setError] = useState(payment_id ? '' : 'Төлбөрийн дугаар олдсонгүй.');
   const [confirming, setConfirming] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopPolling = () => {
@@ -63,7 +65,9 @@ export default function PaymentScreen() {
   const poll = useCallback(async () => {
     if (!payment_id) return;
     try {
-      const p = await checkPayment(payment_id);
+      // QPay callback updates the payment. Background polling must only read
+      // our database; direct QPay checks stay behind the manual button.
+      const p = await fetchPayment(payment_id);
       setPayment(p);
       if (p.status === 'paid') handlePaid(p);
       else if (p.status !== 'pending') stopPolling(); // failed / expired / cancelled
@@ -90,6 +94,12 @@ export default function PaymentScreen() {
 
     return () => stopPolling();
   }, [payment_id, poll, handlePaid]);
+
+  useEffect(() => {
+    if (payment?.status !== 'pending') return;
+    const timerId = setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => clearInterval(timerId);
+  }, [payment?.status]);
 
   const handleMockConfirm = async () => {
     if (!payment_id) return;
@@ -137,6 +147,12 @@ export default function PaymentScreen() {
     : null;
   const bankUrls = payment?.raw_response.urls ?? [];
   const isMock = payment?.raw_response.mode === 'mock';
+  const remainingSeconds = payment?.booking?.hold_expires_at
+    ? Math.max(0, Math.ceil((new Date(payment.booking.hold_expires_at).getTime() - nowMs) / 1_000))
+    : null;
+  const remainingLabel = remainingSeconds === null
+    ? null
+    : `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, '0')}`;
 
   return (
     <ThemedView style={{ flex: 1 }}>
@@ -268,6 +284,7 @@ export default function PaymentScreen() {
                 <ActivityIndicator size="small" color="#16A34A" />
                 <ThemedText themeColor="textSecondary" type="small" style={{ marginLeft: 8 }}>
                   Төлбөрийн байдлыг шалгаж байна...
+                  {remainingLabel ? ` Үлдсэн хугацаа ${remainingLabel}` : ''}
                 </ThemedText>
               </View>
             )}

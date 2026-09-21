@@ -42,12 +42,33 @@ class FakeQPaySession:
 
     def post(self, url, headers=None, timeout=None, json=None):
         self.calls.append(
-            {"url": url, "headers": headers or {}, "timeout": timeout, "json": json}
+            {
+                "method": "POST",
+                "url": url,
+                "headers": headers or {},
+                "timeout": timeout,
+                "json": json,
+            }
+        )
+        return self.responses.pop(0)
+
+    def delete(self, url, headers=None, timeout=None):
+        self.calls.append(
+            {
+                "method": "DELETE",
+                "url": url,
+                "headers": headers or {},
+                "timeout": timeout,
+                "json": None,
+            }
         )
         return self.responses.pop(0)
 
 
 class QPayClientTests(TestCase):
+    def setUp(self):
+        QPayClient._shared_tokens.clear()
+
     def _config(self):
         return QPayConfig(
             client_id="client",
@@ -108,6 +129,49 @@ class QPayClientTests(TestCase):
         self.assertEqual(second, "cached-token")
         self.assertEqual(len(session.calls), 1)
 
+    def test_qpay_client_understands_absolute_expiry_timestamp(self):
+        expires_at = timezone.now() + timedelta(hours=24)
+        session = FakeQPaySession(
+            FakeQPayResponse(
+                payload={
+                    "access_token": "absolute-expiry-token",
+                    "expires_in": int(expires_at.timestamp()),
+                }
+            )
+        )
+
+        token = QPayClient(config=self._config(), session=session).fetch_token()
+
+        self.assertAlmostEqual(
+            token.expires_at.timestamp(),
+            expires_at.timestamp(),
+            delta=1,
+        )
+
+    def test_qpay_clients_share_a_valid_token_within_a_worker(self):
+        first_session = FakeQPaySession(
+            FakeQPayResponse(
+                payload={"access_token": "shared-token", "expires_in": 3600}
+            )
+        )
+        second_session = FakeQPaySession([])
+
+        first = QPayClient(
+            config=self._config(),
+            session=first_session,
+            use_shared_token_cache=True,
+        ).get_access_token()
+        second = QPayClient(
+            config=self._config(),
+            session=second_session,
+            use_shared_token_cache=True,
+        ).get_access_token()
+
+        self.assertEqual(first, "shared-token")
+        self.assertEqual(second, "shared-token")
+        self.assertEqual(len(first_session.calls), 1)
+        self.assertEqual(len(second_session.calls), 0)
+
     def test_qpay_client_creates_invoice_with_bearer_token(self):
         session = FakeQPaySession(
             [
@@ -142,7 +206,10 @@ class QPayClientTests(TestCase):
         self.assertEqual(session.calls[1]["json"]["amount"], 220000)
         self.assertEqual(
             session.calls[1]["json"]["callback_url"],
-            "https://example.com/api/payments/qpay/callback/",
+            (
+                "https://example.com/api/payments/qpay/callback/"
+                "?sender_invoice_no=booking-1-test"
+            ),
         )
 
     def test_qpay_client_checks_payment_by_invoice_id(self):
@@ -165,6 +232,28 @@ class QPayClientTests(TestCase):
         )
         self.assertEqual(session.calls[1]["json"]["object_type"], "INVOICE")
         self.assertEqual(session.calls[1]["json"]["object_id"], "qpay-invoice-1")
+
+    def test_qpay_client_cancels_invoice_by_invoice_id(self):
+        session = FakeQPaySession(
+            [
+                FakeQPayResponse(
+                    payload={"access_token": "cancel-token", "expires_in": 3600}
+                ),
+                FakeQPayResponse(payload={}),
+            ]
+        )
+        client = QPayClient(config=self._config(), session=session)
+
+        client.cancel_invoice(invoice_id="qpay-invoice-1")
+
+        self.assertEqual(session.calls[1]["method"], "DELETE")
+        self.assertEqual(
+            session.calls[1]["url"],
+            "https://merchant.qpay.mn/v2/invoice/qpay-invoice-1",
+        )
+        self.assertEqual(
+            session.calls[1]["headers"]["Authorization"], "Bearer cancel-token"
+        )
 
 
 class ListingImageUploadTests(TestCase):
@@ -622,7 +711,12 @@ class PaymentApiSkeletonTests(TestCase):
         ) as send_email:
             qpay_client_class.return_value.check_payment.return_value = {
                 "count": 1,
-                "rows": [{"payment_id": "payment-manual"}],
+                "rows": [{
+                    "payment_id": "payment-manual",
+                    "payment_status": "PAID",
+                    "payment_amount": str(payment.amount),
+                    "payment_currency": "MNT",
+                }],
             }
             response = self.client.post(f"/api/payments/{payment.id}/check/")
 
@@ -703,6 +797,49 @@ class PaymentApiSkeletonTests(TestCase):
         self.assertEqual(payment.status, Payment.STATUS_PENDING)
         self.assertEqual(BookingHold.objects.filter(booking=booking).count(), 2)
 
+    @override_settings(QPAY_ENABLED=True)
+    def test_payment_check_rejects_wrong_amount_or_currency(self):
+        booking = self._create_pending_booking()
+        payment = Payment.objects.create(
+            booking=booking,
+            provider=Payment.PROVIDER_QPAY,
+            sender_invoice_no="manual-check-mismatch-test",
+            invoice_id="qpay-manual-check-mismatch",
+            amount=booking.total_price + booking.service_fee,
+        )
+
+        mismatches = [
+            {
+                "payment_status": "PAID",
+                "payment_amount": str(payment.amount - 1),
+                "payment_currency": "MNT",
+            },
+            {
+                "payment_status": "PAID",
+                "payment_amount": str(payment.amount),
+                "payment_currency": "USD",
+            },
+            {
+                "payment_status": "PENDING",
+                "payment_amount": str(payment.amount),
+                "payment_currency": "MNT",
+            },
+        ]
+
+        with patch("core.views.QPayClient") as qpay_client_class:
+            for row in mismatches:
+                with self.subTest(row=row):
+                    qpay_client_class.return_value.check_payment.return_value = {
+                        "count": 1,
+                        "rows": [{"payment_id": "mismatch", **row}],
+                    }
+                    response = self.client.post(f"/api/payments/{payment.id}/check/")
+                    self.assertEqual(response.status_code, 200)
+                    payment.refresh_from_db()
+                    booking.refresh_from_db()
+                    self.assertEqual(payment.status, Payment.STATUS_PENDING)
+                    self.assertEqual(booking.status, "pending_payment")
+
     def test_other_user_cannot_check_payment(self):
         booking = self._create_pending_booking()
         payment = Payment.objects.create(
@@ -737,7 +874,12 @@ class PaymentApiSkeletonTests(TestCase):
         with patch("core.views.QPayClient") as qpay_client_class:
             qpay_client_class.return_value.check_payment.return_value = {
                 "count": 1,
-                "rows": [{"payment_id": "payment-1"}],
+                "rows": [{
+                    "payment_id": "payment-1",
+                    "payment_status": "PAID",
+                    "payment_amount": str(payment.amount),
+                    "payment_currency": "MNT",
+                }],
             }
             response = APIClient().post(
                 "/api/payments/qpay/callback/",
@@ -752,6 +894,57 @@ class PaymentApiSkeletonTests(TestCase):
         self.assertEqual(payment.status, Payment.STATUS_PAID)
         self.assertIsNotNone(payment.paid_at)
         self.assertEqual(BookingHold.objects.filter(booking=booking).count(), 0)
+
+    @override_settings(QPAY_ENABLED=True)
+    def test_qpay_callback_maps_provider_payment_id_using_sender_invoice_query(self):
+        booking = self._create_pending_booking()
+        payment = Payment.objects.create(
+            booking=booking,
+            provider=Payment.PROVIDER_QPAY,
+            sender_invoice_no="callback-sender-query-test",
+            invoice_id="qpay-callback-sender-query",
+            amount=booking.total_price + booking.service_fee,
+        )
+
+        with patch("core.views.QPayClient") as qpay_client_class:
+            qpay_client_class.return_value.check_payment.return_value = {
+                "count": 1,
+                "rows": [{
+                    "payment_id": "provider-payment-id",
+                    "payment_status": "PAID",
+                    "payment_amount": str(payment.amount),
+                    "payment_currency": "MNT",
+                }],
+            }
+            response = APIClient().post(
+                (
+                    "/api/payments/qpay/callback/"
+                    f"?sender_invoice_no={payment.sender_invoice_no}"
+                ),
+                {"payment_id": "provider-payment-id"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        qpay_client_class.return_value.check_payment.assert_called_once_with(
+            invoice_id=payment.invoice_id
+        )
+        payment.refresh_from_db()
+        booking.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_PAID)
+        self.assertEqual(booking.status, "confirmed")
+
+    @override_settings(QPAY_ENABLED=True)
+    def test_unknown_qpay_callback_does_not_call_provider(self):
+        with patch("core.views.QPayClient") as qpay_client_class:
+            response = APIClient().post(
+                "/api/payments/qpay/callback/?sender_invoice_no=unknown",
+                {"payment_id": "provider-payment-id"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 404)
+        qpay_client_class.assert_not_called()
 
     @override_settings(QPAY_ENABLED=True)
     def test_qpay_callback_pending_check_does_not_confirm(self):
@@ -796,7 +989,12 @@ class PaymentApiSkeletonTests(TestCase):
         with patch("core.views.QPayClient") as qpay_client_class:
             qpay_client_class.return_value.check_payment.return_value = {
                 "count": 1,
-                "rows": [{"payment_id": "payment-duplicate"}],
+                "rows": [{
+                    "payment_id": "payment-duplicate",
+                    "payment_status": "PAID",
+                    "payment_amount": str(payment.amount),
+                    "payment_currency": "MNT",
+                }],
             }
             first = APIClient().post(
                 "/api/payments/qpay/callback/",
@@ -811,30 +1009,40 @@ class PaymentApiSkeletonTests(TestCase):
 
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 200)
+        qpay_client_class.return_value.check_payment.assert_called_once_with(
+            invoice_id=payment.invoice_id
+        )
         booking.refresh_from_db()
         payment.refresh_from_db()
         self.assertEqual(booking.status, "confirmed")
         self.assertEqual(payment.status, Payment.STATUS_PAID)
 
-    def test_expired_payment_hold_is_released_when_availability_is_requested(self):
+    @override_settings(QPAY_ENABLED=True)
+    def test_expired_payment_hold_is_released_and_invoice_is_cancelled(self):
         booking = self._create_pending_booking()
         payment = Payment.objects.create(
             booking=booking,
             provider=Payment.PROVIDER_QPAY,
             sender_invoice_no="expired-hold-test",
-            invoice_id="mock-expired-hold-test",
+            invoice_id="qpay-expired-hold-test",
             amount=booking.total_price + booking.service_fee,
         )
         booking.hold_expires_at = timezone.now() - timedelta(minutes=1)
         booking.save(update_fields=["hold_expires_at"])
 
-        response = APIClient().get("/api/availability/", {"listing": self.listing.id})
+        with patch("core.views.QPayClient") as qpay_client_class:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.client.get(f"/api/payments/{payment.id}/")
 
         self.assertEqual(response.status_code, 200)
+        qpay_client_class.return_value.cancel_invoice.assert_called_once_with(
+            invoice_id=payment.invoice_id
+        )
         booking.refresh_from_db()
         payment.refresh_from_db()
         self.assertEqual(booking.status, "expired")
         self.assertEqual(payment.status, Payment.STATUS_EXPIRED)
+        self.assertTrue(payment.raw_response["qpay_invoice_cancelled"])
         self.assertEqual(BookingHold.objects.filter(booking=booking).count(), 0)
         self.assertEqual(
             Availability.objects.filter(

@@ -95,6 +95,7 @@ export type BookingSummary = {
   check_in: string;
   check_out: string;
   total_price: number | string;
+  hold_expires_at?: string | null;
   status: string;
   listing: {
     id: number;
@@ -232,6 +233,7 @@ export type ReviewEligibility = {
 
 export type Payment = {
   id: number;
+  booking: BookingDetail;
   booking_id: number;
   booking_status: string;
   provider: string;

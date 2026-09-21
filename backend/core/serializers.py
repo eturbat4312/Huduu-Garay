@@ -524,6 +524,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "host_phone",
             "host_email",
             "service_fee",
+            "hold_expires_at",
             "guest_cancelled_at",
             "guest_cancellation_reason",
             "guest_cancellation_policy_version",
@@ -532,7 +533,7 @@ class BookingSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "host_cancelled_at", "host_cancellation_reason",
             "host_cancellation_policy_version",
-            "service_fee", "guest_cancelled_at", "guest_cancellation_reason",
+            "service_fee", "hold_expires_at", "guest_cancelled_at", "guest_cancellation_reason",
             "guest_cancellation_policy_version",
         ]
 

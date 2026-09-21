@@ -34,6 +34,7 @@ export default function PaymentContent() {
   const [mockConfirming, setMockConfirming] = useState(false);
   const [error, setError] = useState("");
   const [redirecting, setRedirecting] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const redirectIfPaid = useCallback(
     (nextPayment: Payment) => {
@@ -102,11 +103,19 @@ export default function PaymentContent() {
     if (!paymentId || payment?.status !== "pending") return undefined;
 
     const intervalId = window.setInterval(() => {
-      void checkPayment(true);
+      // QPay callback updates our database. Poll only our own API here so the
+      // browser never floods QPay's payment/check and token endpoints.
+      void fetchPayment();
     }, 5000);
 
     return () => window.clearInterval(intervalId);
-  }, [checkPayment, payment?.status, paymentId]);
+  }, [fetchPayment, payment?.status, paymentId]);
+
+  useEffect(() => {
+    if (payment?.status !== "pending") return undefined;
+    const timerId = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timerId);
+  }, [payment?.status]);
 
   const mockConfirm = useCallback(async () => {
     if (!paymentId) return;
@@ -145,9 +154,17 @@ export default function PaymentContent() {
     );
   }
 
-  const qrImage = formatQrImage(payment.raw_response?.qr_image);
-  const urls = payment.raw_response?.urls || [];
-  const isMock = payment.raw_response?.mode === "mock";
+  const isPending = payment.status === "pending";
+  const qrImage = isPending ? formatQrImage(payment.raw_response?.qr_image) : null;
+  const urls = isPending ? payment.raw_response?.urls || [] : [];
+  const isMock = isPending && payment.raw_response?.mode === "mock";
+  const holdExpiresAt = payment.booking.hold_expires_at;
+  const remainingSeconds = holdExpiresAt
+    ? Math.max(0, Math.ceil((new Date(holdExpiresAt).getTime() - nowMs) / 1000))
+    : null;
+  const remainingLabel = remainingSeconds === null
+    ? null
+    : `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, "0")}`;
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -202,7 +219,11 @@ export default function PaymentContent() {
               <img src={qrImage} alt="QPay QR" className="max-h-52 max-w-52" />
             ) : (
               <div className="text-center text-sm text-gray-500">
-                {isMock ? "Local mock invoice" : "QR код ирээгүй байна."}
+                {!isPending
+                  ? "Энэ нэхэмжлэх хаагдсан."
+                  : isMock
+                    ? "Local mock invoice"
+                    : "QR код ирээгүй байна."}
               </div>
             )}
           </div>
@@ -222,7 +243,7 @@ export default function PaymentContent() {
               </div>
             )}
 
-            {payment.raw_response?.qr_text && (
+            {isPending && payment.raw_response?.qr_text && (
               <textarea
                 readOnly
                 value={payment.raw_response.qr_text}
@@ -252,10 +273,19 @@ export default function PaymentContent() {
               )}
             </div>
 
-            {payment.status === "pending" && (
+            {isPending && (
               <div className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-green-200 border-t-green-700" />
-                <span>Төлбөр автоматаар шалгаж байна...</span>
+                <span>
+                  Төлбөр автоматаар шалгаж байна...
+                  {remainingLabel ? ` Үлдсэн хугацаа ${remainingLabel}` : ""}
+                </span>
+              </div>
+            )}
+
+            {!isPending && payment.status !== "paid" && (
+              <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+                Төлбөрийн хугацаа дууссан тул QR нэхэмжлэхийг хаалаа. Захиалгаа дахин үүсгэнэ үү.
               </div>
             )}
 

@@ -102,6 +102,7 @@ export type Category = {
     listing_id?: number; // write-only
     total_price: number;
     service_fee: number;
+    hold_expires_at?: string | null;
     status: string;
     guest_cancelled_at?: string | null;
     guest_cancellation_reason?: string;

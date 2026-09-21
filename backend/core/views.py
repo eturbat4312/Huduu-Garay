@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.generics import RetrieveAPIView, RetrieveUpdateAPIView
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.throttling import AnonRateThrottle
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -97,6 +97,14 @@ ALLOWED_LISTING_IMAGE_TYPES = {
 
 
 class AnalyticsEventThrottle(AnonRateThrottle):
+    rate = "120/min"
+
+
+class PaymentCheckThrottle(UserRateThrottle):
+    rate = "30/min"
+
+
+class QPayCallbackThrottle(AnonRateThrottle):
     rate = "120/min"
 
 
@@ -766,31 +774,76 @@ def _booking_has_hold(booking, requested_dates, lock=False):
 
 
 def _release_booking_hold(booking, now=None):
+    expired_at = now or timezone.now()
     hold_rows = list(
         BookingHold.objects.select_for_update().filter(
             booking=booking, listing=booking.listing
         )
     )
-    if not hold_rows:
-        return 0
 
     for hold in hold_rows:
         Availability.objects.get_or_create(listing=booking.listing, date=hold.date)
 
-    BookingHold.objects.filter(id__in=[hold.id for hold in hold_rows]).delete()
+    if hold_rows:
+        BookingHold.objects.filter(id__in=[hold.id for hold in hold_rows]).delete()
 
     booking.status = "expired"
     booking.save(update_fields=["status"])
 
-    Payment.objects.filter(booking=booking, status=Payment.STATUS_PENDING).update(
-        status=Payment.STATUS_EXPIRED,
-        updated_at=now or timezone.now(),
-        raw_response={
-            "expired_reason": "payment_hold_expired",
-            "expired_at": (now or timezone.now()).isoformat(),
-        },
+    pending_payments = list(
+        Payment.objects.select_for_update().filter(
+            booking=booking,
+            status=Payment.STATUS_PENDING,
+        )
     )
+    for payment in pending_payments:
+        payment.status = Payment.STATUS_EXPIRED
+        payment.raw_response = {
+            **(payment.raw_response or {}),
+            "expired_reason": "payment_hold_expired",
+            "expired_at": expired_at.isoformat(),
+        }
+        payment.save(update_fields=["status", "raw_response", "updated_at"])
+
+        if (
+            settings.QPAY_ENABLED
+            and payment.provider == Payment.PROVIDER_QPAY
+            and payment.invoice_id
+            and not payment.invoice_id.startswith("mock-")
+        ):
+            transaction.on_commit(
+                lambda payment_id=payment.id, invoice_id=payment.invoice_id: (
+                    _cancel_expired_qpay_invoice(payment_id, invoice_id)
+                )
+            )
     return len(hold_rows)
+
+
+def _cancel_expired_qpay_invoice(payment_id, invoice_id):
+    cancelled = False
+    error_code = ""
+    try:
+        QPayClient().cancel_invoice(invoice_id=invoice_id)
+        cancelled = True
+    except QPayConfigurationError:
+        error_code = "configuration_error"
+        logger.warning("QPay invoice cancellation is not configured for payment %s", payment_id)
+    except QPayAPIError:
+        error_code = "provider_error"
+        logger.exception("QPay invoice cancellation failed for payment %s", payment_id)
+
+    payment = Payment.objects.filter(
+        id=payment_id,
+        status=Payment.STATUS_EXPIRED,
+    ).first()
+    if payment is None:
+        return
+    payment.raw_response = {
+        **(payment.raw_response or {}),
+        "qpay_invoice_cancelled": cancelled,
+        "qpay_invoice_cancel_error": error_code,
+    }
+    payment.save(update_fields=["raw_response", "updated_at"])
 
 
 def _release_expired_booking_holds(now=None):
@@ -816,22 +869,29 @@ def _booking_hold_is_expired(booking, now=None):
     )
 
 
-def _payment_check_is_paid(check_response):
+def _payment_check_is_paid(check_response, *, expected_amount, expected_currency="MNT"):
     if not isinstance(check_response, dict):
         return False
-    count = check_response.get("count")
-    if count is not None:
-        try:
-            return int(count) > 0
-        except (TypeError, ValueError):
-            return False
     rows = (
         check_response.get("rows")
         or check_response.get("items")
         or check_response.get("payments")
         or []
     )
-    return bool(rows)
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("payment_status") or "").upper() != "PAID":
+            continue
+        if str(row.get("payment_currency") or "").upper() != expected_currency.upper():
+            continue
+        try:
+            paid_amount = Decimal(str(row.get("payment_amount")))
+        except (TypeError, ValueError, ArithmeticError):
+            continue
+        if paid_amount == Decimal(str(expected_amount)):
+            return True
+    return False
 
 
 def _get_booking_party_details(booking, requested_dates):
@@ -1254,6 +1314,10 @@ class PaymentRetrieveView(RetrieveAPIView):
     serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated]
 
+    def retrieve(self, request, *args, **kwargs):
+        _release_expired_booking_holds()
+        return super().retrieve(request, *args, **kwargs)
+
     def get_queryset(self):
         return Payment.objects.filter(booking__guest=self.request.user).select_related(
             "booking", "booking__listing", "booking__guest", "booking__listing__host"
@@ -1262,6 +1326,7 @@ class PaymentRetrieveView(RetrieveAPIView):
 
 class PaymentCheckView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [PaymentCheckThrottle]
 
     def post(self, request, payment_id, format=None):
         _release_expired_booking_holds()
@@ -1300,7 +1365,11 @@ class PaymentCheckView(APIView):
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
-        if not _payment_check_is_paid(check_response):
+        if not _payment_check_is_paid(
+            check_response,
+            expected_amount=payment.amount,
+            expected_currency=payment.currency,
+        ):
             payment.raw_response = {
                 **payment.raw_response,
                 "last_qpay_check": check_response,
@@ -1389,27 +1458,56 @@ class PaymentMockConfirmView(APIView):
 class QPayCallbackView(APIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
+    throttle_classes = [QPayCallbackThrottle]
 
     def post(self, request, format=None):
-        invoice_id = (
+        sender_invoice_no = (
+            request.data.get("sender_invoice_no")
+            or request.query_params.get("sender_invoice_no")
+        )
+        callback_reference = (
             request.data.get("invoice_id")
             or request.data.get("object_id")
             or request.data.get("payment_id")
+            or request.query_params.get("invoice_id")
+            or request.query_params.get("object_id")
+            or request.query_params.get("payment_id")
         )
-        if not invoice_id:
-            return Response({"error": "invoice_id дутуу байна."}, status=400)
+        if not sender_invoice_no and not callback_reference:
+            return Response({"error": "Төлбөрийн лавлах дугаар дутуу байна."}, status=400)
 
         _release_expired_booking_holds()
 
+        payment_query = Payment.objects.select_related(
+            "booking", "booking__listing"
+        ).filter(provider=Payment.PROVIDER_QPAY)
+        if sender_invoice_no:
+            payment = payment_query.filter(sender_invoice_no=sender_invoice_no).first()
+        else:
+            payment = payment_query.filter(invoice_id=callback_reference).first()
+
+        if payment is None:
+            return Response({"error": "Төлбөр олдсонгүй."}, status=404)
+
+        if payment.status == Payment.STATUS_PAID:
+            return Response(
+                PaymentSerializer(payment, context={"request": request}).data,
+                status=status.HTTP_200_OK,
+            )
+
         try:
-            check_response = QPayClient().check_payment(invoice_id=invoice_id)
+            check_response = QPayClient().check_payment(invoice_id=payment.invoice_id)
         except (QPayConfigurationError, QPayAPIError):
             return Response(
                 {"error": "QPay төлбөр шалгахад алдаа гарлаа."},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
 
-        if not _payment_check_is_paid(check_response):
+        if not _payment_check_is_paid(
+            check_response,
+            expected_amount=payment.amount,
+            expected_currency=payment.currency,
+        ):
             return Response({"status": "pending"}, status=status.HTTP_202_ACCEPTED)
 
         with transaction.atomic():
@@ -1417,7 +1515,7 @@ class QPayCallbackView(APIView):
                 payment = (
                     Payment.objects.select_for_update()
                     .select_related("booking", "booking__listing")
-                    .get(invoice_id=invoice_id, provider=Payment.PROVIDER_QPAY)
+                    .get(pk=payment.pk)
                 )
             except Payment.DoesNotExist:
                 return Response({"error": "Төлбөр олдсонгүй."}, status=404)
