@@ -130,6 +130,8 @@ REST_FRAMEWORK = {
     # ],
 }
 
+ACCOUNT_ADAPTER = "core.adapters.AccountAdapter"
+
 SESSION_COOKIE_PATH = "/admin"
 
 SIMPLE_JWT = {
@@ -248,6 +250,9 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+STAFF_ACTIVITY_EMAILS_ENABLED = os.getenv(
+    "STAFF_ACTIVITY_EMAILS_ENABLED", "True"
+).lower() in {"1", "true", "yes", "on"}
 
 
 # Internationalization

@@ -800,6 +800,7 @@ class Notification(models.Model):
         ("payment", "Төлбөр"),
         ("admin_support", "Шинэ тусламжийн хүсэлт (ажилтан)"),
         ("support_reply", "Тусламжийн хүсэлтийн хариу"),
+        ("admin_user", "Шинэ хэрэглэгч (ажилтан)"),
         # legacy aliases
         ("booking", "Захиалга"),
         ("comment", "Сэтгэгдэл"),

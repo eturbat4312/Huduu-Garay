@@ -2,6 +2,9 @@
   "name": "tanaid-honoy-mobile",
   "main": "expo-router/entry",
   "version": "1.0.0",
+  "engines": {
+    "node": ">=20.19.4 <21"
+  },
   "dependencies": {
     "@expo/ui": "~57.0.18",
     "@react-native-google-signin/google-signin": "^16.1.5",

@@ -1,8 +1,19 @@
 from django.core.mail import send_mail
 from django.conf import settings
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def send_notification_email(user, notif_type, context):
+    if (
+        getattr(user, "is_staff", False)
+        and notif_type != "password_reset"
+        and not getattr(settings, "STAFF_ACTIVITY_EMAILS_ENABLED", True)
+    ):
+        return 0
+
     subject = ""
     message = ""
 
@@ -203,6 +214,10 @@ def send_notification_email(user, notif_type, context):
             "Танайд Хоноё системийн Тусламж хэсгээс хүсэлт, хариугаа харна уу."
         )
 
+    elif notif_type == "staff_activity":
+        subject = context["subject"]
+        message = context["message"]
+
     # Claude: password reset email
     elif notif_type == "password_reset":
         subject = "🔐 Нууц үг сэргээх хүсэлт"
@@ -232,3 +247,12 @@ def send_notification_email(user, notif_type, context):
 
     if notif_type == "password_reset" and sent != 1:
         raise RuntimeError("Password recovery email was not sent")
+
+    if sent != 1:
+        logger.error(
+            "Notification email was not sent: user=%s type=%s",
+            user.pk,
+            notif_type,
+        )
+
+    return sent
