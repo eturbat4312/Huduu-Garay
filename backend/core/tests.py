@@ -935,6 +935,48 @@ class PaymentApiSkeletonTests(TestCase):
         self.assertEqual(booking.status, "confirmed")
 
     @override_settings(QPAY_ENABLED=True)
+    def test_qpay_get_callback_confirms_payment_from_real_provider_shape(self):
+        booking = self._create_pending_booking()
+        payment = Payment.objects.create(
+            booking=booking,
+            provider=Payment.PROVIDER_QPAY,
+            sender_invoice_no="callback-get-test",
+            invoice_id="qpay-callback-get",
+            amount=booking.total_price + booking.service_fee,
+        )
+
+        with patch("core.views.QPayClient") as qpay_client_class:
+            qpay_client_class.return_value.check_payment.return_value = {
+                "count": 1,
+                "rows": [{
+                    "payment_id": "provider-payment-id",
+                    "payment_status": "PAID",
+                    "payment_amount": str(payment.amount),
+                    "payment_currency": "MNT",
+                }],
+            }
+            response = APIClient().get(
+                (
+                    "/api/payments/qpay/callback/"
+                    f"?sender_invoice_no={payment.sender_invoice_no}"
+                    "&qpay_payment_id=provider-payment-id"
+                )
+            )
+
+        self.assertEqual(response.status_code, 200)
+        qpay_client_class.return_value.check_payment.assert_called_once_with(
+            invoice_id=payment.invoice_id
+        )
+        payment.refresh_from_db()
+        booking.refresh_from_db()
+        self.assertEqual(payment.status, Payment.STATUS_PAID)
+        self.assertEqual(booking.status, "confirmed")
+        self.assertEqual(
+            payment.raw_response["qpay_check"]["callback"]["qpay_payment_id"],
+            "provider-payment-id",
+        )
+
+    @override_settings(QPAY_ENABLED=True)
     def test_unknown_qpay_callback_does_not_call_provider(self):
         with patch("core.views.QPayClient") as qpay_client_class:
             response = APIClient().post(

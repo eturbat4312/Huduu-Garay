@@ -1460,7 +1460,22 @@ class QPayCallbackView(APIView):
     authentication_classes = []
     throttle_classes = [QPayCallbackThrottle]
 
+    def get(self, request, format=None):
+        return self._handle_callback(request)
+
     def post(self, request, format=None):
+        return self._handle_callback(request)
+
+    def _handle_callback(self, request):
+        body_payload = (
+            request.data.dict()
+            if hasattr(request.data, "dict")
+            else dict(request.data)
+        )
+        callback_payload = {
+            **request.query_params.dict(),
+            **body_payload,
+        }
         sender_invoice_no = (
             request.data.get("sender_invoice_no")
             or request.query_params.get("sender_invoice_no")
@@ -1523,7 +1538,7 @@ class QPayCallbackView(APIView):
             payment, error_message = _confirm_paid_payment(
                 payment,
                 {
-                    "callback": request.data,
+                    "callback": callback_payload,
                     "payment_check": check_response,
                 },
                 request=request,
