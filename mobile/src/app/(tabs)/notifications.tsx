@@ -1,7 +1,10 @@
 import { router, useFocusEffect } from 'expo-router';
+import Constants from 'expo-constants';
+import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   DeviceEventEmitter,
   FlatList,
   Pressable,
@@ -88,6 +91,7 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canTestInExpoGo = __DEV__ && Constants.appOwnership === 'expo';
 
   const load = useCallback(async (isRefresh = false) => {
     if (!isAuthenticated) { setLoading(false); return; }
@@ -133,6 +137,26 @@ export default function NotificationsScreen() {
     navigateForNotification(item);
   }, []);
 
+  const testLocalNotification = useCallback(async () => {
+    let permission = await Notifications.getPermissionsAsync();
+    if (permission.status !== 'granted') {
+      permission = await Notifications.requestPermissionsAsync();
+    }
+    if (permission.status !== 'granted') {
+      Alert.alert('Мэдэгдлийн зөвшөөрөл', 'Төхөөрөмжийн тохиргооноос notification зөвшөөрнө үү.');
+      return;
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Танайд Хоноё — туршилт',
+        body: 'Expo Go дээр local notification амжилттай ажиллаж байна.',
+        data: { type: 'local_test' },
+      },
+      trigger: null,
+    });
+  }, []);
+
   if (!isAuthenticated) {
     return (
       <ThemedView style={styles.container}>
@@ -155,6 +179,11 @@ export default function NotificationsScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
           <ThemedText type="subtitle">Мэдэгдэл</ThemedText>
+          {canTestInExpoGo && (
+            <Pressable onPress={() => void testLocalNotification()} style={styles.testButton}>
+              <Text style={styles.testButtonText}>Expo Go тест</Text>
+            </Pressable>
+          )}
         </View>
 
         {loading ? (
@@ -202,9 +231,20 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.two },
   emptyContainer: { flex: 1 },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
   },
+  testButton: {
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  testButtonText: { color: '#2563EB', fontSize: 12, fontWeight: '700' },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
