@@ -82,6 +82,8 @@ export type Category = {
   }
   
   export type Booking = {
+    can_contact?: boolean;
+    unread_message_count?: number;
     id: number;
     check_in: string;
     check_out: string;

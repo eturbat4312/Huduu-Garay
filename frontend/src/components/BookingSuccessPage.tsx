@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { t } from "@/lib/i18n";
 import { Booking } from "@/types";
+import BookingContact from "@/components/BookingContact";
 import GuestCancellationAction from "@/components/GuestCancellationAction";
 import { CHECK_IN_TIME, CHECK_OUT_TIME } from "@/lib/bookingTimes";
 
@@ -148,6 +149,7 @@ export default function BookingSuccessPage({
         </div>
       </div>
 
+      <BookingContact key={booking.id} booking={booking} />
       <GuestCancellationAction booking={booking} locale={locale} onChange={setBooking} />
 
       <button

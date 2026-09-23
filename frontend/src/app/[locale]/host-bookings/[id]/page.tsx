@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import api from "@/lib/axios";
 import { t } from "@/lib/i18n";
 import Image from "next/image";
+import BookingContact from "@/components/BookingContact";
 import HostCancellationAction from "@/components/HostCancellationAction";
 import type { Booking } from "@/types";
 import { CHECK_IN_TIME, CHECK_OUT_TIME } from "@/lib/bookingTimes";
@@ -108,7 +109,7 @@ export default function HostBookingDetailPage() {
             <p>
               📞 {t(locale, "booking_detail.guest_phone")}:{" "}
               <a
-                href={`tel:${booking.guest_phone}`}
+                href={booking.can_contact && booking.guest_phone ? `tel:${booking.guest_phone}` : undefined}
                 className="text-blue-600 underline"
               >
                 {booking.guest_phone}
@@ -143,15 +144,11 @@ export default function HostBookingDetailPage() {
           </p>
         </div>
 
+        <BookingContact key={booking.id} booking={booking} host />
         <div className="flex gap-4 mt-4">
           <HostCancellationAction booking={booking} locale={locale} onChange={setBooking} />
 
-          <a
-            href={`tel:${booking.guest_phone}`}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-          >
-            📞 {t(locale, "booking_detail.call_button")}
-          </a>
+
         </div>
 
         {booking.guest_cancelled_at && (

@@ -18,6 +18,7 @@ from django.db.models import (
 from django.db.models.functions import Coalesce, TruncDate, TruncMonth
 from django.utils.html import format_html, format_html_join
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from .models import (
@@ -26,6 +27,7 @@ from .models import (
     ListingImage,
     Availability,
     Booking,
+    BookingMessage,
     Amenity,
     HostApplication,
     Notification,
@@ -69,9 +71,44 @@ class UserAdmin(admin.ModelAdmin):
     readonly_fields = ("date_joined", "last_login")
 
 
+@admin.register(BookingMessage)
+class BookingMessageAdmin(admin.ModelAdmin):
+    list_display = ("id", "booking", "sender", "body", "created_at", "read_at")
+    list_filter = ("created_at", ("read_at", admin.EmptyFieldListFilter))
+    search_fields = ("=booking__id", "booking__listing__title", "sender__username", "body")
+    list_select_related = ("booking__listing", "booking__guest", "sender")
+    readonly_fields = ("booking", "sender", "body", "client_id", "created_at", "read_at")
+    ordering = ("-created_at",)
+    list_per_page = 50
+    actions = None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 # ── Booking ───────────────────────────────────────────────────────────────────
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
+    @admin.display(description="Захиалгын чат")
+    def chat_messages(self, obj):
+        if not obj.pk:
+            return "—"
+        url = reverse("admin:core_bookingmessage_changelist")
+        return format_html('<a href="{}?booking__id__exact={}">Мессежүүд ({})</a>',
+                           url, obj.pk, obj.messages.count())
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = super().get_readonly_fields(request, obj)
+        if request.user.has_perm("core.view_bookingmessage"):
+            return (*fields, "chat_messages")
+        return fields
+
     list_display = (
         "id", "guest_name_display", "listing_title", "check_in", "check_out",
         "guest_count", "total_price_display", "host_payout_display", "platform_fee_display",

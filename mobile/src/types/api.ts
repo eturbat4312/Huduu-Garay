@@ -91,6 +91,8 @@ export type AvailabilityDay = {
 };
 
 export type BookingSummary = {
+  can_contact?: boolean;
+  unread_message_count?: number;
   id: number;
   check_in: string;
   check_out: string;

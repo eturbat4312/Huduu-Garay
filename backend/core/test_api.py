@@ -522,6 +522,9 @@ class ListingTests(TestCase):
 
         booking.status = "confirmed"
         booking.save(update_fields=["status"])
+        from core.models import Payment
+        Payment.objects.create(booking=booking, amount=booking.total_price + booking.service_fee,
+                               status="paid", sender_invoice_no="private-contact-test")
         confirmed = self.gc.get(f"/api/listings/{listing.id}/")
         booking_detail = self.gc.get(f"/api/bookings/{booking.id}/")
 

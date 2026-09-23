@@ -13,6 +13,7 @@ from core.models import Notification, PushDelivery, PushDevice
 logger = logging.getLogger(__name__)
 
 PUSH_TITLES = {
+    "booking_message": "Шинэ мессеж",
     "booking_created": "Шинэ захиалга",
     "booking_confirmed": "Захиалга баталгаажлаа",
     "admin_booking": "Шинэ захиалга",

@@ -1,3 +1,4 @@
+from .booking_messages import BookingMessagesView, BookingMessagesReadView
 from django.urls import path
 from django.conf.urls.static import static
 from django.conf import settings
@@ -59,6 +60,8 @@ from .views import (
 # from core.views import GoogleOneTapLoginView
 
 urlpatterns = [
+    path("bookings/<int:booking_id>/messages/", BookingMessagesView.as_view()),
+    path("bookings/<int:booking_id>/messages/read/", BookingMessagesReadView.as_view()),
     path("analytics/events/", AnalyticsEventCreateView.as_view(), name="analytics-event-create"),
     path("categories/", CategoryListCreateView.as_view(), name="category-list-create"),
     path("listings/", ListingListCreateView.as_view(), name="listing-list-create"),

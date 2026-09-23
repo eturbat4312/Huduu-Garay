@@ -589,3 +589,8 @@ export function connectFacebook(pendingToken: string): Promise<{ status: string 
     method: 'POST', body: { pending_token: pendingToken, confirm_link: true },
   });
 }
+
+export type BookingMessage = { id: number; body: string; is_mine: boolean; created_at: string };
+export const fetchBookingMessages = (id: number, after = 0) => request<{ messages: BookingMessage[]; has_more: boolean }>(`/bookings/${id}/messages/?after=${after}`);
+export const sendBookingMessage = (id: number, body: string, client_id: string) => request<BookingMessage>(`/bookings/${id}/messages/`, { method: 'POST', body: { body, client_id } });
+export const readBookingMessages = (id: number, through: number) => request(`/bookings/${id}/messages/read/`, { method: 'POST', body: { through } });

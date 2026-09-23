@@ -308,6 +308,23 @@ class Booking(models.Model):
         )
 
 
+class BookingMessage(models.Model):
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="messages")
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    body = models.TextField(max_length=2000)
+    client_id = models.UUIDField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Захиалгын мессеж"
+        verbose_name_plural = "Захиалгын мессежүүд"
+        ordering = ["id"]
+        constraints = [models.UniqueConstraint(
+            fields=["booking", "sender", "client_id"], name="unique_booking_message_retry"
+        )]
+
+
 class BookingHold(models.Model):
     booking = models.ForeignKey(
         Booking, on_delete=models.CASCADE, related_name="held_dates"
@@ -818,6 +835,7 @@ class PlatformAnalyticsEvent(models.Model):
 
 class Notification(models.Model):
     NOTIFICATION_TYPES = [
+        ("booking_message", "Захиалгын мессеж"),
         ("booking_created", "Шинэ захиалга (түрээслүүлэгч)"),
         ("booking_confirmed", "Захиалга баталгаажсан (зочин)"),
         ("admin_booking", "Шинэ захиалга (ажилтан)"),

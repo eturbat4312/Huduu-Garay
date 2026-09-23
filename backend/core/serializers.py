@@ -1,3 +1,5 @@
+from .services.booking_contact import booking_contact_allowed
+from django.db.models import F
 from rest_framework import serializers
 from datetime import timedelta
 from django.contrib.auth import get_user_model
@@ -212,6 +214,8 @@ def can_view_private_listing_location(listing, request):
         allowed_listing_ids = set(
             Booking.objects.filter(
                 guest=user,
+                payments__status="paid",
+                payments__amount__gte=F("total_price") + F("service_fee"),
                 status="confirmed",
                 is_cancelled_by_host=False,
                 guest_cancelled_at__isnull=True,
@@ -473,6 +477,36 @@ class AvailabilityBulkSerializer(serializers.Serializer):
 
 
 class BookingSerializer(serializers.ModelSerializer):
+    can_contact = serializers.SerializerMethodField()
+    unread_message_count = serializers.SerializerMethodField()
+
+    def get_can_contact(self, obj):
+        request = self.context.get("request")
+        if not request:
+            return False
+        cache = getattr(request, "_booking_contact_permissions", None)
+        if cache is None:
+            cache = request._booking_contact_permissions = {}
+        if obj.pk not in cache:
+            cache[obj.pk] = booking_contact_allowed(obj, request.user)
+        return cache[obj.pk]
+
+    def get_unread_message_count(self, obj):
+        request = self.context.get("request")
+        if not self.get_can_contact(obj):
+            return 0
+        return obj.messages.filter(read_at__isnull=True).exclude(sender=request.user).count()
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        if not data["can_contact"] and (not request or request.user.pk != instance.guest_id):
+            # Free-text booking fields must not become a pre-payment contact channel.
+            for field in ("phone_number", "guest_phone", "notes", "full_name", "guest_name",
+                          "guest_cancellation_reason", "host_cancellation_reason"):
+                data[field] = ""
+        return data
+
     listing = serializers.SerializerMethodField(read_only=True)
     listing_id = serializers.PrimaryKeyRelatedField(
         queryset=Listing.objects.all(), write_only=True, source="listing"
@@ -501,6 +535,8 @@ class BookingSerializer(serializers.ModelSerializer):
         model = Booking
         fields = [
             "id",
+            "can_contact",
+            "unread_message_count",
             "check_in",
             "check_out",
             "listing",
@@ -617,15 +653,13 @@ class BookingSerializer(serializers.ModelSerializer):
         ).exists()
 
     def get_host_name(self, obj):
-        request = self.context.get("request")
-        if not can_view_private_listing_location(obj.listing, request):
+        if not self.get_can_contact(obj):
             return obj.listing.host.username
         host_app = getattr(obj.listing.host, "hostapplication", None)
         return host_app.full_name if host_app else obj.listing.host.username
 
     def get_host_phone(self, obj):
-        request = self.context.get("request")
-        if not can_view_private_listing_location(obj.listing, request):
+        if not self.get_can_contact(obj):
             return None
         host_app = getattr(obj.listing.host, "hostapplication", None)
         if host_app and host_app.phone_number:
@@ -633,8 +667,7 @@ class BookingSerializer(serializers.ModelSerializer):
         return obj.listing.host.phone or None
 
     def get_host_email(self, obj):
-        request = self.context.get("request")
-        if not can_view_private_listing_location(obj.listing, request):
+        if not self.get_can_contact(obj):
             return None
         return obj.listing.host.email or None
 

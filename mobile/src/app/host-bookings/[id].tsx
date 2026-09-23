@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BookingContact } from '@/components/booking-contact';
 import { ThemedView } from '@/components/themed-view';
 import { HostCancellationAction } from '@/components/host-cancellation-action';
 import { Colors, Spacing, type ColorPalette } from '@/constants/theme';
@@ -128,7 +129,7 @@ export default function HostBookingDetailScreen() {
           <View style={{ width: 64 }} />
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
           {/* Статус badge */}
           <View style={[styles.statusBadge, { backgroundColor: statusInfo.color + '18' }]}>
             <View style={[styles.statusDot, { backgroundColor: statusInfo.color }]} />
@@ -178,6 +179,7 @@ export default function HostBookingDetailScreen() {
               </Text>
             </View>
           )}
+          <BookingContact key={booking.id} booking={booking} host />
           <HostCancellationAction booking={booking} onChange={setBooking} />
 
           {booking.is_cancelled_by_host && (

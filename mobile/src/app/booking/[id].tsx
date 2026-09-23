@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { BookingContact } from '@/components/booking-contact';
 import { ThemedView } from '@/components/themed-view';
 import { GuestCancellationAction } from '@/components/guest-cancellation-action';
 import { Colors, Spacing } from '@/constants/theme';
@@ -93,7 +94,7 @@ export default function BookingDetailScreen() {
             <ThemedText themeColor="textSecondary">{error}</ThemedText>
           </View>
         ) : booking ? (
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <ScrollView keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
             {/* Статус */}
             {(() => {
               const s = STATUS_LABELS[booking.status] ?? { label: booking.status, color: '#6B7280' };
@@ -175,6 +176,7 @@ export default function BookingDetailScreen() {
                 </Text>
               </View>
             )}
+            <BookingContact key={booking.id} booking={booking} />
             <GuestCancellationAction booking={booking} onChange={setBooking} />
           </ScrollView>
         ) : null}
