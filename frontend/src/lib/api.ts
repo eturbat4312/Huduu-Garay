@@ -15,6 +15,12 @@ export async function markAllNotificationsAsRead(): Promise<void> {
   await api.post("/notifications/mark-read/");
 }
 
+export async function markNotificationAsRead(
+  notificationId: number,
+): Promise<void> {
+  await api.post(`/notifications/${notificationId}/read/`);
+}
+
 // 📥 Зөвхөн booking төрлийн мэдэгдлийг уншсан гэж тэмдэглэх
 // Claude: was "booking" but backend stores "booking_created" — fixed to match
 export async function markBookingNotificationsAsRead(): Promise<void> {

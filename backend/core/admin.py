@@ -35,6 +35,8 @@ from .models import (
     FinancialAuditLog,
     SupportRequest,
     PlatformAnalyticsEvent,
+    PushDevice,
+    PushDelivery,
 )
 from core.services.booking_times import (
     PLATFORM_TIME_ZONE,
@@ -1092,6 +1094,28 @@ class AmenityAdmin(admin.ModelAdmin):
 admin.site.register(ListingImage)
 admin.site.register(Availability)
 admin.site.register(Notification)
+
+
+@admin.register(PushDevice)
+class PushDeviceAdmin(admin.ModelAdmin):
+    list_display = ("user", "platform", "is_active", "last_seen_at")
+    list_filter = ("platform", "is_active")
+    search_fields = ("user__username", "user__email", "token")
+    readonly_fields = ("created_at", "updated_at", "last_seen_at")
+
+
+@admin.register(PushDelivery)
+class PushDeliveryAdmin(admin.ModelAdmin):
+    list_display = (
+        "notification",
+        "device",
+        "status",
+        "attempt_count",
+        "last_attempt_at",
+    )
+    list_filter = ("status",)
+    search_fields = ("ticket_id", "token", "error_code")
+    readonly_fields = ("created_at", "updated_at")
 
 
 # ── Custom finance and booking dashboard ─────────────────────────────────────

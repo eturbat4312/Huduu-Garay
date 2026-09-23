@@ -63,6 +63,7 @@ from .models import (
     Review,
     HostApplication,
     SupportRequest,
+    PushDevice,
 )
 from .serializers import (
     CategorySerializer,
@@ -78,6 +79,8 @@ from .serializers import (
     UserSerializer,
     AmenitySerializer,
     FavoriteSerializer,
+    PushDeviceRegistrationSerializer,
+    PushDeviceDeactivationSerializer,
     NotificationSerializer,
     ReviewSerializer,
     HostApplicationSerializer,
@@ -1884,6 +1887,54 @@ class NotificationMarkOneAsReadView(APIView):
             notification.is_read = True
             notification.save(update_fields=["is_read"])
         return Response({"message": "Marked as read."})
+
+
+class PushDeviceRegisterView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = PushDeviceRegistrationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+
+        with transaction.atomic():
+            previous_token = values.get("previous_token")
+            if previous_token and previous_token != values["token"]:
+                PushDevice.objects.filter(
+                    user=request.user,
+                    token=previous_token,
+                ).update(is_active=False)
+
+            device, created = PushDevice.objects.update_or_create(
+                token=values["token"],
+                defaults={
+                    "user": request.user,
+                    "platform": values["platform"],
+                    "is_active": True,
+                },
+            )
+
+        return Response(
+            {
+                "id": device.pk,
+                "platform": device.platform,
+                "is_active": device.is_active,
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+class PushDeviceDeactivateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = PushDeviceDeactivationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        PushDevice.objects.filter(
+            user=request.user,
+            token=serializer.validated_data["token"],
+        ).update(is_active=False)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SupportRequestListCreateView(generics.ListCreateAPIView):

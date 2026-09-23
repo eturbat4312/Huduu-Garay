@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { MouseEvent, useEffect, useState } from "react";
 import api from "@/lib/axios";
 import Link from "next/link";
-import { markAllNotificationsAsRead } from "@/lib/api";
 import { t } from "@/lib/i18n";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { useNotification } from "@/context/NotificationContext";
 
 type Notification = {
   id: number;
@@ -64,15 +64,15 @@ function getNotificationLink(n: Notification, locale: string): string {
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  //   const { locale } = useParams();
   const { locale } = useParams() as { locale: string };
+  const router = useRouter();
+  const { markAllAsRead, markOneAsRead } = useNotification();
 
   useEffect(() => {
-    const fetchAndMarkRead = async () => {
+    const fetchNotifications = async () => {
       try {
         const res = await api.get("/notifications/");
         setNotifications(res.data);
-        await markAllNotificationsAsRead();
       } catch (err) {
         console.error("Failed to load notifications", err);
       } finally {
@@ -80,17 +80,66 @@ export default function NotificationsPage() {
       }
     };
 
-    fetchAndMarkRead();
+    fetchNotifications();
   }, []);
+
+  const handleOpen = async (
+    event: MouseEvent<HTMLAnchorElement>,
+    notification: Notification,
+    href: string,
+  ) => {
+    event.preventDefault();
+    if (!notification.is_read) {
+      setNotifications((current) => current.map((item) => (
+        item.id === notification.id ? { ...item, is_read: true } : item
+      )));
+      try {
+        await markOneAsRead(notification.id, notification.type);
+      } catch (error) {
+        setNotifications((current) => current.map((item) => (
+          item.id === notification.id ? { ...item, is_read: false } : item
+        )));
+        console.error("Failed to mark notification as read", error);
+      }
+    }
+
+    if (/^https?:\/\//.test(href)) {
+      window.location.assign(href);
+    } else {
+      router.push(href);
+    }
+  };
+
+  const handleMarkAll = async () => {
+    const previous = notifications;
+    setNotifications((current) => current.map((item) => ({ ...item, is_read: true })));
+    try {
+      await markAllAsRead();
+    } catch (error) {
+      setNotifications(previous);
+      console.error("Failed to mark all notifications as read", error);
+    }
+  };
 
   if (loading)
     return <p className="p-6">{t(locale, "notifications.loading")}</p>;
 
   return (
     <main className="max-w-3xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">
-        🔔 {t(locale, "notifications.title")}
-      </h1>
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">
+          🔔 {t(locale, "notifications.title")}
+        </h1>
+        {notifications.some((item) => !item.is_read) && (
+          <button
+            type="button"
+            onClick={handleMarkAll}
+            className="text-sm font-medium text-blue-700 hover:text-blue-900"
+          >
+            Бүгдийг уншсан болгох
+          </button>
+        )}
+      </div>
       {notifications.length === 0 ? (
         <p>{t(locale, "notifications.empty")}</p>
       ) : (
@@ -108,7 +157,11 @@ export default function NotificationsPage() {
               >
                 {/* Claude: unread dot indicator */}
                 <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${isUnread ? "bg-blue-500" : "bg-transparent"}`} />
-                <Link href={href} className="flex-1">
+                <Link
+                  href={href}
+                  onClick={(event) => handleOpen(event, n, href)}
+                  className="flex-1"
+                >
                   <p className={`text-sm ${isUnread ? "font-semibold text-gray-900" : "text-gray-700"}`}>
                     {n.message}
                   </p>

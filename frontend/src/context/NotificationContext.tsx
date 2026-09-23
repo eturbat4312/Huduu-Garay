@@ -1,27 +1,30 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   fetchUnreadNotifications,
   markAllNotificationsAsRead,
   markBookingNotificationsAsRead,
+  markNotificationAsRead,
 } from "@/lib/api";
 
 type NotificationContextType = {
   totalUnread: number;
   bookingUnread: number;
-  refresh: () => void;
-  markAllAsRead: () => void;
-  markBookingNotificationsAsRead: () => void;
+  refresh: () => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  markOneAsRead: (notificationId: number, type?: string) => Promise<void>;
+  markBookingNotificationsAsRead: () => Promise<void>;
 };
 
 const NotificationContext = createContext<NotificationContextType>({
   totalUnread: 0,
   bookingUnread: 0,
-  refresh: () => {},
-  markAllAsRead: () => {},
-  markBookingNotificationsAsRead: () => {},
+  refresh: async () => {},
+  markAllAsRead: async () => {},
+  markOneAsRead: async () => {},
+  markBookingNotificationsAsRead: async () => {},
 });
 
 export function NotificationProvider({
@@ -35,7 +38,8 @@ export function NotificationProvider({
   const [totalUnread, setTotalUnread] = useState(0);
   const [bookingUnread, setBookingUnread] = useState(0);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
+    if (!user) return;
     try {
       const res = await fetchUnreadNotifications();
       setTotalUnread(res.total_unread);
@@ -43,19 +47,26 @@ export function NotificationProvider({
     } catch {
       // silent — 401 is expected when logged out
     }
-  };
+  }, [user]);
 
-  const markAllAsRead = async () => {
-    try {
-      await markAllNotificationsAsRead();
-      setTotalUnread(0);
-      setBookingUnread(0);
-    } catch {
-      // ignore
+  const markAllAsRead = useCallback(async () => {
+    await markAllNotificationsAsRead();
+    setTotalUnread(0);
+    setBookingUnread(0);
+  }, []);
+
+  const markOneAsRead = useCallback(async (notificationId: number, type?: string) => {
+    await markNotificationAsRead(notificationId);
+    setTotalUnread((current) => Math.max(0, current - 1));
+    if (
+      type &&
+      ["booking_created", "booking_confirmed", "booking_cancelled", "admin_booking"].includes(type)
+    ) {
+      setBookingUnread((current) => Math.max(0, current - 1));
     }
-  };
+  }, []);
 
-  const markBookingAsRead = async () => {
+  const markBookingAsRead = useCallback(async () => {
     try {
       await markBookingNotificationsAsRead();
       // Claude: clamp to 0 to prevent negative count on race conditions
@@ -64,7 +75,7 @@ export function NotificationProvider({
     } catch {
       // ignore
     }
-  };
+  }, [bookingUnread]);
 
   // Claude: only start polling when user is authenticated
   useEffect(() => {
@@ -75,8 +86,17 @@ export function NotificationProvider({
     }
     refresh();
     const interval = setInterval(refresh, 60000);
-    return () => clearInterval(interval);
-  }, [user]);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [user, refresh]);
 
   return (
     <NotificationContext.Provider
@@ -85,6 +105,7 @@ export function NotificationProvider({
         bookingUnread,
         refresh,
         markAllAsRead,
+        markOneAsRead,
         markBookingNotificationsAsRead: markBookingAsRead,
       }}
     >

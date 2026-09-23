@@ -2,8 +2,15 @@ from django.contrib.auth import get_user_model
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from core.models import Booking, Listing, Review
+from core.models import Booking, Listing, Notification, Review
+from core.services.push_notifications import queue_push_for_notification
 from core.utils.staff_notifications import notify_staff_activity
+
+
+@receiver(post_save, sender=Notification)
+def queue_mobile_push(sender, instance, created, **kwargs):
+    if created:
+        queue_push_for_notification(instance)
 
 
 @receiver(post_save, sender=get_user_model())

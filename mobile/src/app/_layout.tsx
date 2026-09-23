@@ -6,6 +6,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import AppShell from '@/components/app-shell';
 import { AnalyticsTracker } from '@/components/analytics-tracker';
 import { AuthProvider } from '@/context/auth';
+import { PushNotificationManager } from '@/components/push-notification-manager';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -15,6 +16,7 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AnalyticsTracker />
       <AuthProvider>
+        <PushNotificationManager />
         <AppShell>
           <AnimatedSplashOverlay />
           <Stack screenOptions={{ headerShown: false }}>

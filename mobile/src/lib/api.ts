@@ -21,6 +21,7 @@ const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
 
 export const ACCESS_TOKEN_KEY = 'access_token';
 export const REFRESH_TOKEN_KEY = 'refresh_token';
+export const REGISTERED_PUSH_TOKEN_KEY = 'registered_expo_push_token';
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -160,6 +161,13 @@ export async function signup(
 }
 
 export async function logout(): Promise<void> {
+  const pushToken = await getItem(REGISTERED_PUSH_TOKEN_KEY);
+  if (pushToken) {
+    try {
+      await deactivatePushDevice(pushToken);
+    } catch {}
+    await removeItem(REGISTERED_PUSH_TOKEN_KEY);
+  }
   await removeItem(ACCESS_TOKEN_KEY);
   await removeItem(REFRESH_TOKEN_KEY);
 }
@@ -428,6 +436,24 @@ export function markNotificationsRead(type?: string): Promise<void> {
 export function markNotificationRead(notificationId: number | string): Promise<void> {
   return request<void>(`/notifications/${notificationId}/read/`, {
     method: 'POST',
+  });
+}
+
+export function registerPushDevice(payload: {
+  token: string;
+  previous_token?: string;
+  platform: 'ios' | 'android';
+}): Promise<{ id: number; platform: string; is_active: boolean }> {
+  return request('/push-devices/register/', {
+    method: 'POST',
+    body: payload,
+  });
+}
+
+export function deactivatePushDevice(token: string): Promise<void> {
+  return request<void>('/push-devices/deactivate/', {
+    method: 'POST',
+    body: { token },
   });
 }
 

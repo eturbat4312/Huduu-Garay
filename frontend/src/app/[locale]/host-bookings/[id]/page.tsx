@@ -4,7 +4,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import api from "@/lib/axios";
-import { useNotification } from "@/context/NotificationContext";
 import { t } from "@/lib/i18n";
 import Image from "next/image";
 import HostCancellationAction from "@/components/HostCancellationAction";
@@ -15,7 +14,6 @@ export default function HostBookingDetailPage() {
   const { id, locale } = useParams() as { id: string; locale: string };
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
-  const { markBookingNotificationsAsRead } = useNotification();
 
   const fetchBooking = useCallback(async () => {
     try {
@@ -30,8 +28,7 @@ export default function HostBookingDetailPage() {
 
   useEffect(() => {
     fetchBooking();
-    markBookingNotificationsAsRead();
-  }, [fetchBooking, markBookingNotificationsAsRead]);
+  }, [fetchBooking]);
 
   if (loading)
     return <p className="p-6">{t(locale, "booking_detail.loading")}</p>;

@@ -612,9 +612,8 @@ class BookingSerializer(serializers.ModelSerializer):
         return Notification.objects.filter(
             user=request.user,
             is_read=False,
-            type="booking",
-            message__icontains=obj.listing.title,
-            created_at__gte=obj.created_at,
+            type__in=["booking_created", "booking_cancelled"],
+            related_booking=obj,
         ).exists()
 
     def get_host_name(self, obj):
@@ -808,6 +807,29 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     def get_related_listing(self, obj):
         return obj.related_listing.id if obj.related_listing else None
+
+
+class PushDeviceRegistrationSerializer(serializers.Serializer):
+    token = serializers.CharField(max_length=255, trim_whitespace=True)
+    previous_token = serializers.CharField(
+        max_length=255,
+        trim_whitespace=True,
+        required=False,
+        allow_blank=True,
+    )
+    platform = serializers.ChoiceField(choices=("ios", "android"))
+
+    def validate_token(self, value):
+        valid_prefix = value.startswith("ExpoPushToken[") or value.startswith(
+            "ExponentPushToken["
+        )
+        if not valid_prefix or not value.endswith("]"):
+            raise serializers.ValidationError("Expo push token буруу байна.")
+        return value
+
+
+class PushDeviceDeactivationSerializer(serializers.Serializer):
+    token = serializers.CharField(max_length=255, trim_whitespace=True)
 
 
 class SupportRequestSerializer(serializers.ModelSerializer):

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/axios";
-import { useNotification } from "@/context/NotificationContext";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { t } from "@/lib/i18n";
@@ -30,7 +29,6 @@ type Booking = {
 export default function HostBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
-  const { markBookingNotificationsAsRead } = useNotification();
   const { locale } = useParams(); // 🔥 locale-г URL-аас авна
 
   useEffect(() => {
@@ -38,7 +36,6 @@ export default function HostBookingsPage() {
       try {
         const res = await api.get("/host-bookings/");
         setBookings(res.data);
-        markBookingNotificationsAsRead(); // ✅ notification-уудыг уншсан болгож байна
       } catch (err) {
         console.error("Error fetching bookings:", err);
       } finally {
@@ -47,7 +44,7 @@ export default function HostBookingsPage() {
     };
 
     fetchBookings();
-  }, [markBookingNotificationsAsRead]);
+  }, []);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">

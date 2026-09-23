@@ -254,6 +254,18 @@ STAFF_ACTIVITY_EMAILS_ENABLED = os.getenv(
     "STAFF_ACTIVITY_EMAILS_ENABLED", "True"
 ).lower() in {"1", "true", "yes", "on"}
 
+EXPO_PUSH_NOTIFICATIONS_ENABLED = os.getenv(
+    "EXPO_PUSH_NOTIFICATIONS_ENABLED", "True"
+).lower() in {"1", "true", "yes", "on"}
+EXPO_PUSH_URL = os.getenv(
+    "EXPO_PUSH_URL", "https://exp.host/--/api/v2/push/send"
+)
+EXPO_PUSH_RECEIPTS_URL = os.getenv(
+    "EXPO_PUSH_RECEIPTS_URL", "https://exp.host/--/api/v2/push/getReceipts"
+)
+EXPO_PUSH_ACCESS_TOKEN = os.getenv("EXPO_PUSH_ACCESS_TOKEN", "")
+EXPO_PUSH_TIMEOUT_SECONDS = int(os.getenv("EXPO_PUSH_TIMEOUT_SECONDS", "10"))
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/

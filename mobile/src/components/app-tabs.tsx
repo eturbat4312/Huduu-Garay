@@ -32,12 +32,14 @@ export default function AppTabs() {
 
     load();
     const interval = setInterval(load, 30000);
-    const sub = DeviceEventEmitter.addListener('notifications:marked-read', load);
+    const markedReadSub = DeviceEventEmitter.addListener('notifications:marked-read', load);
+    const changedSub = DeviceEventEmitter.addListener('notifications:changed', load);
 
     return () => {
       cancelled = true;
       clearInterval(interval);
-      sub.remove();
+      markedReadSub.remove();
+      changedSub.remove();
     };
   }, [isAuthenticated]);
 

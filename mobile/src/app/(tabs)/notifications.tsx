@@ -1,10 +1,9 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   DeviceEventEmitter,
   FlatList,
-  Linking,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -18,7 +17,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, BottomTabInset, type ColorPalette } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
-import { API_BASE_URL, fetchNotifications, markNotificationRead } from '@/lib/api';
+import { fetchNotifications, markNotificationRead } from '@/lib/api';
+import { navigateForNotification } from '@/lib/notification-navigation';
 import type { NotificationItem } from '@/types/api';
 
 // ─── Notification icon by type ──────────────────────────────────────────────
@@ -37,39 +37,6 @@ function notifIcon(type: string): string {
     case 'admin_support':      return '🆘';
     case 'support_reply':      return '💬';
     default:                   return '🔔';
-  }
-}
-
-// ─── Navigate on tap ────────────────────────────────────────────────────────
-function navigateForNotification(item: NotificationItem) {
-  if (item.type === 'support_reply') {
-    router.push('/support' as never);
-    return;
-  }
-  if (item.type === 'admin_support' && item.related_support_request) {
-    void Linking.openURL(`${API_BASE_URL.replace(/\/api\/?$/, '')}/admin/core/supportrequest/${item.related_support_request}/change/`);
-    return;
-  }
-  if (item.related_booking) {
-    if (item.booking_role === 'admin') {
-      void Linking.openURL(`${API_BASE_URL.replace(/\/api\/?$/, '')}/admin/core/booking/${item.related_booking}/change/`);
-      return;
-    }
-    if (item.booking_role === 'guest') {
-      router.push(`/booking/${item.related_booking}` as never);
-      return;
-    }
-    if (item.booking_role === 'host') {
-      router.push(`/host-bookings/${item.related_booking}` as never);
-      return;
-    }
-    if (item.type === 'booking_created' || item.type === 'admin_booking') {
-      router.push(`/host-bookings/${item.related_booking}` as never);
-    } else {
-      router.push(`/booking/${item.related_booking}` as never);
-    }
-  } else if (item.related_listing) {
-    router.push(`/listing/${item.related_listing}` as never);
   }
 }
 
@@ -142,6 +109,13 @@ export default function NotificationsScreen() {
   useFocusEffect(useCallback(() => {
     load();
   }, [load]));
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('notifications:changed', () => {
+      void load(true);
+    });
+    return () => subscription.remove();
+  }, [load]);
 
   const handlePress = useCallback((item: NotificationItem) => {
     if (!item.is_read) {

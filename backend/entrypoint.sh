@@ -10,8 +10,15 @@ while ! nc -z "${DB_HOST}" "${DB_PORT}"; do
 done
 echo "✅ PostgreSQL is up."
 
-# Миграци / статик
+# Миграци
 python manage.py migrate --noinput
+
+# Worker эсвэл local runserver command өгсөн үед compose-ийн command-ыг ажиллуулна.
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
+
+# Статик
 python manage.py collectstatic --noinput
 
 # Gunicorn тохиргоо (env-ээр өөрчилж болно)

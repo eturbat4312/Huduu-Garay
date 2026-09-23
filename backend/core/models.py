@@ -852,7 +852,7 @@ class Notification(models.Model):
         "Booking",
         null=True,
         blank=True,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="notifications",
     )
 
@@ -860,7 +860,7 @@ class Notification(models.Model):
         "Listing",
         null=True,
         blank=True,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         related_name="notifications",
     )
 
@@ -873,11 +873,98 @@ class Notification(models.Model):
     )
 
     class Meta:
+        ordering = ["-created_at", "-id"]
         verbose_name = "Мэдэгдэл"
         verbose_name_plural = "Мэдэгдлүүд"
 
     def __str__(self):
         return f"[{self.get_type_display()}] {self.user.username}: {self.message[:30]}"
+
+
+class PushDevice(models.Model):
+    PLATFORM_IOS = "ios"
+    PLATFORM_ANDROID = "android"
+    PLATFORM_CHOICES = [
+        (PLATFORM_IOS, "iOS"),
+        (PLATFORM_ANDROID, "Android"),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="push_devices",
+    )
+    token = models.CharField(max_length=255, unique=True)
+    platform = models.CharField(max_length=10, choices=PLATFORM_CHOICES)
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-last_seen_at", "-id"]
+        indexes = [models.Index(fields=["user", "is_active"])]
+        verbose_name = "Push төхөөрөмж"
+        verbose_name_plural = "Push төхөөрөмжүүд"
+
+    def __str__(self):
+        return f"{self.user.username} · {self.platform} · {self.token[:24]}…"
+
+
+class PushDelivery(models.Model):
+    STATUS_PENDING = "pending"
+    STATUS_SENDING = "sending"
+    STATUS_ACCEPTED = "accepted"
+    STATUS_DELIVERED = "delivered"
+    STATUS_FAILED = "failed"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Илгээхээр хүлээж байна"),
+        (STATUS_SENDING, "Илгээж байна"),
+        (STATUS_ACCEPTED, "Expo хүлээн авсан"),
+        (STATUS_DELIVERED, "Хүргэгдсэн"),
+        (STATUS_FAILED, "Амжилтгүй"),
+    ]
+
+    notification = models.ForeignKey(
+        Notification,
+        on_delete=models.CASCADE,
+        related_name="push_deliveries",
+    )
+    device = models.ForeignKey(
+        PushDevice,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name="deliveries",
+    )
+    token = models.CharField(max_length=255)
+    status = models.CharField(
+        max_length=12,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        db_index=True,
+    )
+    ticket_id = models.CharField(max_length=80, blank=True, db_index=True)
+    error_code = models.CharField(max_length=80, blank=True)
+    error_message = models.TextField(blank=True)
+    attempt_count = models.PositiveSmallIntegerField(default=0)
+    last_attempt_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["notification", "device"],
+                name="unique_push_delivery_per_device",
+            )
+        ]
+        indexes = [models.Index(fields=["status", "last_attempt_at"])]
+        verbose_name = "Push хүргэлт"
+        verbose_name_plural = "Push хүргэлтүүд"
+
+    def __str__(self):
+        return f"Notification #{self.notification_id} · {self.status}"
 
 
 class Review(models.Model):
