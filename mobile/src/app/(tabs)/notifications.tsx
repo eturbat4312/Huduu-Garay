@@ -52,31 +52,44 @@ function formatDate(iso: string): string {
 function NotifRow({
   item,
   C,
+  isDark,
   onPress,
 }: {
   item: NotificationItem;
   C: ColorPalette;
+  isDark: boolean;
   onPress: (item: NotificationItem) => void;
 }) {
   const unread = !item.is_read;
+  const unreadBackground = isDark ? '#102A43' : '#EFF6FF';
+  const unreadText = isDark ? '#F8FAFC' : '#0F172A';
+  const unreadDate = isDark ? '#B8C7D9' : '#64748B';
+  const unreadAccent = isDark ? '#60A5FA' : '#3B82F6';
   return (
     <Pressable
       onPress={() => onPress(item)}
       style={({ pressed }) => [
         styles.row,
-        { backgroundColor: unread ? '#EFF6FF' : C.backgroundElement },
+        { backgroundColor: unread ? unreadBackground : C.backgroundElement },
         unread && styles.rowUnread,
+        unread && { borderLeftColor: unreadAccent },
         pressed && { opacity: 0.75 },
       ]}
     >
       <Text style={styles.icon}>{notifIcon(item.type)}</Text>
       <View style={styles.rowBody}>
-        <Text style={[styles.message, { color: C.text }, unread && { fontWeight: '600' }]}>
+        <Text style={[
+          styles.message,
+          { color: unread ? unreadText : C.text },
+          unread && { fontWeight: '600' },
+        ]}>
           {item.message}
         </Text>
-        <Text style={[styles.date, { color: C.textSecondary }]}>{formatDate(item.created_at)}</Text>
+        <Text style={[styles.date, { color: unread ? unreadDate : C.textSecondary }]}>
+          {formatDate(item.created_at)}
+        </Text>
       </View>
-      {unread && <View style={styles.dot} />}
+      {unread && <View style={[styles.dot, { backgroundColor: unreadAccent }]} />}
     </Pressable>
   );
 }
@@ -204,7 +217,14 @@ export default function NotificationsScreen() {
           <FlatList
             data={items}
             keyExtractor={(i) => String(i.id)}
-            renderItem={({ item }) => <NotifRow item={item} C={C} onPress={handlePress} />}
+            renderItem={({ item }) => (
+              <NotifRow
+                item={item}
+                C={C}
+                isDark={scheme === 'dark'}
+                onPress={handlePress}
+              />
+            )}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} />
             }
@@ -253,7 +273,6 @@ const styles = StyleSheet.create({
   },
   rowUnread: {
     borderLeftWidth: 3,
-    borderLeftColor: '#3B82F6',
   },
   icon: { fontSize: 24, marginTop: 2 },
   rowBody: { flex: 1, gap: 4 },
@@ -261,7 +280,7 @@ const styles = StyleSheet.create({
   date: { fontSize: 12 },
   dot: {
     width: 8, height: 8, borderRadius: 4,
-    backgroundColor: '#3B82F6', marginTop: 6,
+    marginTop: 6,
   },
   loginBtn: {
     marginTop: Spacing.two,
