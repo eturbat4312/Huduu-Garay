@@ -336,6 +336,31 @@ class ListingImageUploadTests(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(ListingImage.objects.count(), 0)
 
+    def test_upload_resizes_large_image_and_stores_optimized_jpeg(self):
+        buffer = BytesIO()
+        Image.new("RGB", (3000, 2000), color=(80, 140, 90)).save(
+            buffer, format="JPEG", quality=95
+        )
+        buffer.seek(0)
+        upload = SimpleUploadedFile(
+            "camera-photo.jpg",
+            buffer.read(),
+            content_type="image/jpeg",
+        )
+
+        response = self.client.post(
+            "/api/listing-images/",
+            {"listing": self.listing.id, "images": [upload]},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        stored = ListingImage.objects.get()
+        self.assertTrue(stored.image.name.endswith(".jpg"))
+        with Image.open(stored.image.path) as optimized:
+            self.assertEqual(optimized.format, "JPEG")
+            self.assertEqual(optimized.size, (1920, 1280))
+
 
 class PaymentFoundationTests(TestCase):
     def setUp(self):

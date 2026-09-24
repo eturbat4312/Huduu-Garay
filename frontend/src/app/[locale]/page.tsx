@@ -14,6 +14,14 @@ import FilterSidebar from "@/components/FilterSidebar";
 
 type SimpleCategory = { id: number; name: string; translation_key: string };
 
+const HERO_IMAGES = [
+  "/images/hero.webp",
+  "/images/hero2.webp",
+  "/images/hero3.webp",
+  "/images/hero4.webp",
+  "/images/hero5.webp",
+];
+
 export default function HomePage() {
   const raw = useParams().locale;
   const locale = (typeof raw === "string" ? raw : "mn") as string;
@@ -54,13 +62,6 @@ export default function HomePage() {
   }, []);
 
   // Hero images
-  const heroImages = [
-    "/images/hero.png",
-    "/images/hero2.png",
-    "/images/hero3.png",
-    "/images/hero4.png",
-    "/images/hero5.png",
-  ];
   const [current, setCurrent] = useState(0);
 
   // Fetch listings
@@ -102,11 +103,16 @@ export default function HomePage() {
   // Hero slideshow
   useEffect(() => {
     const id = setInterval(
-      () => setCurrent((p) => (p + 1) % heroImages.length),
+      () => setCurrent((p) => (p + 1) % HERO_IMAGES.length),
       3000
     );
     return () => clearInterval(id);
-  }, [heroImages.length]);
+  }, []);
+
+  useEffect(() => {
+    const nextImage = new window.Image();
+    nextImage.src = HERO_IMAGES[(current + 1) % HERO_IMAGES.length];
+  }, [current]);
 
   // Category pills
   const CategoryPills = () => {
@@ -177,18 +183,16 @@ export default function HomePage() {
     <main className="pb-16">
       {/* Hero */}
       <section className="relative w-full h-[420px] overflow-hidden">
-        {heroImages.map((img, idx) => (
-          <Image
-            key={idx}
-            src={img}
-            alt="Hero"
-            fill
-            priority={idx === 0}
-            className={`object-cover transition-opacity duration-1000 ease-in-out ${
-              idx === current ? "opacity-100" : "opacity-0"
-            }`}
-          />
-        ))}
+        <Image
+          key={HERO_IMAGES[current]}
+          src={HERO_IMAGES[current]}
+          alt="Hero"
+          fill
+          priority={current === 0}
+          unoptimized
+          sizes="100vw"
+          className="object-cover"
+        />
         <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-center text-white px-4">
           <h1 className="text-4xl md:text-5xl font-bold">
             {t(locale, "title")}

@@ -75,7 +75,7 @@ export default function ListingsPage() {
                       ? listing.images[0].image.startsWith("http")
                         ? listing.images[0].image
                         : `${MEDIA_URL}${listing.images[0].image}`
-                      : "/images/hero.png"
+                      : "/images/hero.webp"
                   }
                   alt={listing.title}
                   width={400}

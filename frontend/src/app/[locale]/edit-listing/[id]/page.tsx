@@ -11,6 +11,7 @@ import { t } from "@/lib/i18n";
 import LoadingButton from "@/components/LoadingButton";
 import NumberStepper from "@/components/NumberStepper";
 import LocationField from "@/components/LocationField";
+import { compressListingImages } from "@/lib/imageCompression";
 
 type Amenity = {
   id: number;
@@ -346,8 +347,9 @@ export default function EditListingPage() {
       }
 
       if (newImages.length > 0) {
+        const uploadImages = await compressListingImages(newImages);
         const formData = new FormData();
-        for (const img of newImages) {
+        for (const img of uploadImages) {
           formData.append("images", img);
         }
         formData.append("listing", id!.toString());

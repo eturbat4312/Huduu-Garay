@@ -12,6 +12,7 @@ import { t } from "@/lib/i18n";
 import NumberStepper from "@/components/NumberStepper";
 import LoadingButton from "@/components/LoadingButton";
 import LocationField from "@/components/LocationField"; // 🆕 MAP-PIN КОМПОНЕНТ
+import { compressListingImages } from "@/lib/imageCompression";
 
 type Category = { id: number; name: string };
 type Amenity = {
@@ -156,8 +157,9 @@ export default function CreateListingPage() {
 
   const handleImageUpload = async (listingId: number) => {
     if (images.length === 0) return;
+    const uploadImages = await compressListingImages(images);
     const formData = new FormData();
-    images.forEach((img) => formData.append("images", img));
+    uploadImages.forEach((img) => formData.append("images", img));
     formData.append("listing", String(listingId));
     await api.post("/listing-images/", formData, {
       headers: { "Content-Type": "multipart/form-data" },

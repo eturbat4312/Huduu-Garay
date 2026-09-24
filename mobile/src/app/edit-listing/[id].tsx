@@ -27,6 +27,7 @@ import {
   uploadListingImages,
 } from '@/lib/api';
 import type { ListingAmenity, ListingCategory, ListingImage } from '@/types/api';
+import { compressListingImages } from '@/lib/image-compression';
 
 const formatPrice = (value: string) =>
   value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -203,7 +204,12 @@ export default function EditListingScreen() {
     if (validAssets.length < result.assets.length) {
       Alert.alert('Зөвшөөрөгдсөн формат', 'Зөвхөн JPEG, PNG, WebP зураг оруулна уу.');
     }
-    setNewImageUris((prev) => [...prev, ...validAssets.map((a) => a.uri)].slice(0, 6));
+    try {
+      const compressedUris = await compressListingImages(validAssets);
+      setNewImageUris((prev) => [...prev, ...compressedUris].slice(0, 6));
+    } catch {
+      Alert.alert('Алдаа', 'Зургийг бэлтгэж чадсангүй. Дахин оролдоно уу.');
+    }
   };
 
   const handleDeleteExistingImage = async (img: ListingImage) => {

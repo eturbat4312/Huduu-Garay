@@ -11,9 +11,6 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.shortcuts import get_object_or_404
 from datetime import timedelta
-from PIL import Image, UnidentifiedImageError
-from io import BytesIO
-from django.core.files.base import ContentFile
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.utils import timezone
 from core.utils.email_notifications import send_notification_email
@@ -87,6 +84,7 @@ from .serializers import (
     SupportRequestSerializer,
     AnalyticsEventSerializer,
 )
+from .image_processing import ListingImageProcessingError, process_listing_image
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -401,6 +399,13 @@ class ListingImageUploadView(APIView):
 
             listing = Listing.objects.get(id=listing_id, host=request.user)
 
+            remaining_slots = 6 - listing.images.count()
+            if remaining_slots <= 0 or len(images) > remaining_slots:
+                return Response(
+                    {"error": "Нэг зарт нийт 6 хүртэл зураг оруулж болно."},
+                    status=400,
+                )
+
             processed_images = []
 
             for uploaded_image in images:
@@ -416,30 +421,12 @@ class ListingImageUploadView(APIView):
                     )
 
                 try:
-                    image = Image.open(uploaded_image)
-                    image.verify()
-                    uploaded_image.seek(0)
-                    image = Image.open(uploaded_image)
-                except (UnidentifiedImageError, OSError):
+                    processed_images.append(process_listing_image(uploaded_image))
+                except ListingImageProcessingError as error:
                     return Response(
-                        {
-                            "error": (
-                                "Зураг унших боломжгүй байна. JPG, PNG, WebP эсвэл GIF "
-                                "форматтай зураг оруулна уу."
-                            )
-                        },
+                        {"error": str(error)},
                         status=400,
                     )
-
-                max_size = (1024, 768)
-                image.thumbnail(max_size)
-
-                buffer = BytesIO()
-                image.convert("RGB").save(buffer, format="JPEG", quality=85)
-                buffer.seek(0)
-
-                final_image_file = ContentFile(buffer.read(), name="listing.jpg")
-                processed_images.append(final_image_file)
 
             created_images = []
             for final_image_file in processed_images:

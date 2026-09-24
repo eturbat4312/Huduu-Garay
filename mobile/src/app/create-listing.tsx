@@ -27,6 +27,7 @@ import {
 } from '@/lib/api';
 import type { ListingAmenity, ListingCategory } from '@/types/api';
 import MapPickerField from '@/components/map-picker-field';
+import { compressListingImages } from '@/lib/image-compression';
 
 // ─── Stepper компонент ────────────────────────────────────────────────────────
 function Stepper({
@@ -253,7 +254,12 @@ export default function CreateListingScreen() {
     if (validAssets.length < result.assets.length) {
       Alert.alert('Зөвшөөрөгдсөн формат', 'Зөвхөн JPEG, PNG, WebP зураг оруулна уу.');
     }
-    setImageUris((prev) => [...prev, ...validAssets.map((a) => a.uri)].slice(0, 6));
+    try {
+      const compressedUris = await compressListingImages(validAssets);
+      setImageUris((prev) => [...prev, ...compressedUris].slice(0, 6));
+    } catch {
+      Alert.alert('Алдаа', 'Зургийг бэлтгэж чадсангүй. Дахин оролдоно уу.');
+    }
   };
 
   // ─── Toggle amenity ──────────────────────────────────────────────────────────
