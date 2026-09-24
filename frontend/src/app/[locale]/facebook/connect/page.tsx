@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/axios";
-import { clearFacebookPending, facebookError, getFacebookPending, storeFacebookTokens, type FacebookPending } from "@/lib/facebook";
+import { clearFacebookPending, facebookError, facebookReturnPath, getFacebookPending, storeFacebookTokens, type FacebookPending } from "@/lib/facebook";
 import FacebookLoginButton from "@/components/FacebookLoginButton";
 
 export default function FacebookConnectPage() {
@@ -37,7 +37,7 @@ export default function FacebookConnectPage() {
         setUser(profile.data);
       }
       clearFacebookPending();
-      router.replace(`/${locale}/profile`);
+      router.replace(facebookReturnPath(locale, null, `/${locale}/profile`));
     } catch (err) { setError(facebookError(err)); }
     finally { setBusy(false); }
   }

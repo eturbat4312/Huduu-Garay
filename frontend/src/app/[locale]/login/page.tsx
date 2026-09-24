@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { facebookReturnPath } from "@/lib/facebook";
 import api from "@/lib/axios";
 import { useAuth } from "@/context/AuthContext";
@@ -11,10 +11,13 @@ import { t } from "@/lib/i18n";
 import LoadingButton from "@/components/LoadingButton"; // ⭐ CHANGE: импорт нэмсэн
 import Link from "next/link";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { locale: raw } = useParams();
   const locale = (typeof raw === "string" ? raw : "mn") as string;
+  const returnTo = searchParams.get("returnTo");
+  const isBookingLogin = returnTo?.startsWith(`/${locale}/checkout`) ?? false;
 
   const { login } = useAuth();
   const [username, setUsername] = useState("");
@@ -34,7 +37,7 @@ export default function LoginPage() {
       localStorage.setItem("refresh_token", data.refresh);
 
       await login();
-      router.replace(facebookReturnPath(locale));
+      router.replace(facebookReturnPath(locale, returnTo));
     } catch (err: unknown) {
       const status =
         typeof err === "object" &&
@@ -58,6 +61,12 @@ export default function LoginPage() {
         <h2 className="text-2xl font-bold text-center mb-6">
           {t(locale, "login_title")}
         </h2>
+
+        {isBookingLogin && (
+          <p className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            {t(locale, "booking_login_prompt")}
+          </p>
+        )}
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
@@ -107,9 +116,17 @@ export default function LoginPage() {
           <hr className="w-2/5 border-gray-300" />
         </div>
 
-        <GoogleLoginButton />
-        <FacebookLoginButton />
+        <GoogleLoginButton returnTo={returnTo} />
+        <FacebookLoginButton returnTo={returnTo} />
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Түр хүлээнэ үү...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

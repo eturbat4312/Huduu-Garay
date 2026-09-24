@@ -12,7 +12,7 @@ interface GoogleCredentialResponse {
   select_by: string;
 }
 
-export default function GoogleLoginButton() {
+export default function GoogleLoginButton({ returnTo }: { returnTo?: string | null }) {
   const router = useRouter();
   const { login } = useAuth();
   const { locale } = useParams() as { locale: string };
@@ -50,7 +50,7 @@ export default function GoogleLoginButton() {
             localStorage.setItem("refresh_token", res.data.refresh);
 
             await login();
-            router.replace(facebookReturnPath(locale));
+            router.replace(facebookReturnPath(locale, returnTo));
           } catch (err: unknown) {
             console.error("Google login error:", err);
             const responseError =
@@ -94,7 +94,7 @@ export default function GoogleLoginButton() {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [login, router, locale]);
+  }, [login, router, locale, returnTo]);
 
   return (
     <div className="mt-4">

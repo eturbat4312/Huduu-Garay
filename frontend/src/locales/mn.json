@@ -96,6 +96,7 @@
   
   "per_night_suffix": "/ шөнө",
   "login_title": "Нэвтрэх",
+  "booking_login_prompt": "Захиалгаа үргэлжлүүлэхийн тулд нэвтэрнэ үү. Нэвтэрсний дараа сонгосон захиалга руу тань буцаана.",
   "username_label": "Хэрэглэгчийн нэр",
   "username_or_email_label": "Хэрэглэгчийн нэр эсвэл имэйл",
   "username_or_email_placeholder": "username эсвэл email@example.com",

@@ -5,7 +5,13 @@ import { useParams } from "next/navigation";
 import api from "@/lib/axios";
 import { facebookError, startFacebook } from "@/lib/facebook";
 
-export default function FacebookLoginButton({ intent = "login" }: { intent?: "login" | "connect" }) {
+export default function FacebookLoginButton({
+  intent = "login",
+  returnTo,
+}: {
+  intent?: "login" | "connect";
+  returnTo?: string | null;
+}) {
   const { locale } = useParams() as { locale: string };
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -22,7 +28,7 @@ export default function FacebookLoginButton({ intent = "login" }: { intent?: "lo
     <button type="button" disabled={busy || !enabled} onClick={async () => {
       if (busy || !enabled) return;
       setBusy(true); setError("");
-      try { await startFacebook(locale, intent); }
+      try { await startFacebook(locale, intent, returnTo); }
       catch (err) { setError(facebookError(err)); setBusy(false); }
     }} className="flex min-h-11 w-full items-center justify-center rounded-lg bg-[#1877F2] px-4 py-3 font-semibold text-white hover:bg-[#166FE5] disabled:opacity-60">
       {busy ? "Facebook нээж байна..." : intent === "connect" ? "Facebook холбох" : "Facebook-ээр үргэлжлүүлэх"}

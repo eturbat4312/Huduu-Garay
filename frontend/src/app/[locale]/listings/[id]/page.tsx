@@ -14,6 +14,7 @@ import { Listing, Booking } from "@/types";
 import { AxiosError } from "axios";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import { loginHref } from "@/lib/authReturn";
 
 // ---------- Extra Types ----------
 type BookingDay = {
@@ -30,7 +31,7 @@ const formatDateString = (d: Date) =>
 export default function ListingDetailPage() {
   const { id, locale } = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [listing, setListing] = useState<Listing | null>(null);
   const [availableDateStrings, setAvailableDateStrings] = useState<Set<string>>(
@@ -178,9 +179,12 @@ export default function ListingDetailPage() {
       setBookingMessage(t(locale as string, "please_select_date"));
       return;
     }
-    router.push(
-      `/${locale}/checkout?listing=${id}&check_in_ts=${selectedRange.from.getTime()}&check_out_ts=${selectedRange.to.getTime()}`
-    );
+    const checkoutPath = `/${locale}/checkout?listing=${id}&check_in_ts=${selectedRange.from.getTime()}&check_out_ts=${selectedRange.to.getTime()}`;
+    if (!user) {
+      router.push(loginHref(locale as string, checkoutPath));
+      return;
+    }
+    router.push(checkoutPath);
   };
 
   const handleDelete = async () => {
@@ -427,7 +431,9 @@ export default function ListingDetailPage() {
               )}
               <button
                 onClick={handleBooking}
-                disabled={!selectedRange?.from || !selectedRange?.to}
+                disabled={
+                  authLoading || !selectedRange?.from || !selectedRange?.to
+                }
                 className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white w-full py-2 rounded mt-2"
               >
                 {t(locale as string, "create_booking")}

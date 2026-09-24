@@ -1,8 +1,10 @@
 import axios from "axios";
 import api from "@/lib/axios";
+import { safeAuthReturnPath } from "@/lib/authReturn";
 
 const VERIFIER_KEY = "facebook_login_verifier";
 const PENDING_KEY = "facebook_pending_connection";
+const RETURN_PATH_KEY = "facebook_login_return_path";
 export type FacebookPending = {
   status: "account_required";
   pending_token: string;
@@ -29,12 +31,30 @@ export function clearFacebookPending() {
   sessionStorage.removeItem(PENDING_KEY);
 }
 
-export function facebookReturnPath(locale: string) {
-  return getFacebookPending() ? `/${locale}/facebook/connect` : `/${locale}`;
+export function facebookReturnPath(
+  locale: string,
+  requestedPath?: string | null,
+  fallbackPath = `/${locale}`
+) {
+  if (getFacebookPending()) return `/${locale}/facebook/connect`;
+
+  const savedPath = sessionStorage.getItem(RETURN_PATH_KEY);
+  sessionStorage.removeItem(RETURN_PATH_KEY);
+  return safeAuthReturnPath(requestedPath || savedPath || fallbackPath, locale);
 }
 
-export async function startFacebook(locale: string, intent: "login" | "connect") {
+export async function startFacebook(
+  locale: string,
+  intent: "login" | "connect",
+  returnTo?: string | null
+) {
   exchange = null;
+  if (returnTo) {
+    sessionStorage.setItem(
+      RETURN_PATH_KEY,
+      safeAuthReturnPath(returnTo, locale)
+    );
+  }
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   const verifier = Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));

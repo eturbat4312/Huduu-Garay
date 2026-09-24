@@ -8,6 +8,8 @@ import { t } from "@/lib/i18n";
 import { CHECK_IN_TIME, CHECK_OUT_TIME } from "@/lib/bookingTimes";
 import { Listing } from "@/types";
 import axios from "axios";
+import { useAuth } from "@/context/AuthContext";
+import { loginHref } from "@/lib/authReturn";
 
 // Local YYYY-MM-DD (no TZ shift)
 const toYMD = (d: Date) =>
@@ -33,6 +35,11 @@ export default function CheckoutContent() {
   const { locale: rawLocale } = useParams();
   const locale = (typeof rawLocale === "string" ? rawLocale : "mn") as string;
   const uiLocale = localeMap[locale] || "mn-MN";
+  const { user, loading: authLoading } = useAuth();
+  const checkoutQuery = searchParams.toString();
+  const checkoutPath = `/${locale}/checkout${
+    checkoutQuery ? `?${checkoutQuery}` : ""
+  }`;
 
   const nf = useMemo(() => new Intl.NumberFormat(uiLocale), [uiLocale]);
   const df = useMemo(
@@ -90,6 +97,12 @@ export default function CheckoutContent() {
   const [submitting, setSubmitting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const attemptKeyRef = useRef<string | null>(null); // idempotency key per attempt
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace(loginHref(locale, checkoutPath));
+    }
+  }, [authLoading, checkoutPath, locale, router, user]);
 
   useEffect(() => {
     let mounted = true;
@@ -164,6 +177,11 @@ export default function CheckoutContent() {
         return;
       }
 
+      if (!user) {
+        router.replace(loginHref(locale, checkoutPath));
+        return;
+      }
+
       setBannerError("");
       if (!validate()) return;
       if (!listingId || !checkInDate || !displayCheckOutDate) {
@@ -217,6 +235,10 @@ export default function CheckoutContent() {
         if (axios.isCancel(err)) {
           return;
         }
+        if (axios.isAxiosError(err) && err.response?.status === 401) {
+          router.replace(loginHref(locale, checkoutPath));
+          return;
+        }
         const msg = axios.isAxiosError(err)
           ? err.response?.data?.error || t(locale, "error.booking_failed")
           : t(locale, "error.booking_failed");
@@ -228,6 +250,7 @@ export default function CheckoutContent() {
     },
     [
       submitting,
+      user,
       validate,
       listingId,
       checkInDate,
@@ -238,10 +261,11 @@ export default function CheckoutContent() {
       guestCount,
       router,
       locale,
+      checkoutPath,
     ]
   );
 
-  if (loading) {
+  if (authLoading || !user || loading) {
     return (
       <main className="max-w-5xl mx-auto px-4 py-10">
         <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mb-6" />

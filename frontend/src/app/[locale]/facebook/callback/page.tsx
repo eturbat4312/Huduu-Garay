@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/axios";
-import { completeFacebook, facebookError, forgetFacebookExchange } from "@/lib/facebook";
+import { completeFacebook, facebookError, facebookReturnPath, forgetFacebookExchange } from "@/lib/facebook";
 import { useAuth } from "@/context/AuthContext";
 
 function Callback() {
@@ -21,7 +21,7 @@ function Callback() {
       if (!active) return;
       if (result.status === "authenticated") {
         const { data } = await api.get("/me/");
-        if (active) { forgetFacebookExchange(); setUser(data); router.replace(`/${locale}`); }
+        if (active) { forgetFacebookExchange(); setUser(data); router.replace(facebookReturnPath(locale)); }
       } else if (result.status === "account_required") {
         forgetFacebookExchange();
         router.replace(`/${locale}/facebook/connect`);
