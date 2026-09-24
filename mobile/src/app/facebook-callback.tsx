@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 import { useAuth } from '@/context/auth';
-import { completeFacebook, facebookError, forgetFacebookExchange } from '@/lib/facebook';
+import { completeFacebook, facebookError, facebookReturnPath, forgetFacebookExchange } from '@/lib/facebook';
 
 export default function FacebookCallbackScreen() {
   const { code } = useLocalSearchParams<{ code?: string }>();
@@ -19,7 +19,7 @@ export default function FacebookCallbackScreen() {
       if (!active) return;
       if (result.status === 'authenticated') {
         await acceptFacebookSession(result);
-        if (active) { forgetFacebookExchange(code); router.replace('/(tabs)/profile'); }
+        if (active) { forgetFacebookExchange(code); router.replace(await facebookReturnPath()); }
       } else if (result.status === 'account_required') {
         forgetFacebookExchange(code);
         router.replace('/facebook-connect' as Href);

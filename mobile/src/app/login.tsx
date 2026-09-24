@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -19,8 +19,12 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 import { ApiError } from '@/lib/api';
+import { safeAuthReturnPath } from '@/lib/auth-return';
 
 export default function LoginScreen() {
+  const { returnTo: rawReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const returnTo = safeAuthReturnPath(rawReturnTo);
+  const isBookingLogin = returnTo?.startsWith('/checkout?') ?? false;
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -37,7 +41,7 @@ export default function LoginScreen() {
     setIsSubmitting(true);
     try {
       await login(email.trim(), password);
-      router.replace(await facebookReturnPath());
+      router.replace(await facebookReturnPath(returnTo));
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setError('Имэйл эсвэл нууц үг буруу байна.');
@@ -61,7 +65,9 @@ export default function LoginScreen() {
             <View style={styles.header}>
               <ThemedText type="title">Нэвтрэх</ThemedText>
               <ThemedText themeColor="textSecondary">
-                Танайд Хоноё — Орон сууц, Зуслан, Амралт захиалгын цогц платформ
+                {isBookingLogin
+                  ? 'Захиалгаа үргэлжлүүлэхийн тулд нэвтэрнэ үү. Нэвтэрсний дараа сонгосон захиалга руу буцаана.'
+                  : 'Танайд Хоноё — Орон сууц, Зуслан, Амралт захиалгын цогц платформ'}
               </ThemedText>
             </View>
 
@@ -126,15 +132,21 @@ export default function LoginScreen() {
               <GoogleSignInButton
                 label="Google-ээр нэвтрэх"
                 onError={(msg) => setError(msg)}
+                returnTo={returnTo}
               />
-              <FacebookSignInButton />
+              <FacebookSignInButton returnTo={returnTo} />
             </View>
 
             <View style={styles.footer}>
               <ThemedText type="small" themeColor="textSecondary">
                 Бүртгэл байхгүй юу?
               </ThemedText>
-              <Pressable onPress={() => router.push('/signup')}>
+              <Pressable
+                onPress={() => router.push(
+                  returnTo
+                    ? ({ pathname: '/signup', params: { returnTo } } as never)
+                    : '/signup',
+                )}>
                 <ThemedText type="smallBold" style={styles.linkText}>
                   Бүртгүүлэх
                 </ThemedText>

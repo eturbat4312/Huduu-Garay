@@ -25,7 +25,9 @@ import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
 import { CHECK_IN_TIME, CHECK_OUT_TIME } from '@/constants/booking-times';
 import { useAuth } from '@/context/auth';
+import { loginHref } from '@/lib/auth-return';
 import {
+  ApiError,
   createFavorite,
   createReview,
   deleteFavorite,
@@ -345,7 +347,7 @@ export default function ListingDetailScreen() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const C = Colors[scheme];
   const { width: screenWidth } = useWindowDimensions();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [listing, setListing] = useState<ListingDetail | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set());
@@ -356,6 +358,7 @@ export default function ListingDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoriteId, setFavoriteId] = useState<number | null>(null);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
   const routeError = id ? null : 'Зарын дугаар олдсонгүй';
 
   // ── Reviews ──
@@ -457,7 +460,7 @@ export default function ListingDetailScreen() {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, user?.id]);
 
   const imageUrls = useMemo(() => {
     const urls = (listing?.images ?? [])
@@ -528,10 +531,13 @@ export default function ListingDetailScreen() {
   };
 
   const isOwner = !!user && !!listing?.host?.id && user.id === listing.host.id;
-  const isLoggedIn = !!user;
-
   const handleFavorite = async () => {
-    if (!listing) return;
+    if (!listing || favoriteBusy || authLoading) return;
+    if (!user) {
+      router.push(loginHref(`/listing/${listing.id}`));
+      return;
+    }
+    setFavoriteBusy(true);
     try {
       if (isFavorited && favoriteId) {
         await deleteFavorite(favoriteId);
@@ -542,7 +548,15 @@ export default function ListingDetailScreen() {
         setIsFavorited(true);
         setFavoriteId(res.id);
       }
-    } catch {}
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        router.push(loginHref(`/listing/${listing.id}`));
+      } else {
+        Alert.alert('Алдаа', err instanceof Error ? err.message : 'Хадгалахад алдаа гарлаа.');
+      }
+    } finally {
+      setFavoriteBusy(false);
+    }
   };
 
   const handleDelete = () => {
@@ -580,16 +594,13 @@ export default function ListingDetailScreen() {
     }
 
     setBookingMessage('');
-    router.push(
-      {
-        pathname: '/checkout',
-        params: {
-          listing: String(id),
-          check_in: checkIn,
-          check_out: normalizedCheckOut,
-        },
-      } as unknown as Href,
-    );
+    const checkoutPath = `/checkout?listing=${encodeURIComponent(String(id))}&check_in=${encodeURIComponent(checkIn)}&check_out=${encodeURIComponent(normalizedCheckOut)}`;
+    if (authLoading) return;
+    if (!user) {
+      router.push(loginHref(checkoutPath));
+      return;
+    }
+    router.push(checkoutPath as Href);
   };
 
   if (routeError) {
@@ -734,8 +745,11 @@ export default function ListingDetailScreen() {
                     <Text style={styles.actionBtnText}>🗑 Устгах</Text>
                   </Pressable>
                 </View>
-              ) : isLoggedIn && isPublished ? (
-                <Pressable onPress={handleFavorite} style={styles.favoriteBtn}>
+              ) : isPublished ? (
+                <Pressable
+                  disabled={favoriteBusy || authLoading}
+                  onPress={handleFavorite}
+                  style={[styles.favoriteBtn, (favoriteBusy || authLoading) && { opacity: 0.5 }]}>
                   <Text style={{ fontSize: 26 }}>{isFavorited ? '❤️' : '🤍'}</Text>
                 </Pressable>
               ) : null}

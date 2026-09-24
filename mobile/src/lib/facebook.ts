@@ -2,6 +2,7 @@ import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 import type { Href } from 'expo-router';
 import { API_BASE_URL, ApiError, ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from './api';
+import { rememberAuthReturnPath, resolveAuthReturnPath } from './auth-return';
 import { getItem, setItem, removeItem } from './storage';
 
 const VERIFIER_KEY = 'facebook_login_verifier';
@@ -34,12 +35,20 @@ export async function getFacebookPending(): Promise<FacebookPending | null> {
   return null;
 }
 export async function clearFacebookPending() { await removeItem(PENDING_KEY); }
-export async function facebookReturnPath(): Promise<Href> {
-  return (await getFacebookPending() ? '/facebook-connect' : '/(tabs)/profile') as Href;
+export async function facebookReturnPath(
+  requestedPath?: string | null,
+  fallback = '/(tabs)/profile',
+): Promise<Href> {
+  if (await getFacebookPending()) return '/facebook-connect' as Href;
+  return resolveAuthReturnPath(requestedPath, fallback);
 }
-export async function prepareFacebook(intent: 'login' | 'connect') {
+export async function prepareFacebook(
+  intent: 'login' | 'connect',
+  returnTo?: string | null,
+) {
   exchange = null;
   completedCode = '';
+  await rememberAuthReturnPath(intent === 'login' ? returnTo : null);
   if (Platform.OS === 'web') throw new Error('Facebook нэвтрэлтийг үндсэн вэб сайт дээр ашиглана уу.');
   const bytes = await Crypto.getRandomBytesAsync(32);
   const verifier = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');

@@ -13,9 +13,14 @@ export const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
 type Props = {
   label?: string;
   onError?: (msg: string) => void;
+  returnTo?: string | null;
 };
 
-export function GoogleSignInButton({ label = 'Google-ээр нэвтрэх', onError }: Props) {
+export function GoogleSignInButton({
+  label = 'Google-ээр нэвтрэх',
+  onError,
+  returnTo,
+}: Props) {
   const { loginWithGoogle } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const isConfigured = Boolean(
@@ -54,7 +59,7 @@ export function GoogleSignInButton({ label = 'Google-ээр нэвтрэх', onE
       if (!idToken) throw new Error('Google таних мэдээлэл ирсэнгүй.');
 
       await loginWithGoogle(idToken);
-      router.replace(await facebookReturnPath());
+      router.replace(await facebookReturnPath(returnTo));
     } catch (err) {
       const googleModule = await import('@react-native-google-signin/google-signin');
       if (googleModule.isErrorWithCode(err)) {

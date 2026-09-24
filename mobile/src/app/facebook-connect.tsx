@@ -7,7 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { FacebookSignInButton } from '@/components/facebook-sign-in-button';
 import { useAuth } from '@/context/auth';
 import { connectFacebook } from '@/lib/api';
-import { clearFacebookPending, facebookError, facebookRequest, getFacebookPending, type FacebookPending } from '@/lib/facebook';
+import { clearFacebookPending, facebookError, facebookRequest, facebookReturnPath, getFacebookPending, type FacebookPending } from '@/lib/facebook';
 
 export default function FacebookConnectScreen() {
   const { user, isLoading, acceptFacebookSession, logout, refresh } = useAuth();
@@ -39,7 +39,7 @@ export default function FacebookConnectScreen() {
         await acceptFacebookSession(data);
       }
       await clearFacebookPending();
-      router.replace('/(tabs)/profile');
+      router.replace(await facebookReturnPath(null, '/(tabs)/profile'));
     } catch (err) { setError(facebookError(err)); }
     finally { setBusy(false); }
   }

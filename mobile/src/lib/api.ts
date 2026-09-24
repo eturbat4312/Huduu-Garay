@@ -23,6 +23,13 @@ export const ACCESS_TOKEN_KEY = 'access_token';
 export const REFRESH_TOKEN_KEY = 'refresh_token';
 export const REGISTERED_PUSH_TOKEN_KEY = 'registered_expo_push_token';
 
+let authInvalidatedListener: (() => void) | null = null;
+let refreshPromise: Promise<string | null> | null = null;
+
+export function setAuthInvalidatedListener(listener: (() => void) | null) {
+  authInvalidatedListener = listener;
+}
+
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
@@ -43,9 +50,18 @@ export class ApiError extends Error {
   }
 }
 
-async function refreshAccessToken(): Promise<string | null> {
+async function clearInvalidSession() {
+  await removeItem(ACCESS_TOKEN_KEY);
+  await removeItem(REFRESH_TOKEN_KEY);
+  authInvalidatedListener?.();
+}
+
+async function performTokenRefresh(): Promise<string | null> {
   const refresh = await getItem(REFRESH_TOKEN_KEY);
-  if (!refresh) return null;
+  if (!refresh) {
+    await clearInvalidSession();
+    return null;
+  }
 
   const response = await fetch(`${API_BASE_URL}/token/refresh/`, {
     method: 'POST',
@@ -54,14 +70,34 @@ async function refreshAccessToken(): Promise<string | null> {
   });
 
   if (!response.ok) {
-    await removeItem(ACCESS_TOKEN_KEY);
-    await removeItem(REFRESH_TOKEN_KEY);
-    return null;
+    let data: unknown;
+    try {
+      data = await response.json();
+    } catch {}
+    if (response.status === 400 || response.status === 401) {
+      await clearInvalidSession();
+      return null;
+    }
+    throw new ApiError(
+      response.status,
+      extractErrorMessage(data) ?? `Token refresh failed: ${response.status}`,
+      data,
+    );
   }
 
-  const data = (await response.json()) as { access: string };
+  const data = (await response.json()) as { access: string; refresh?: string };
   await setItem(ACCESS_TOKEN_KEY, data.access);
+  if (data.refresh) await setItem(REFRESH_TOKEN_KEY, data.refresh);
   return data.access;
+}
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = performTokenRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
 }
 
 function buildQuery(params: Record<string, string | number | undefined>) {
@@ -101,6 +137,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (newAccess) {
       return request<T>(path, { ...options, retryOnUnauthorized: false });
     }
+    authInvalidatedListener?.();
+  } else if (response.status === 401) {
+    await clearInvalidSession();
   }
 
   if (!response.ok) {

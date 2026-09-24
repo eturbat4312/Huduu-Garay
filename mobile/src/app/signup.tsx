@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import {
   KeyboardAvoidingView,
@@ -19,8 +19,11 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 import { ApiError } from '@/lib/api';
+import { safeAuthReturnPath } from '@/lib/auth-return';
 
 export default function SignupScreen() {
+  const { returnTo: rawReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const returnTo = safeAuthReturnPath(rawReturnTo);
   const { signup } = useAuth();
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -51,7 +54,7 @@ export default function SignupScreen() {
     setIsSubmitting(true);
     try {
       await signup(email.trim(), username.trim(), password);
-      router.replace(await facebookReturnPath());
+      router.replace(await facebookReturnPath(returnTo));
     } catch (err) {
       if (err instanceof ApiError) {
         const data = err.data as Record<string, unknown> | undefined;
@@ -95,8 +98,9 @@ export default function SignupScreen() {
               <GoogleSignInButton
                 label="Google-ээр бүртгүүлэх"
                 onError={(msg) => setError(msg)}
+                returnTo={returnTo}
               />
-              <FacebookSignInButton />
+              <FacebookSignInButton returnTo={returnTo} />
 
               <View style={styles.divider}>
                 <View style={styles.dividerLine} />
@@ -178,7 +182,12 @@ export default function SignupScreen() {
               <ThemedText type="small" themeColor="textSecondary">
                 Бүртгэл байгаа юу?
               </ThemedText>
-              <Pressable onPress={() => router.push('/login')}>
+              <Pressable
+                onPress={() => router.push(
+                  returnTo
+                    ? ({ pathname: '/login', params: { returnTo } } as never)
+                    : '/login',
+                )}>
                 <ThemedText type="smallBold" style={styles.linkText}>
                   Нэвтрэх
                 </ThemedText>

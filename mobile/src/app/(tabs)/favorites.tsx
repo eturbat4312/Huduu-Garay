@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,7 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Colors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
-import { deleteFavorite, fetchFavorites, resolveMediaUrl } from '@/lib/api';
+import { loginHref } from '@/lib/auth-return';
+import { ApiError, deleteFavorite, fetchFavorites, resolveMediaUrl } from '@/lib/api';
 import type { FavoriteListItem } from '@/types/api';
 
 export default function FavoritesScreen() {
@@ -27,21 +28,40 @@ export default function FavoritesScreen() {
   const [error, setError] = useState('');
   const [removing, setRemoving] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    if (!isAuthenticated) {
+      setLoading(false);
+      return () => { active = false; };
+    }
+
+    setLoading(true);
+    setError('');
     fetchFavorites()
-      .then(setFavorites)
-      .catch(() => setError('Мэдээлэл татахад алдаа гарлаа.'))
-      .finally(() => setLoading(false));
-  }, [isAuthenticated]);
+      .then((data) => { if (active) setFavorites(data); })
+      .catch((err) => {
+        if (!active) return;
+        if (err instanceof ApiError && err.status === 401) {
+          router.push(loginHref('/(tabs)/favorites'));
+        } else {
+          setError(err instanceof Error ? err.message : 'Мэдээлэл татахад алдаа гарлаа.');
+        }
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [isAuthenticated]));
 
   async function handleRemove(favoriteId: number) {
     setRemoving(favoriteId);
     try {
       await deleteFavorite(favoriteId);
       setFavorites((prev) => prev.filter((f) => f.id !== favoriteId));
-    } catch {
-      // алдаа гарсан ч UI өөрчлөхгүй
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        router.push(loginHref('/(tabs)/favorites'));
+      } else {
+        setError(err instanceof Error ? err.message : 'Хадгалснаас хасахад алдаа гарлаа.');
+      }
     } finally {
       setRemoving(null);
     }
@@ -60,7 +80,7 @@ export default function FavoritesScreen() {
               Дуртай газруудаа харахын тулд нэвтрэн орно уу.
             </Text>
             <Pressable
-              onPress={() => router.push('/login')}
+              onPress={() => router.push(loginHref('/(tabs)/favorites'))}
               style={({ pressed }) => [styles.btn, pressed && { opacity: 0.75 }]}
             >
               <Text style={styles.btnText}>Нэвтрэх</Text>
@@ -135,7 +155,11 @@ export default function FavoritesScreen() {
                     )}
                     {/* Хасах товч */}
                     <Pressable
-                      onPress={() => handleRemove(item.id)}
+                      disabled={removing !== null}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        void handleRemove(item.id);
+                      }}
                       style={({ pressed }) => [styles.removeBtnWrap, pressed && { opacity: 0.7 }]}
                     >
                       {isRemoving ? (

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-import { fetchMe, googleLogin as apiGoogleLogin, login as apiLogin, logout as apiLogout, signup as apiSignup, ACCESS_TOKEN_KEY } from '@/lib/api';
+import { fetchMe, googleLogin as apiGoogleLogin, login as apiLogin, logout as apiLogout, signup as apiSignup, ACCESS_TOKEN_KEY, setAuthInvalidatedListener } from '@/lib/api';
 import { getItem } from '@/lib/storage';
 import { storeFacebookTokens } from '@/lib/facebook';
 import type { UserProfile } from '@/types/api';
@@ -62,6 +62,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadUser();
   }, [loadUser]);
+
+  useEffect(() => {
+    setAuthInvalidatedListener(() => setState({ status: 'guest' }));
+    return () => setAuthInvalidatedListener(null);
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     await apiLogin(email, password);

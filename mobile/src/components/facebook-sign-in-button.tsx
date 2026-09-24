@@ -6,7 +6,13 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-
 import { ThemedText } from '@/components/themed-text';
 import { facebookError, facebookRequest, prepareFacebook, wasFacebookCallbackHandled } from '@/lib/facebook';
 
-export function FacebookSignInButton({ intent = 'login' }: { intent?: 'login' | 'connect' }) {
+export function FacebookSignInButton({
+  intent = 'login',
+  returnTo,
+}: {
+  intent?: 'login' | 'connect';
+  returnTo?: string | null;
+}) {
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -25,7 +31,7 @@ export function FacebookSignInButton({ intent = 'login' }: { intent?: 'login' | 
     }
     setBusy(true); setError('');
     try {
-      const url = await prepareFacebook(intent);
+      const url = await prepareFacebook(intent, returnTo);
       const result = await WebBrowser.openAuthSessionAsync(url, 'tanaidhonoy://facebook-callback');
       if (result.type === 'success') {
         const returned = new URL(result.url);

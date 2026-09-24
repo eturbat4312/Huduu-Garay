@@ -16,6 +16,8 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
 import { CHECK_IN_TIME, CHECK_OUT_TIME } from '@/constants/booking-times';
+import { useAuth } from '@/context/auth';
+import { loginHref } from '@/lib/auth-return';
 import { ApiError, createPayment, createPaymentIntent, fetchListing } from '@/lib/api';
 import { datesBetweenNights, isDateString } from '@/lib/dates';
 import type { ListingDetail } from '@/types/api';
@@ -28,6 +30,8 @@ export default function CheckoutScreen() {
     check_in?: string;
     check_out?: string;
   }>();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const returnPath = `/checkout?listing=${encodeURIComponent(params.listing ?? '')}&check_in=${encodeURIComponent(params.check_in ?? '')}&check_out=${encodeURIComponent(params.check_out ?? '')}`;
   const routeError =
     !params.listing || !params.check_in || !params.check_out
       ? 'Захиалгын огноо эсвэл зарын дугаар дутуу байна.'
@@ -42,6 +46,12 @@ export default function CheckoutScreen() {
   const [isLoading, setIsLoading] = useState(!routeError);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const attemptKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.replace(loginHref(returnPath));
+    }
+  }, [authLoading, isAuthenticated, returnPath]);
 
   useEffect(() => {
     if (routeError || !params.listing) {
@@ -127,6 +137,11 @@ export default function CheckoutScreen() {
       return;
     }
 
+    if (!isAuthenticated) {
+      router.replace(loginHref(returnPath));
+      return;
+    }
+
     const validationError = validate();
     if (validationError) {
       setError(validationError);
@@ -172,7 +187,7 @@ export default function CheckoutScreen() {
       attemptKeyRef.current = null;
 
       if (err instanceof ApiError && err.status === 401) {
-        setError('Захиалга хийхийн тулд эхлээд нэвтэрнэ үү.');
+        router.replace(loginHref(returnPath));
       } else {
         setError(err instanceof Error ? err.message : 'Захиалга үүсгэхэд алдаа гарлаа.');
       }
@@ -181,7 +196,7 @@ export default function CheckoutScreen() {
     }
   };
 
-  if (isLoading) {
+  if (authLoading || !isAuthenticated || isLoading) {
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.center}>

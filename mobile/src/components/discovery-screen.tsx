@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Modal,
@@ -21,7 +22,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
+import { loginHref } from '@/lib/auth-return';
 import {
+  ApiError,
   createFavorite,
   deleteFavorite,
   fetchCategories,
@@ -139,7 +142,7 @@ export default function DiscoveryScreen() {
     return () => {
       isMounted = false;
     };
-  }, [appliedFilters, reloadKey]);
+  }, [appliedFilters, isAuthenticated, reloadKey]);
 
   useEffect(() => {
     let isMounted = true;
@@ -621,7 +624,7 @@ function ListingCard({
 
   const toggleFavorite = async () => {
     if (!isAuthenticated) {
-      router.push('/login');
+      router.push(loginHref('/(tabs)'));
       return;
     }
     if (favoriteBusy) return;
@@ -634,8 +637,12 @@ function ListingCard({
         const favorite = await createFavorite(item.id);
         onChange({ ...item, is_favorited: true, favorite_id: favorite.id });
       }
-    } catch {
-      // Network/API алдааны үед одоогийн төлөвийг хэвээр үлдээнэ.
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        router.push(loginHref('/(tabs)'));
+      } else {
+        Alert.alert('Алдаа', err instanceof Error ? err.message : 'Хадгалахад алдаа гарлаа.');
+      }
     } finally {
       setFavoriteBusy(false);
     }
