@@ -974,6 +974,11 @@ class HostApplicationSerializer(serializers.ModelSerializer):
             "status",
             "submitted_at",
         ]
+        extra_kwargs = {
+            # Нууц файл — API хариунд хэзээ ч URL буцаахгүй.
+            "id_card_image": {"write_only": True},
+            "selfie_with_id": {"write_only": True},
+        }
         read_only_fields = [
             "status",
             "submitted_at",

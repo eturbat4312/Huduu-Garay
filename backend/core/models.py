@@ -9,6 +9,13 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 
 # from .utils.notifications import send_notification_email
+from core.private_storage import (
+    guest_refund_proof_upload_to,
+    host_payout_proof_upload_to,
+    id_card_upload_to,
+    private_storage,
+    selfie_upload_to,
+)
 from core.utils.email_notifications import send_notification_email
 
 
@@ -513,7 +520,10 @@ class HostPayout(models.Model):
     )
     transfer_reference = models.CharField("Гүйлгээний дугаар", max_length=160, blank=True)
     transfer_proof = models.FileField(
-        "Шилжүүлгийн баримт", upload_to="financial_proofs/host_payouts/", blank=True
+        "Шилжүүлгийн баримт",
+        upload_to=host_payout_proof_upload_to,
+        storage=private_storage,
+        blank=True,
     )
     legacy_review_required = models.BooleanField(
         "Хуучин бүртгэлийг шалгах", default=False, db_index=True
@@ -632,7 +642,10 @@ class GuestRefund(models.Model):
     )
     transfer_reference = models.CharField("Гүйлгээний дугаар", max_length=160, blank=True)
     transfer_proof = models.FileField(
-        "Шилжүүлгийн баримт", upload_to="financial_proofs/guest_refunds/", blank=True
+        "Шилжүүлгийн баримт",
+        upload_to=guest_refund_proof_upload_to,
+        storage=private_storage,
+        blank=True,
     )
     legacy_review_required = models.BooleanField(
         "Хуучин бүртгэлийг шалгах", default=False, db_index=True
@@ -1038,8 +1051,8 @@ class HostApplication(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     full_name = models.CharField(max_length=255)
     phone_number = models.CharField(max_length=20)
-    id_card_image = models.ImageField(upload_to="id_cards/")
-    selfie_with_id = models.ImageField(upload_to="selfies/")
+    id_card_image = models.ImageField(upload_to=id_card_upload_to, storage=private_storage)
+    selfie_with_id = models.ImageField(upload_to=selfie_upload_to, storage=private_storage)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     submitted_at = models.DateTimeField(auto_now_add=True)
     host_terms_accepted_at = models.DateTimeField(null=True, blank=True)

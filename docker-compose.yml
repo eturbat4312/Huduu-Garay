@@ -23,6 +23,8 @@ services:
       context: ./backend
     volumes:
       - ./backend/media:/app/media
+      # Иргэний үнэмлэх, selfie, санхүүгийн баримт — Nginx-ээр serve хийхгүй
+      - ./backend/private_media:/app/private_media
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8010}:8010"
     env_file:

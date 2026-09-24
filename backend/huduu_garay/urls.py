@@ -4,6 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib.admin.views.decorators import staff_member_required
 from core.admin import booking_finance_detail_view, stats_view
+from core.private_media_views import private_media_view
 
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -17,6 +18,13 @@ urlpatterns = [
         name="admin-booking-finance-detail",
     ),
     path("admin/stats/", staff_member_required(stats_view), name="admin-stats"),
+    # Нууц файл (ID, selfie, баримт) — admin session cookie /admin path-д л
+    # илгээгддэг тул энэ route заавал /admin/ доор байна.
+    path(
+        "admin/private-media/<str:token>/",
+        private_media_view,
+        name="private-media",
+    ),
     path("admin/", staff_member_required(stats_view), name="admin-home"),
     path("admin/", admin.site.urls),
     path("api/", include("core.urls")),  # core app API-ууд

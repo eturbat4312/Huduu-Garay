@@ -14,6 +14,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from datetime import timedelta
+from django.core.exceptions import ImproperlyConfigured
 from corsheaders.defaults import default_headers  # ⬅️ нэмнэ
 
 
@@ -186,6 +187,16 @@ AUTH_USER_MODEL = "core.CustomUser"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+# Иргэний үнэмлэх, selfie, санхүүгийн баримт. Nginx-ээр serve ХИЙХГҮЙ — зөвхөн
+# staff-д зориулсан /admin/private-media/<token>/ view-ээр нээгдэнэ.
+PRIVATE_MEDIA_ROOT = os.getenv(
+    "PRIVATE_MEDIA_ROOT", os.path.join(BASE_DIR, "private_media")
+)
+if os.path.commonpath(
+    [os.path.abspath(PRIVATE_MEDIA_ROOT), os.path.abspath(MEDIA_ROOT)]
+) == os.path.abspath(MEDIA_ROOT):
+    raise ImproperlyConfigured("PRIVATE_MEDIA_ROOT нь MEDIA_ROOT дотор байж болохгүй.")
 
 CORS_ALLOWED_ORIGINS = os.getenv(
     "CORS_ALLOWED_ORIGINS",

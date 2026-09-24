@@ -1,0 +1,9 @@
+# Image-д орох ёсгүй: хэрэглэгчийн файл, нууц тохиргоо, local venv
+media/
+private_media/
+staticfiles/
+env/
+.env
+.env.*
+**/__pycache__/
+**/*.pyc
