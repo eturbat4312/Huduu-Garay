@@ -20,7 +20,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing, BottomTabInset, type ColorPalette } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
-import { fetchNotifications, markNotificationRead } from '@/lib/api';
+import { fetchNotifications, markNotificationRead, markNotificationsRead } from '@/lib/api';
 import { navigateForNotification } from '@/lib/notification-navigation';
 import type { NotificationItem } from '@/types/api';
 
@@ -104,6 +104,7 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [markingAll, setMarkingAll] = useState(false);
   const canTestInExpoGo = __DEV__ && Constants.appOwnership === 'expo';
 
   const load = useCallback(async (isRefresh = false) => {
@@ -150,6 +151,22 @@ export default function NotificationsScreen() {
     navigateForNotification(item);
   }, []);
 
+  const handleMarkAll = useCallback(async () => {
+    if (markingAll) return;
+    const previous = items;
+    setItems((current) => current.map((item) => ({ ...item, is_read: true })));
+    setMarkingAll(true);
+    try {
+      await markNotificationsRead();
+      DeviceEventEmitter.emit('notifications:marked-read');
+    } catch {
+      setItems(previous);
+      setError('Мэдэгдлүүдийг уншсанаар тэмдэглэж чадсангүй.');
+    } finally {
+      setMarkingAll(false);
+    }
+  }, [items, markingAll]);
+
   const testLocalNotification = useCallback(async () => {
     let permission = await Notifications.getPermissionsAsync();
     if (permission.status !== 'granted') {
@@ -192,11 +209,18 @@ export default function NotificationsScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
           <ThemedText type="subtitle">Мэдэгдэл</ThemedText>
-          {canTestInExpoGo && (
-            <Pressable onPress={() => void testLocalNotification()} style={styles.testButton}>
-              <Text style={styles.testButtonText}>Expo Go тест</Text>
-            </Pressable>
-          )}
+          <View style={styles.headerActions}>
+            {items.some((item) => !item.is_read) ? (
+              <Pressable disabled={markingAll} onPress={() => void handleMarkAll()} style={styles.markAllButton}>
+                <Text style={styles.markAllText}>{markingAll ? 'Тэмдэглэж байна…' : 'Бүгдийг уншсан'}</Text>
+              </Pressable>
+            ) : null}
+            {canTestInExpoGo && (
+              <Pressable onPress={() => void testLocalNotification()} style={styles.testButton}>
+                <Text style={styles.testButtonText}>Expo Go тест</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
 
         {loading ? (
@@ -257,6 +281,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
   },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
+  markAllButton: { paddingHorizontal: 8, paddingVertical: 7 },
+  markAllText: { color: '#2563EB', fontSize: 12, fontWeight: '700' },
   testButton: {
     borderWidth: 1,
     borderColor: '#3B82F6',

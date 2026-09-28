@@ -130,6 +130,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     method: options.method ?? 'GET',
     headers,
     body,
+    cache: options.method ? 'default' : 'no-store',
   });
 
   if (response.status === 401 && options.retryOnUnauthorized !== false) {
@@ -191,12 +192,18 @@ export async function signup(
   username: string,
   password: string,
 ): Promise<void> {
-  await request('/signup/', {
+  await request('/auth/registration/', {
     method: 'POST',
-    body: { email, username, password },
+    body: { email, username, password1: password, password2: password },
+    headers: { 'X-Client-Platform': 'mobile' },
   });
-  // бүртгэлийн дараа автомат нэвтрэх
-  await login(email, password);
+}
+
+export async function verifyRegistrationEmail(key: string): Promise<void> {
+  await request('/auth/registration/verify-email/', {
+    method: 'POST',
+    body: { key },
+  });
 }
 
 export async function logout(): Promise<void> {
@@ -314,9 +321,15 @@ export function resolveMediaUrl(url: string | null | undefined): string | null {
 
 export type HostApplication = {
   id: number;
-  status: string;
-  created_at: string;
-  message?: string | null;
+  full_name: string;
+  phone_number: string;
+  bank_name: string;
+  account_number: string;
+  status: 'pending' | 'approved' | 'rejected';
+  submitted_at: string;
+  host_terms_accepted_at?: string | null;
+  host_terms_version?: string;
+  host_commission_rate?: string;
 };
 
 export function fetchMyListings(): Promise<import('@/types/api').ListingSummary[]> {
@@ -351,6 +364,15 @@ export function applyToBeHost(payload: { message?: string }): Promise<HostApplic
 
 export function fetchHostApplication(): Promise<HostApplication> {
   return request<HostApplication>('/host/application/me/');
+}
+
+export function updateHostApplication(
+  payload: Partial<Pick<HostApplication, 'phone_number' | 'bank_name' | 'account_number'>>,
+): Promise<HostApplication> {
+  return request<HostApplication>('/host/application/me/', {
+    method: 'PATCH',
+    body: payload,
+  });
 }
 
 export function applyToBeHostFormData(formData: FormData): Promise<HostApplication> {
@@ -452,6 +474,13 @@ export function createAvailabilityBulk(listingId: number, dates: string[]): Prom
   return request<void>('/availability/bulk/', {
     method: 'POST',
     body: { listing: listingId, dates },
+  });
+}
+
+export function deleteAvailabilityByListing(listingId: number | string): Promise<void> {
+  return request<void>('/availability/delete-by-listing/', {
+    method: 'POST',
+    body: { listing: listingId },
   });
 }
 
@@ -613,6 +642,12 @@ export function fetchPayment(paymentId: number | string): Promise<import('@/type
 
 export function checkPayment(paymentId: number | string): Promise<import('@/types/api').Payment> {
   return request<import('@/types/api').Payment>(`/payments/${paymentId}/check/`, {
+    method: 'POST',
+  });
+}
+
+export function cancelPayment(paymentId: number | string): Promise<import('@/types/api').Payment> {
+  return request<import('@/types/api').Payment>(`/payments/${paymentId}/cancel/`, {
     method: 'POST',
   });
 }

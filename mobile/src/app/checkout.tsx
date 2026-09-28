@@ -292,8 +292,17 @@ export default function CheckoutScreen() {
             editable={!isSubmitting}
             onChangeText={setNotes}
             placeholder="Нэмэлт тэмдэглэл"
+            placeholderTextColor={C.textSecondary}
             multiline
-            style={[styles.input, styles.notesInput]}
+            style={[
+              styles.input,
+              styles.notesInput,
+              {
+                backgroundColor: C.backgroundElement,
+                color: C.text,
+                borderColor: C.backgroundSelected,
+              },
+            ]}
           />
         </View>
 

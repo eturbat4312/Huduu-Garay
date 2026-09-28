@@ -46,6 +46,7 @@ from core.services.booking_times import (
     check_out_at,
     payout_eligible_at,
 )
+from core.services.booking_lifecycle import complete_finished_bookings
 from core.services.settlements import (
     ensure_host_payout,
     payment_received_amount,
@@ -1389,7 +1390,11 @@ def _overview_trend(overview, payment_base):
     }
     booking_rows = {
         _bucket_date(row["bucket"]): row
-        for row in Booking.objects.filter(created_at__gte=start_at, created_at__lt=end_at)
+        for row in Booking.objects.filter(
+            created_at__gte=start_at,
+            created_at__lt=end_at,
+            status__in=Booking.CUSTOMER_VISIBLE_STATUSES,
+        )
         .annotate(bucket=trunc("created_at", tzinfo=PLATFORM_TIME_ZONE))
         .values("bucket")
         .annotate(
@@ -1512,6 +1517,7 @@ def _traffic_chart_rows(overview_rows):
 
 
 def stats_view(request):
+    complete_finished_bookings()
     now = timezone.now()
     this_month_start = _month_start(now)
     paid_payment_statuses = [Payment.STATUS_PAID, Payment.STATUS_REFUNDED]
@@ -1535,7 +1541,9 @@ def stats_view(request):
     period_net_received = period_total_received - period_qpay_fees
 
     period_bookings = Booking.objects.filter(
-        created_at__gte=overview["start_at"], created_at__lt=overview["end_at"]
+        created_at__gte=overview["start_at"],
+        created_at__lt=overview["end_at"],
+        status__in=Booking.CUSTOMER_VISIBLE_STATUSES,
     )
     period_users = User.objects.filter(
         date_joined__gte=overview["start_at"], date_joined__lt=overview["end_at"]
@@ -1544,7 +1552,8 @@ def stats_view(request):
         created_at__gte=overview["start_at"], created_at__lt=overview["end_at"]
     )
     period_paid_confirmed_bookings = Booking.objects.filter(
-        status="confirmed", payments__in=period_payments
+        status__in=[Booking.STATUS_CONFIRMED, Booking.STATUS_COMPLETED],
+        payments__in=period_payments,
     ).distinct()
     period_guest_fees = int(
         period_paid_confirmed_bookings.aggregate(total=Sum("service_fee"))["total"] or 0
@@ -1732,7 +1741,10 @@ def stats_view(request):
             guest_refund__status__in=[GuestRefund.STATUS_REVIEW, GuestRefund.STATUS_APPROVED]
         )
     elif finance_filter == "missing":
-        bookings = bookings.filter(host_payout__isnull=True, status="confirmed")
+        bookings = bookings.filter(
+            host_payout__isnull=True,
+            status__in=[Booking.STATUS_CONFIRMED, Booking.STATUS_COMPLETED],
+        )
 
     date_from = request.GET.get("date_from", "")
     date_to = request.GET.get("date_to", "")
@@ -1883,7 +1895,8 @@ def stats_view(request):
         ),
         "review_refund_count": review_refunds.count(),
         "missing_accounting_count": Booking.objects.filter(
-            status="confirmed", host_payout__isnull=True
+            status__in=[Booking.STATUS_CONFIRMED, Booking.STATUS_COMPLETED],
+            host_payout__isnull=True,
         ).count(),
         "month_received": int(
             payment_base.filter(paid_at__gte=this_month_start).aggregate(total=Sum("amount"))[
@@ -1902,7 +1915,9 @@ def stats_view(request):
         "total_guests": total_users - total_hosts,
         "new_users_month": User.objects.filter(date_joined__gte=this_month_start).count(),
         "pending_applications": HostApplication.objects.filter(status="pending").count(),
-        "total_bookings": Booking.objects.count(),
+        "total_bookings": Booking.objects.filter(
+            status__in=Booking.CUSTOMER_VISIBLE_STATUSES
+        ).count(),
         "active_bookings": Booking.objects.filter(status="confirmed").count(),
         "cancelled_bookings": Booking.objects.filter(status="cancelled").count(),
         "payout_rows": payout_rows,

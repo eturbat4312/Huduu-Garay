@@ -38,6 +38,13 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen
+              name="payment"
+              options={{
+                headerShown: false,
+                gestureEnabled: false,
+              }}
+            />
+            <Stack.Screen
               name="login"
               options={{
                 headerShown: true,
@@ -62,6 +69,10 @@ export default function RootLayout() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
+              name="confirm-email"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
               name="become-host"
               options={{ headerShown: false }}
             />
@@ -79,6 +90,10 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="support"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="privacy"
               options={{ headerShown: false }}
             />
           </Stack>

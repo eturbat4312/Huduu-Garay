@@ -4,31 +4,26 @@
     "slug": "tanaid-honoy",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-icon-brand.png",
     "scheme": "tanaidhonoy",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/app-icon-brand.png",
       "bundleIdentifier": "mn.tanaidhonoy.app",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Байршлыг газрын зураг дээр харуулахад ашиглана.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Байршлыг газрын зураг дээр харуулахад ашиглана."
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FAF9F5",
+        "foregroundImage": "./assets/images/app-icon-brand-foreground.png",
+        "monochromeImage": "./assets/images/app-icon-brand-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "mn.tanaidhonoy.app",
-      "config": {
-        "googleMaps": {
-          "apiKey": ""
-        }
-      },
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION"
@@ -43,24 +38,25 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#FAF9F5",
+          "image": "./assets/images/app-icon-brand-foreground.png",
+          "imageWidth": 220
         }
       ],
       "expo-secure-store",
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/android-icon-monochrome.png",
-          "color": "#208AEF",
+          "icon": "./assets/images/app-icon-brand-foreground.png",
+          "color": "#006D3A",
           "defaultChannel": "default"
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Иргэний үнэмлэхний зураг болон selfie оруулахын тулд зургийн цомогт хандах зөвшөөрөл хэрэгтэй."
+          "photosPermission": "Иргэний үнэмлэхний зураг болон selfie оруулахын тулд зургийн цомогт хандах зөвшөөрөл хэрэгтэй.",
+          "microphonePermission": false
         }
       ],
       [
@@ -69,12 +65,7 @@
           "locationWhenInUsePermission": "Байршлыг газрын зураг дээр харуулахад ашиглана."
         }
       ],
-      [
-        "react-native-maps",
-        {
-          "googleMapsApiKey": ""
-        }
-      ],
+      "react-native-maps",
       [
         "@react-native-google-signin/google-signin",
         {

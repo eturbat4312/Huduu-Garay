@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Linking,
   Pressable,
   ScrollView,
@@ -28,7 +29,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, Spacing } from '@/constants/theme';
-import { checkPayment, fetchPayment, mockConfirmPayment } from '@/lib/api';
+import { cancelPayment, checkPayment, fetchPayment, mockConfirmPayment } from '@/lib/api';
 import type { Payment } from '@/types/api';
 
 const POLL_INTERVAL_MS = 5_000;
@@ -43,6 +44,7 @@ export default function PaymentScreen() {
   const [error, setError] = useState(payment_id ? '' : 'Төлбөрийн дугаар олдсонгүй.');
   const [confirming, setConfirming] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -131,6 +133,49 @@ export default function PaymentScreen() {
     }
   };
 
+  const cancelAndReturnToListings = useCallback(async () => {
+    if (!payment_id || cancelling) return;
+    stopPolling();
+    setCancelling(true);
+    try {
+      const nextPayment = await cancelPayment(payment_id);
+      setPayment(nextPayment);
+      router.replace('/(tabs)' as never);
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      Alert.alert('Буцах боломжгүй', err.message ?? 'Төлбөрийг цуцлахад алдаа гарлаа.');
+      if (payment?.status === 'pending') {
+        pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
+      }
+    } finally {
+      setCancelling(false);
+    }
+  }, [cancelling, payment?.status, payment_id, poll]);
+
+  const handleBack = useCallback(() => {
+    if (cancelling || loading) return;
+    if (payment?.status === 'pending') {
+      Alert.alert(
+        'Төлбөрийг цуцлах уу?',
+        'Буцвал төлбөрийн нэхэмжлэх хаагдаж, сонгосон огноо дахин боломжтой болно.',
+        [
+          { text: 'Үгүй', style: 'cancel' },
+          { text: 'Цуцлаад буцах', style: 'destructive', onPress: cancelAndReturnToListings },
+        ],
+      );
+      return;
+    }
+    router.replace('/(tabs)' as never);
+  }, [cancelAndReturnToListings, cancelling, loading, payment?.status]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBack();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [handleBack]);
+
   const openBankApp = async (link?: string) => {
     if (!link) return;
     try {
@@ -159,7 +204,17 @@ export default function PaymentScreen() {
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: C.backgroundSelected }]}>
-          <View style={{ width: 64 }} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Listings рүү буцах"
+            disabled={loading || cancelling}
+            onPress={handleBack}
+            style={({ pressed }) => [
+              styles.headerBack,
+              (pressed || loading || cancelling) && { opacity: 0.5 },
+            ]}>
+            <Text style={[styles.headerBackText, { color: '#16A34A' }]}>‹ Буцах</Text>
+          </Pressable>
           <Text style={[styles.headerTitle, { color: C.text }]}>QPay Төлбөр</Text>
           <View style={{ width: 64 }} />
         </View>
@@ -314,6 +369,21 @@ export default function PaymentScreen() {
               </Pressable>
             )}
 
+            {payment.status === 'pending' && (
+              <Pressable
+                onPress={handleBack}
+                disabled={cancelling}
+                style={({ pressed }) => [
+                  styles.cancelBtn,
+                  { borderColor: C.backgroundSelected },
+                  (pressed || cancelling) && { opacity: 0.6 },
+                ]}>
+                {cancelling
+                  ? <ActivityIndicator color={C.text} />
+                  : <Text style={[styles.cancelBtnText, { color: C.text }]}>Төлбөрийг цуцлаад listings рүү буцах</Text>}
+              </Pressable>
+            )}
+
             {/* Буцах */}
             {payment.status !== 'pending' && (
               <Pressable
@@ -336,6 +406,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerTitle: { fontSize: 16, fontWeight: '700' },
+  headerBack: { width: 64, minHeight: 44, justifyContent: 'center' },
+  headerBackText: { fontSize: 14, fontWeight: '700' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.four },
   content: { padding: Spacing.three, gap: Spacing.three, paddingBottom: Spacing.five },
   statusBox: { borderRadius: 16, padding: 20, gap: 8, alignItems: 'center' },
@@ -374,4 +446,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14, alignItems: 'center',
   },
   backBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  cancelBtn: {
+    minHeight: 48, borderWidth: 1, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.two,
+  },
+  cancelBtnText: { fontSize: 14, fontWeight: '700', textAlign: 'center' },
 });

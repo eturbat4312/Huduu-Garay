@@ -60,7 +60,13 @@ export default function BookingContact({ booking, host = false }: { booking: Boo
     finally { setSending(false); }
   }
 
-  if (!allowed) return <p className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600">Чат, утас нь төлбөр төлөгдөж, захиалга баталгаажсаны дараа нээгдэнэ.</p>;
+  if (!allowed) return (
+    <p className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600">
+      {booking.status === "completed"
+        ? "Байрлах хугацаа дууссан тул чат болон холбоо барих мэдээлэл хаагдсан."
+        : "Чат, утас нь төлбөр төлөгдөж, захиалга баталгаажсаны дараа нээгдэнэ."}
+    </p>
+  );
   return <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
     <h2 className="font-semibold">{host ? "Зочинтой холбогдох" : "Түрээслүүлэгчтэй холбогдох"}</h2>
     <div className="flex flex-wrap gap-3">

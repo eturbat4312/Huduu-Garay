@@ -19,6 +19,7 @@ export type Category = {
   export type ListingImage = {
     id: number;
     image: string; // URL
+    thumbnail?: string;
   };
 
   export type Host = {
@@ -66,6 +67,7 @@ export type Category = {
     host_username?: string;
     // Claude: null means no reviews yet
     average_rating?: number | null;
+    has_available_dates?: boolean;
     host?: Host;
 
     

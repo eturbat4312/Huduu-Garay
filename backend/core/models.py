@@ -190,6 +190,7 @@ class ListingImage(models.Model):
         Listing, on_delete=models.CASCADE, related_name="images"
     )
     image = models.ImageField(upload_to="listing_images/")
+    thumbnail = models.ImageField(upload_to="listing_thumbnails/", blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -248,13 +249,25 @@ class Availability(models.Model):
 
 
 class Booking(models.Model):
+    STATUS_PENDING_PAYMENT = "pending_payment"
+    STATUS_CONFIRMED = "confirmed"
+    STATUS_COMPLETED = "completed"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_EXPIRED = "expired"
+    STATUS_PAYMENT_FAILED = "payment_failed"
+    CUSTOMER_VISIBLE_STATUSES = (
+        STATUS_CONFIRMED,
+        STATUS_COMPLETED,
+        STATUS_CANCELLED,
+    )
 
     STATUS_CHOICES = [
-        ("pending_payment", "Төлбөр хүлээж байна"),
-        ("confirmed", "Баталгаажсан"),
-        ("cancelled", "Цуцлагдсан"),
-        ("expired", "Хугацаа дууссан"),
-        ("payment_failed", "Төлбөр амжилтгүй"),
+        (STATUS_PENDING_PAYMENT, "Төлбөр хүлээж байна"),
+        (STATUS_CONFIRMED, "Баталгаажсан"),
+        (STATUS_COMPLETED, "Дууссан"),
+        (STATUS_CANCELLED, "Цуцлагдсан"),
+        (STATUS_EXPIRED, "Хугацаа дууссан"),
+        (STATUS_PAYMENT_FAILED, "Төлбөр амжилтгүй"),
     ]
     listing = models.ForeignKey(
         Listing, on_delete=models.CASCADE, related_name="bookings"
@@ -291,7 +304,10 @@ class Booking(models.Model):
     total_price = models.PositiveIntegerField(default=0)
     service_fee = models.PositiveIntegerField(default=0)
     status = models.CharField(
-        max_length=20, choices=STATUS_CHOICES, default="confirmed", db_index=True
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_CONFIRMED,
+        db_index=True,
     )
     payment_intent_key = models.CharField(
         max_length=120, blank=True, null=True, db_index=True

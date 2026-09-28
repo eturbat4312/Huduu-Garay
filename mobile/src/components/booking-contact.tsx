@@ -58,7 +58,13 @@ export function BookingContact({ booking, host = false }: { booking: BookingDeta
     finally { setSending(false); }
   }
 
-  if (!allowed) return <Text style={{ color: C.textSecondary }}>Чат, утас нь төлбөр төлөгдөж, захиалга баталгаажсаны дараа нээгдэнэ.</Text>;
+  if (!allowed) return (
+    <Text style={{ color: C.textSecondary }}>
+      {booking.status === 'completed'
+        ? 'Байрлах хугацаа дууссан тул чат болон холбоо барих мэдээлэл хаагдсан.'
+        : 'Чат, утас нь төлбөр төлөгдөж, захиалга баталгаажсаны дараа нээгдэнэ.'}
+    </Text>
+  );
   return <View style={{ backgroundColor: C.backgroundElement, padding: 16, borderRadius: 16, gap: 12 }}>
     <Text style={{ color: C.text, fontWeight: '700' }}>{host ? 'Зочинтой холбогдох' : 'Түрээслүүлэгчтэй холбогдох'}</Text>
     <Pressable accessibilityRole="button" onPress={() => setOpen(!open)} style={{ backgroundColor: '#15803d', padding: 14, borderRadius: 10 }}><Text style={{ color: 'white' }}>Мессеж бичих{!open && booking.unread_message_count ? ` (${booking.unread_message_count})` : ''}</Text></Pressable>

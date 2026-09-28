@@ -79,6 +79,9 @@ export default function HomePage() {
       })
       .then((res) => {
         const sorted = [...res.data].sort((a, b) => {
+          const availabilityDifference = Number(Boolean(b.has_available_dates))
+            - Number(Boolean(a.has_available_dates));
+          if (availabilityDifference) return availabilityDifference;
           if (a.created_at && b.created_at) {
             return (
               new Date(b.created_at).getTime() -

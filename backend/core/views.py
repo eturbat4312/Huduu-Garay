@@ -1,5 +1,5 @@
 from rest_framework import generics, status, permissions, serializers
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.generics import RetrieveAPIView, RetrieveUpdateAPIView
@@ -21,14 +21,14 @@ from core.services.cancellations import (
     guest_cancellation_blocked_reason,
     host_cancellation_blocked_reason,
 )
-from core.services.booking_times import local_now, stay_has_ended
+from core.services.booking_lifecycle import complete_finished_bookings
 from core.services.settlements import ensure_host_payout, sync_cancellation_settlements
 from decimal import Decimal
 from google.oauth2 import id_token
 import logging
 import uuid
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 # Claude: password reset imports
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -84,7 +84,11 @@ from .serializers import (
     SupportRequestSerializer,
     AnalyticsEventSerializer,
 )
-from .image_processing import ListingImageProcessingError, process_listing_image
+from .image_processing import (
+    ListingImageProcessingError,
+    process_listing_image,
+    process_listing_thumbnail,
+)
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -235,7 +239,7 @@ class GoogleLogin(APIView):
 
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
         serializer = UserSerializer(request.user, context={"request": request})
@@ -343,12 +347,18 @@ class ListingListCreateView(generics.ListCreateAPIView):
             for name in names:
                 queryset = queryset.filter(amenities__name__iexact=name)
 
-        return queryset
+        future_availability = Availability.objects.filter(
+            listing_id=OuterRef("pk"),
+            date__gte=timezone.localdate(),
+        )
+        return queryset.annotate(
+            has_available_dates=Exists(future_availability)
+        ).order_by("-has_available_dates", "-created_at", "-id")
 
     def perform_create(self, serializer):
         if not self.request.user.is_host:
             raise serializers.ValidationError(
-                {"detail": "Танд зар үүсгэх эрх байхгүй. Та эхлээд host бол. 🤷‍♂️"}
+                {"detail": "Танд зар үүсгэх эрх байхгүй. Та эхлээд түрээслүүлэгч болно уу."}
             )
         listing = serializer.save(host=self.request.user)
         Notification.objects.create(
@@ -366,6 +376,7 @@ class ListingRetrieveView(RetrieveAPIView):
     serializer_class = ListingSerializer
 
     def get_queryset(self):
+        complete_finished_bookings()
         public_filter = Q(is_active=True, status=Listing.STATUS_ACTIVE)
         user = self.request.user
         if user.is_authenticated:
@@ -421,7 +432,12 @@ class ListingImageUploadView(APIView):
                     )
 
                 try:
-                    processed_images.append(process_listing_image(uploaded_image))
+                    processed_images.append(
+                        (
+                            process_listing_image(uploaded_image),
+                            process_listing_thumbnail(uploaded_image),
+                        )
+                    )
                 except ListingImageProcessingError as error:
                     return Response(
                         {"error": str(error)},
@@ -429,9 +445,11 @@ class ListingImageUploadView(APIView):
                     )
 
             created_images = []
-            for final_image_file in processed_images:
+            for final_image_file, thumbnail_file in processed_images:
                 new_image = ListingImage.objects.create(
-                    listing=listing, image=final_image_file
+                    listing=listing,
+                    image=final_image_file,
+                    thumbnail=thumbnail_file,
                 )
                 created_images.append(new_image)
 
@@ -763,8 +781,15 @@ def _booking_has_hold(booking, requested_dates, lock=False):
     return set(requested_dates).issubset(set(held_dates))
 
 
-def _release_booking_hold(booking, now=None):
-    expired_at = now or timezone.now()
+def _release_booking_hold(
+    booking,
+    now=None,
+    *,
+    booking_status=Booking.STATUS_EXPIRED,
+    payment_status=Payment.STATUS_EXPIRED,
+    reason="payment_hold_expired",
+):
+    released_at = now or timezone.now()
     hold_rows = list(
         BookingHold.objects.select_for_update().filter(
             booking=booking, listing=booking.listing
@@ -777,7 +802,7 @@ def _release_booking_hold(booking, now=None):
     if hold_rows:
         BookingHold.objects.filter(id__in=[hold.id for hold in hold_rows]).delete()
 
-    booking.status = "expired"
+    booking.status = booking_status
     booking.save(update_fields=["status"])
 
     pending_payments = list(
@@ -787,11 +812,11 @@ def _release_booking_hold(booking, now=None):
         )
     )
     for payment in pending_payments:
-        payment.status = Payment.STATUS_EXPIRED
+        payment.status = payment_status
         payment.raw_response = {
             **(payment.raw_response or {}),
-            "expired_reason": "payment_hold_expired",
-            "expired_at": expired_at.isoformat(),
+            "closed_reason": reason,
+            "closed_at": released_at.isoformat(),
         }
         payment.save(update_fields=["status", "raw_response", "updated_at"])
 
@@ -803,13 +828,17 @@ def _release_booking_hold(booking, now=None):
         ):
             transaction.on_commit(
                 lambda payment_id=payment.id, invoice_id=payment.invoice_id: (
-                    _cancel_expired_qpay_invoice(payment_id, invoice_id)
+                    _cancel_qpay_invoice(
+                        payment_id,
+                        invoice_id,
+                        expected_status=payment_status,
+                    )
                 )
             )
     return len(hold_rows)
 
 
-def _cancel_expired_qpay_invoice(payment_id, invoice_id):
+def _cancel_qpay_invoice(payment_id, invoice_id, *, expected_status):
     cancelled = False
     error_code = ""
     try:
@@ -824,7 +853,7 @@ def _cancel_expired_qpay_invoice(payment_id, invoice_id):
 
     payment = Payment.objects.filter(
         id=payment_id,
-        status=Payment.STATUS_EXPIRED,
+        status=expected_status,
     ).first()
     if payment is None:
         return
@@ -1393,6 +1422,61 @@ class PaymentCheckView(APIView):
         )
 
 
+class PaymentCancelView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, payment_id, format=None):
+        with transaction.atomic():
+            try:
+                payment = (
+                    Payment.objects.select_for_update()
+                    .select_related("booking", "booking__listing")
+                    .get(id=payment_id, booking__guest=request.user)
+                )
+            except Payment.DoesNotExist:
+                return Response({"error": "Төлбөр олдсонгүй."}, status=404)
+
+            if payment.status == Payment.STATUS_PAID:
+                return Response(
+                    {"error": "Төлбөр аль хэдийн баталгаажсан тул цуцлах боломжгүй."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            if payment.status in {
+                Payment.STATUS_CANCELLED,
+                Payment.STATUS_EXPIRED,
+                Payment.STATUS_FAILED,
+            }:
+                return Response(
+                    PaymentSerializer(payment, context={"request": request}).data,
+                    status=status.HTTP_200_OK,
+                )
+
+            booking = (
+                Booking.objects.select_for_update()
+                .select_related("listing")
+                .get(id=payment.booking_id)
+            )
+            if booking.status == Booking.STATUS_CONFIRMED:
+                return Response(
+                    {"error": "Захиалга аль хэдийн баталгаажсан тул цуцлах боломжгүй."},
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            _release_booking_hold(
+                booking,
+                booking_status=Booking.STATUS_EXPIRED,
+                payment_status=Payment.STATUS_CANCELLED,
+                reason="cancelled_by_guest_before_payment",
+            )
+            payment.refresh_from_db()
+
+        return Response(
+            PaymentSerializer(payment, context={"request": request}).data,
+            status=status.HTTP_200_OK,
+        )
+
+
 class PaymentMockConfirmView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -1547,6 +1631,7 @@ class BookingRetrieveView(RetrieveAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        complete_finished_bookings()
         return Booking.objects.filter(guest=self.request.user)
 
 
@@ -1594,8 +1679,12 @@ class MyBookingView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        complete_finished_bookings()
         return (
-            Booking.objects.filter(guest=self.request.user)
+            Booking.objects.filter(
+                guest=self.request.user,
+                status__in=Booking.CUSTOMER_VISIBLE_STATUSES,
+            )
             .select_related("listing")
             .prefetch_related("listing__images")
         )
@@ -1606,9 +1695,13 @@ class HostBookingListView(ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        complete_finished_bookings()
         user = self.request.user
         return (
-            Booking.objects.filter(listing__host=user)
+            Booking.objects.filter(
+                listing__host=user,
+                status__in=Booking.CUSTOMER_VISIBLE_STATUSES,
+            )
             .select_related("listing")
             .order_by("-created_at")
         )  # 🟢 Шинэ захиалга дээрээ гарна
@@ -1985,8 +2078,12 @@ class HostBookingDetailView(RetrieveAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        complete_finished_bookings()
         # зөвхөн тухайн хэрэглэгчийн хост захиалгуудыг зөвшөөрнө
-        return Booking.objects.filter(listing__host=self.request.user)
+        return Booking.objects.filter(
+            listing__host=self.request.user,
+            status__in=Booking.CUSTOMER_VISIBLE_STATUSES,
+        )
 
 
 class MyListingsView(generics.ListAPIView):
@@ -2003,6 +2100,7 @@ class HostBookingCalendarView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        complete_finished_bookings()
         user = request.user
         bookings = Booking.objects.filter(
             listing__host=user, status="confirmed", is_cancelled_by_host=False
@@ -2104,22 +2202,16 @@ def _review_eligibility(listing, user):
     if listing.host_id == user.id:
         return None, "Түрээслүүлэгч өөрийн байранд сэтгэгдэл бичих боломжгүй.", "listing_owner"
 
-    now = timezone.now()
-    today = local_now(now).date()
-    confirmed_bookings = Booking.objects.filter(
+    complete_finished_bookings()
+    completed_bookings = Booking.objects.filter(
         listing=listing,
         guest=user,
-        status="confirmed",
+        status=Booking.STATUS_COMPLETED,
         is_cancelled_by_host=False,
         guest_cancelled_at__isnull=True,
     )
-    completed_bookings = confirmed_bookings.filter(check_out__lte=today)
-    completed_bookings = [
-        booking for booking in completed_bookings if stay_has_ended(booking, now)
-    ]
-    completed_booking_ids = [booking.id for booking in completed_bookings]
     booking = (
-        confirmed_bookings.filter(id__in=completed_booking_ids)
+        completed_bookings
         .exclude(review__isnull=False)
         .order_by("-check_out", "-id")
         .first()
@@ -2127,9 +2219,15 @@ def _review_eligibility(listing, user):
 
     if booking:
         return booking, "", "eligible"
-    if confirmed_bookings.filter(id__in=completed_booking_ids).exists():
+    if completed_bookings.exists():
         return None, "Та энэ захиалгад аль хэдийн сэтгэгдэл үлдээсэн байна.", "already_reviewed"
-    if confirmed_bookings.exists():
+    if Booking.objects.filter(
+        listing=listing,
+        guest=user,
+        status=Booking.STATUS_CONFIRMED,
+        is_cancelled_by_host=False,
+        guest_cancelled_at__isnull=True,
+    ).exists():
         return None, "Сэтгэгдэл бичих эрх гарах өдрийн 12:00 цагаас хойш нээгдэнэ.", "stay_not_completed"
     return None, "Зөвхөн энэ байранд байрласан зочин сэтгэгдэл үлдээх боломжтой.", "no_completed_stay"
 

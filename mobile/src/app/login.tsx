@@ -22,11 +22,21 @@ import { ApiError } from '@/lib/api';
 import { safeAuthReturnPath } from '@/lib/auth-return';
 
 export default function LoginScreen() {
-  const { returnTo: rawReturnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const {
+    returnTo: rawReturnTo,
+    registered,
+    email: initialEmail,
+    email_verified: emailVerified,
+  } = useLocalSearchParams<{
+    returnTo?: string;
+    registered?: string;
+    email?: string;
+    email_verified?: string;
+  }>();
   const returnTo = safeAuthReturnPath(rawReturnTo);
   const isBookingLogin = returnTo?.startsWith('/checkout?') ?? false;
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,6 +82,20 @@ export default function LoginScreen() {
             </View>
 
             <View style={styles.form}>
+              {registered === '1' ? (
+                <View style={styles.successBox}>
+                  <ThemedText type="small" style={styles.successText}>
+                    Бүртгэл амжилттай. Имэйл рүү илгээсэн холбоосоор хаягаа баталгаажуулна уу.
+                  </ThemedText>
+                </View>
+              ) : null}
+              {emailVerified === '1' ? (
+                <View style={styles.successBox}>
+                  <ThemedText type="small" style={styles.successText}>
+                    Имэйл хаяг амжилттай баталгаажлаа. Одоо нэвтэрч болно.
+                  </ThemedText>
+                </View>
+              ) : null}
               <View style={styles.field}>
                 <ThemedText type="smallBold">Имэйл эсвэл хэрэглэгчийн нэр</ThemedText>
                 <TextInput
@@ -193,6 +217,14 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#FFFFFF', fontSize: 16 },
   pressed: { opacity: 0.8 },
   errorText: { color: '#DC2626' },
+  successBox: {
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    borderRadius: 10,
+    padding: Spacing.three,
+    backgroundColor: '#F0FDF4',
+  },
+  successText: { color: '#15803D' },
   linkButton: { alignItems: 'center', paddingVertical: Spacing.two },
   divider: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   dividerLine: { flex: 1, height: 1, backgroundColor: '#D7DAE0' },

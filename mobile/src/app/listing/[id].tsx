@@ -1,11 +1,12 @@
 import type { Href } from 'expo-router';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Image as ExpoImage } from 'expo-image';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
+  Linking,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
@@ -26,6 +27,7 @@ import { Colors, Spacing } from '@/constants/theme';
 import { CHECK_IN_TIME, CHECK_OUT_TIME } from '@/constants/booking-times';
 import { useAuth } from '@/context/auth';
 import { loginHref } from '@/lib/auth-return';
+import { nativeMapAvailable } from '@/lib/map-support';
 import {
   ApiError,
   createFavorite,
@@ -171,6 +173,7 @@ function CalendarPicker({
           }
 
           const date = dayYmd(day);
+          const isToday = date === today;
           const isPast = compareYmd(date, today) < 0;
           const isAvailable = availableDates.has(date);
           const isCheckIn = date === checkIn;
@@ -219,7 +222,12 @@ function CalendarPicker({
               )}
 
               {/* Day circle */}
-              <View style={[calStyles.circle, { backgroundColor: circleBg }]}>
+              <View
+                style={[
+                  calStyles.circle,
+                  { backgroundColor: circleBg },
+                  isToday && calStyles.todayCircle,
+                ]}>
                 <Text style={[calStyles.dayText, { color: textColor }]}>{day}</Text>
               </View>
             </Pressable>
@@ -236,6 +244,10 @@ function CalendarPicker({
         <View style={calStyles.legendItem}>
           <View style={[calStyles.legendCircle, { backgroundColor: '#16A34A' }]} />
           <Text style={[calStyles.legendText, { color: C.textSecondary }]}>Сонгосон</Text>
+        </View>
+        <View style={calStyles.legendItem}>
+          <View style={[calStyles.legendCircle, calStyles.todayLegend]} />
+          <Text style={[calStyles.legendText, { color: C.textSecondary }]}>Өнөөдөр</Text>
         </View>
       </View>
     </View>
@@ -316,6 +328,10 @@ const calStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  todayCircle: {
+    borderWidth: 2,
+    borderColor: '#2563EB',
+  },
   dayText: {
     fontSize: 13,
     fontWeight: '500',
@@ -338,6 +354,11 @@ const calStyles = StyleSheet.create({
     height: 10,
     borderRadius: 5,
   },
+  todayLegend: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#2563EB',
+  },
 });
 
 // ─── Main screen ────────────────────────────────────────────────────────────
@@ -356,10 +377,20 @@ export default function ListingDetailScreen() {
   const [bookingMessage, setBookingMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const hasFocusedOnce = useRef(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [favoriteId, setFavoriteId] = useState<number | null>(null);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const routeError = id ? null : 'Зарын дугаар олдсонгүй';
+
+  useFocusEffect(useCallback(() => {
+    if (hasFocusedOnce.current) {
+      setReloadKey((value) => value + 1);
+    } else {
+      hasFocusedOnce.current = true;
+    }
+  }, []));
 
   // ── Reviews ──
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -460,7 +491,7 @@ export default function ListingDetailScreen() {
     return () => {
       isMounted = false;
     };
-  }, [id, user?.id]);
+  }, [id, reloadKey, user?.id]);
 
   const imageUrls = useMemo(() => {
     const urls = (listing?.images ?? [])
@@ -497,6 +528,11 @@ export default function ListingDetailScreen() {
 
     return datesBetweenNights(checkIn, normalizedCheckOut);
   }, [checkIn, normalizedCheckOut]);
+
+  const hasFutureAvailability = useMemo(() => {
+    const today = todayYmd();
+    return Array.from(availableDates).some((date) => compareYmd(date, today) >= 0);
+  }, [availableDates]);
 
   const totalPrice = selectedNights.length * Number(listing?.price_per_night ?? 0);
   const canReview =
@@ -680,9 +716,12 @@ export default function ListingDetailScreen() {
               showsHorizontalScrollIndicator={false}
               keyExtractor={(url, index) => `${url}-${index}`}
               renderItem={({ item, index }) => (
-                <Image
+                <ExpoImage
                   source={{ uri: item }}
                   style={[styles.heroImage, { width: screenWidth }]}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  transition={180}
                   accessibilityLabel={`Байрны зураг ${index + 1}`}
                 />
               )}
@@ -809,6 +848,14 @@ export default function ListingDetailScreen() {
               onReset={isOwner ? () => {} : () => { setCheckIn(''); setCheckOut(''); }}
             />
 
+            {!isOwner && !hasFutureAvailability ? (
+              <View style={styles.unavailableNotice}>
+                <ThemedText type="small" style={styles.unavailableNoticeText}>
+                  Одоогоор захиалах боломжтой өдөр байхгүй байна.
+                </ThemedText>
+              </View>
+            ) : null}
+
             {/* Захиалах товч – зөвхөн зочиндод */}
             {!isOwner ? (
               <>
@@ -822,7 +869,13 @@ export default function ListingDetailScreen() {
                   </View>
                 ) : null}
 
-                <Pressable onPress={handleContinueToCheckout} style={styles.continueButton}>
+                <Pressable
+                  disabled={!hasFutureAvailability}
+                  onPress={handleContinueToCheckout}
+                  style={[
+                    styles.continueButton,
+                    !hasFutureAvailability && styles.continueButtonDisabled,
+                  ]}>
                   <ThemedText type="smallBold" style={styles.continueButtonText}>
                     Захиалга үргэлжлүүлэх
                   </ThemedText>
@@ -878,36 +931,52 @@ export default function ListingDetailScreen() {
             <View style={styles.section}>
               <ThemedText type="smallBold">Байршил</ThemedText>
               <View style={styles.mapContainer}>
-                <MapView
-                  mapType="none"
-                  style={styles.map}
-                  initialRegion={{
-                    latitude: listing.location_lat,
-                    longitude: listing.location_lng,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  }}
-                  scrollEnabled={true}
-                  zoomEnabled={true}
-                  pitchEnabled={false}
-                  rotateEnabled={false}>
-                  <UrlTile
-                    urlTemplate={`https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
-                    maximumZ={19}
-                    flipY={false}
-                    tileSize={256}
-                    zIndex={0}
-                  />
-                  <Marker
-                    coordinate={{
+                {nativeMapAvailable ? (
+                  <MapView
+                    mapType="none"
+                    style={styles.map}
+                    initialRegion={{
                       latitude: listing.location_lat,
                       longitude: listing.location_lng,
+                      latitudeDelta: 0.01,
+                      longitudeDelta: 0.01,
                     }}
-                    title={listing.title}
-                    description={[listing.location_city, listing.location_district].filter(Boolean).join(', ')}
-                    pinColor="#16A34A"
-                  />
-                </MapView>
+                    scrollEnabled={true}
+                    zoomEnabled={true}
+                    pitchEnabled={false}
+                    rotateEnabled={false}>
+                    <UrlTile
+                      urlTemplate={`https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
+                      maximumZ={19}
+                      flipY={false}
+                      tileSize={256}
+                      zIndex={0}
+                    />
+                    <Marker
+                      coordinate={{
+                        latitude: listing.location_lat,
+                        longitude: listing.location_lng,
+                      }}
+                      title={listing.title}
+                      description={[listing.location_city, listing.location_district].filter(Boolean).join(', ')}
+                      pinColor="#16A34A"
+                    />
+                  </MapView>
+                ) : (
+                  <View style={[styles.mapFallback, { backgroundColor: C.backgroundElement }]}>
+                    <Text style={styles.mapFallbackIcon}>📍</Text>
+                    <ThemedText type="small" themeColor="textSecondary" style={styles.mapFallbackText}>
+                      Апп доторх газрын зураг түр идэвхгүй байна. Байршлыг Google Maps дээр нээж болно.
+                    </ThemedText>
+                    <Pressable
+                      onPress={() => void Linking.openURL(
+                        `https://www.google.com/maps/search/?api=1&query=${listing.location_lat},${listing.location_lng}`,
+                      )}
+                      style={styles.mapFallbackButton}>
+                      <Text style={styles.mapFallbackButtonText}>Google Maps дээр нээх</Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
             </View>
           ) : null}
@@ -1097,6 +1166,17 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  mapFallback: {
+    width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center',
+    padding: Spacing.three, gap: Spacing.two,
+  },
+  mapFallbackIcon: { fontSize: 30 },
+  mapFallbackText: { textAlign: 'center' },
+  mapFallbackButton: {
+    backgroundColor: '#16A34A', borderRadius: 10,
+    paddingHorizontal: Spacing.three, paddingVertical: 10,
+  },
+  mapFallbackButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
   bookingPanel: {
     gap: Spacing.three,
     borderWidth: 1,
@@ -1128,11 +1208,22 @@ const styles = StyleSheet.create({
     backgroundColor: '#16A34A',
     paddingHorizontal: Spacing.three,
   },
+  continueButtonDisabled: {
+    opacity: 0.45,
+  },
   continueButtonText: {
     color: '#FFFFFF',
   },
   errorText: {
     color: '#DC2626',
+  },
+  unavailableNotice: {
+    borderRadius: 8,
+    backgroundColor: '#FEF3C7',
+    padding: Spacing.two,
+  },
+  unavailableNoticeText: {
+    color: '#92400E',
   },
   amenities: {
     flexDirection: 'row',

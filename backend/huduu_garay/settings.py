@@ -253,6 +253,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://www.tanaid-honoy.mn").rstrip("/")
+MOBILE_APP_SCHEME = os.getenv("MOBILE_APP_SCHEME", "tanaidhonoy")
 PASSWORD_RESET_TIMEOUT = 24 * 60 * 60
 EMAIL_TIMEOUT = 15
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL") or os.getenv("EMAIL_HOST_USER") or "webmaster@localhost"

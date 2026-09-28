@@ -32,6 +32,7 @@ export default function PaymentContent() {
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const [mockConfirming, setMockConfirming] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState("");
   const [redirecting, setRedirecting] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -135,6 +136,35 @@ export default function PaymentContent() {
     }
   }, [locale, paymentId, router]);
 
+  const returnToListings = useCallback(async () => {
+    if (cancelling) return;
+    if (!payment || payment.status !== "pending") {
+      router.replace(`/${locale}/`);
+      return;
+    }
+    if (
+      !window.confirm(
+        "Буцвал төлбөрийн нэхэмжлэх хаагдаж, сонгосон огноо дахин боломжтой болно. Үргэлжлүүлэх үү?"
+      )
+    ) {
+      return;
+    }
+
+    setCancelling(true);
+    setError("");
+    try {
+      await api.post(`/payments/${payment.id}/cancel/`);
+      router.replace(`/${locale}/`);
+    } catch (err) {
+      const msg = axios.isAxiosError(err)
+        ? err.response?.data?.error || "Төлбөрийг цуцлахад алдаа гарлаа."
+        : "Төлбөрийг цуцлахад алдаа гарлаа.";
+      setError(msg);
+    } finally {
+      setCancelling(false);
+    }
+  }, [cancelling, locale, payment, router]);
+
   if (loading) {
     return (
       <main className="mx-auto max-w-3xl px-4 py-10">
@@ -168,7 +198,17 @@ export default function PaymentContent() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="mb-4 text-2xl font-bold text-green-700">Төлбөр төлөх</h1>
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <button
+          type="button"
+          onClick={returnToListings}
+          disabled={cancelling}
+          className="rounded-lg border px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+        >
+          {cancelling ? "Цуцалж байна..." : "← Зарууд руу буцах"}
+        </button>
+        <h1 className="text-2xl font-bold text-green-700">Төлбөр төлөх</h1>
+      </div>
 
       {redirecting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4">
@@ -293,6 +333,19 @@ export default function PaymentContent() {
               Төлбөр төлөгдсөний дараа автоматаар шалгаж, баталгаажмагц захиалгын
               амжилтын хуудас руу шилжинэ.
             </p>
+
+            {isPending && (
+              <button
+                type="button"
+                onClick={returnToListings}
+                disabled={cancelling}
+                className="w-full rounded border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {cancelling
+                  ? "Цуцалж байна..."
+                  : "Төлбөрийг цуцлаад зарууд руу буцах"}
+              </button>
+            )}
           </div>
         </div>
       </section>

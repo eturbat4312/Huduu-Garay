@@ -20,8 +20,11 @@ import type { BookingSummary } from '@/types/api';
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending:   { label: 'Хүлээгдэж байна', color: '#D97706' },
+  pending_payment: { label: 'Төлбөр хүлээж байна', color: '#D97706' },
   confirmed: { label: 'Баталгаажсан',    color: '#16A34A' },
   cancelled: { label: 'Цуцалсан',        color: '#DC2626' },
+  expired: { label: 'Хугацаа дууссан', color: '#6B7280' },
+  payment_failed: { label: 'Төлбөр амжилтгүй', color: '#DC2626' },
   completed: { label: 'Дууссан',         color: '#6B7280' },
 };
 
@@ -53,7 +56,7 @@ export default function HostBookingsScreen() {
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
             <Text style={[styles.backText, { color: C.textSecondary }]}>‹ Буцах</Text>
           </Pressable>
-          <Text style={[styles.title, { color: C.text }]}>Хостын захиалгууд</Text>
+          <Text style={[styles.title, { color: C.text }]}>Түрээслүүлэгчийн захиалгууд</Text>
           <View style={{ width: 64 }} />
         </View>
 
@@ -82,6 +85,7 @@ export default function HostBookingsScreen() {
               const statusInfo = STATUS_LABELS[item.status] ?? { label: item.status, color: '#6B7280' };
               return (
                 <Pressable
+                  onPress={() => router.push(`/host-bookings/${item.id}` as never)}
                   style={({ pressed }) => [
                     styles.card,
                     { backgroundColor: C.backgroundElement },
@@ -116,6 +120,14 @@ export default function HostBookingsScreen() {
                       📅 {formatDate(item.check_in)} — {formatDate(item.check_out)}
                     </Text>
                     <Text style={[styles.cardDate, { color: C.textSecondary }]}>Орох {CHECK_IN_TIME} · Гарах {CHECK_OUT_TIME}</Text>
+                    {item.guest_name ? (
+                      <Text style={[styles.cardDate, { color: C.textSecondary }]}>
+                        👤 {item.guest_name}{item.guest_count ? ` · ${item.guest_count} зочин` : ''}
+                      </Text>
+                    ) : null}
+                    {item.notes ? (
+                      <Text style={[styles.cardDate, { color: C.textSecondary }]} numberOfLines={2}>💬 {item.notes}</Text>
+                    ) : null}
                     <View style={styles.cardFooter}>
                       <Text style={[styles.cardPrice, { color: C.text }]}>
                         ₮{Number(item.total_price).toLocaleString()}

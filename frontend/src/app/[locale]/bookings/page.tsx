@@ -11,7 +11,7 @@ import { CHECK_IN_TIME, CHECK_OUT_TIME } from "@/lib/bookingTimes";
 
 const statusLabels: Record<string, string> = {
   confirmed: "Батлагдлаа", cancelled: "Цуцлагдсан", pending_payment: "Төлбөр хүлээгдэж байна",
-  expired: "Хугацаа дууссан", payment_failed: "Төлбөр амжилтгүй",
+  expired: "Хугацаа дууссан", payment_failed: "Төлбөр амжилтгүй", completed: "Дууссан",
 };
 
 type Booking = {

@@ -161,7 +161,7 @@ export default function ProfileScreen() {
             {/* Хост badge */}
             {user.is_host && (
               <View style={styles.hostBadge}>
-                <Text style={styles.hostBadgeText}>🏠 Хост</Text>
+                <Text style={styles.hostBadgeText}>🏠 Түрээслүүлэгч</Text>
               </View>
             )}
 
@@ -202,12 +202,18 @@ export default function ProfileScreen() {
           </View>
 
           {/* ── Нэмэлт мэдээлэл ── */}
-          {(user.phone || user.bio) ? (
+          {(user.phone || user.address || user.bio) ? (
             <View style={[styles.infoCard, { backgroundColor: C.backgroundElement }]}>
               {user.phone ? (
                 <View style={styles.infoRow}>
                   <Text style={styles.infoIcon}>📞</Text>
                   <Text style={[styles.infoText, { color: C.text }]}>{user.phone}</Text>
+                </View>
+              ) : null}
+              {user.address ? (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoIcon}>📍</Text>
+                  <Text style={[styles.infoText, { color: C.textSecondary }]}>{user.address}</Text>
                 </View>
               ) : null}
               {user.bio ? (
@@ -243,13 +249,27 @@ export default function ProfileScreen() {
               color={C.text}
               borderColor={C.backgroundSelected}
               onPress={() => router.push('/support' as never)}
+            />
+            <MenuRow
+              icon="📄"
+              label="Үйлчилгээний нөхцөл"
+              color={C.text}
+              borderColor={C.backgroundSelected}
+              onPress={() => router.push('/terms' as never)}
+            />
+            <MenuRow
+              icon="🔐"
+              label="Нууцлалын бодлого"
+              color={C.text}
+              borderColor={C.backgroundSelected}
+              onPress={() => router.push('/privacy' as never)}
               isLast
             />
           </MenuSection>
 
           {/* ── Хост хэсэг ── */}
           {user.is_host ? (
-            <MenuSection title="Хост" color={C.textSecondary}>
+            <MenuSection title="Түрээслүүлэгч" color={C.textSecondary}>
               <MenuRow
                 icon="➕"
                 label="Зар нэмэх"
@@ -266,7 +286,7 @@ export default function ProfileScreen() {
               />
               <MenuRow
                 icon="📋"
-                label="Хостын захиалгууд"
+                label="Түрээслүүлэгчийн захиалгууд"
                 color={C.text}
                 borderColor={C.backgroundSelected}
                 onPress={() => router.push('/host-bookings' as never)}

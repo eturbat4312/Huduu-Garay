@@ -15,6 +15,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://www.tanaid-honoy.mn/api",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "1074205961751-qd87fnoos6b6bjj8d3mdrlv0rjbj9f2u.apps.googleusercontent.com",
@@ -31,6 +32,10 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6816730132"
+      }
+    }
   }
 }

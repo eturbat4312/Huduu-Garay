@@ -22,8 +22,11 @@ import type { BookingSummary } from '@/types/api';
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending:   { label: 'Хүлээгдэж байна', color: '#D97706' },
+  pending_payment: { label: 'Төлбөр хүлээж байна', color: '#D97706' },
   confirmed: { label: 'Баталгаажсан',    color: '#16A34A' },
   cancelled: { label: 'Цуцалсан',        color: '#DC2626' },
+  expired: { label: 'Хугацаа дууссан', color: '#6B7280' },
+  payment_failed: { label: 'Төлбөр амжилтгүй', color: '#DC2626' },
   completed: { label: 'Дууссан',         color: '#6B7280' },
 };
 

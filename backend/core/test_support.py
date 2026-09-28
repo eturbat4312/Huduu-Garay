@@ -30,6 +30,11 @@ class SupportRequestApiTests(TestCase):
             password="pass1234!",
             is_staff=True,
         )
+        self.admin = User.objects.create_superuser(
+            username="support-admin",
+            email="admin-support@example.com",
+            password="pass1234!",
+        )
         self.client = APIClient()
         self.client.force_authenticate(self.user)
 
@@ -57,7 +62,11 @@ class SupportRequestApiTests(TestCase):
             user=self.staff, type="admin_support"
         )
         self.assertEqual(notification.related_support_request, support_request)
-        send_email.assert_called_once()
+        self.assertEqual(
+            Notification.objects.filter(type="admin_support").count(),
+            2,
+        )
+        self.assertEqual(send_email.call_count, 2)
 
     def test_list_only_returns_current_users_requests(self):
         own = SupportRequest.objects.create(

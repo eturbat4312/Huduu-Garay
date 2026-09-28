@@ -189,6 +189,17 @@ class MeTests(TestCase):
         self.user.refresh_from_db()
         self.assertEqual(self.user.phone, "99001234")
 
+    def test_patch_profile_accepts_json_from_mobile(self):
+        r = self.c.patch(
+            "/api/me/",
+            {"full_name": "Mobile User", "address": "Ulaanbaatar"},
+            format="json",
+        )
+        self.assertEqual(r.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.full_name, "Mobile User")
+        self.assertEqual(self.user.address, "Ulaanbaatar")
+
     def test_unauthenticated(self):
         r = APIClient().get("/api/me/")
         self.assertEqual(r.status_code, 401)
@@ -437,6 +448,26 @@ class ListingTests(TestCase):
         r = APIClient().get("/api/listings/")
         self.assertEqual(r.status_code, 200)
         self.assertGreaterEqual(len(r.data), 1)
+
+    def test_listings_with_future_availability_are_sorted_first(self):
+        available = make_listing(self.host, self.cat, title="Боломжтой")
+        unavailable = make_listing(self.host, self.cat, title="Огноогүй")
+        Availability.objects.create(
+            listing=available,
+            date=date.today() + timedelta(days=2),
+        )
+        Availability.objects.create(
+            listing=unavailable,
+            date=date.today() - timedelta(days=2),
+        )
+
+        response = APIClient().get("/api/listings/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["id"], available.id)
+        by_id = {item["id"]: item for item in response.data}
+        self.assertTrue(by_id[available.id]["has_available_dates"])
+        self.assertFalse(by_id[unavailable.id]["has_available_dates"])
 
     def test_retrieve(self):
         listing = make_listing(self.host, self.cat)
@@ -1197,6 +1228,25 @@ class HostApplicationTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data["status"], "pending")
 
+    def test_update_my_application_payout_details(self):
+        self._apply()
+
+        response = self.c.patch(
+            "/api/host/application/me/",
+            {
+                "phone_number": "99112233",
+                "bank_name": "Голомт Банк",
+                "account_number": "87654321",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        app = HostApplication.objects.get(user=self.user)
+        self.assertEqual(app.phone_number, "99112233")
+        self.assertEqual(app.bank_name, "Голомт Банк")
+        self.assertEqual(app.account_number, "87654321")
+
     def test_not_found_before_apply(self):
         r = self.c.get("/api/host/application/me/")
         self.assertEqual(r.status_code, 404)
@@ -1208,6 +1258,21 @@ class HostApplicationTests(TestCase):
         app.save()
         self.user.refresh_from_db()
         self.assertTrue(self.user.is_host)
+
+    def test_host_can_update_application_phone_from_profile(self):
+        self._apply()
+        app = HostApplication.objects.get(user=self.user)
+        app.status = "approved"
+        app.save()
+        self.user.refresh_from_db()
+
+        response = self.c.patch(
+            "/api/me/", {"host_phone_number": "99112233"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        app.refresh_from_db()
+        self.assertEqual(app.phone_number, "99112233")
 
     def test_rejection_keeps_not_host(self):
         self._apply()

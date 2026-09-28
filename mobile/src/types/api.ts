@@ -17,6 +17,7 @@ export type ListingSummary = {
   host_username?: string | null;
   thumbnail: string | null;
   average_rating: number | null;
+  has_available_dates?: boolean;
   location_lat?: number | null;
   location_lng?: number | null;
   is_active: boolean;
@@ -45,6 +46,7 @@ export type ListingFilters = {
 export type ListingImage = {
   id: number;
   image: string;
+  thumbnail?: string;
   uploaded_at?: string;
 };
 
@@ -99,6 +101,12 @@ export type BookingSummary = {
   total_price: number | string;
   hold_expires_at?: string | null;
   status: string;
+  guest_name?: string;
+  guest_phone?: string;
+  notes?: string | null;
+  guest_count?: number;
+  is_cancelled_by_host?: boolean;
+  is_unread?: boolean;
   listing: {
     id: number;
     title: string;
@@ -131,8 +139,10 @@ export type UserProfile = {
   username: string;
   full_name?: string | null;
   phone?: string | null;
+  address?: string | null;
   bio?: string | null;
   avatar?: string | null;
+  host_phone_number?: string | null;
   is_host: boolean;
   host_application_status?: string | null;
 };

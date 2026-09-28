@@ -24,6 +24,7 @@ import MapView, { Marker, UrlTile } from 'react-native-maps';
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors, Spacing } from '@/constants/theme';
+import { nativeMapAvailable } from '@/lib/map-support';
 
 // Улаанбаатарын төв
 const UB_CENTER = { latitude: 47.918, longitude: 106.917 };
@@ -170,39 +171,53 @@ export default function MapPickerField({ lat, lng, onChange, onMapFocus, onMapBl
         onTouchStart={onMapFocus}
         onTouchEnd={onMapBlur}
         onTouchCancel={onMapBlur}>
-        <MapView
-          ref={mapRef}
-          mapType="none"
-          style={styles.map}
-          initialRegion={{
-            ...(pin ?? UB_CENTER),
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
-          onPress={(e) => {
-            const { latitude, longitude } = e.nativeEvent.coordinate;
-            placePin(latitude, longitude);
-            setResults([]);
-          }}>
-          <UrlTile
-            urlTemplate={`https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
-            maximumZ={19}
-            flipY={false}
-            tileSize={256}
-            zIndex={0}
-          />
-          {pin && (
-            <Marker
-              coordinate={pin}
-              pinColor="#16A34A"
-              draggable
-              onDragEnd={(e) => {
-                const { latitude, longitude } = e.nativeEvent.coordinate;
-                placePin(latitude, longitude);
-              }}
+        {nativeMapAvailable ? (
+          <MapView
+            ref={mapRef}
+            mapType="none"
+            style={styles.map}
+            initialRegion={{
+              ...(pin ?? UB_CENTER),
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            }}
+            onPress={(e) => {
+              const { latitude, longitude } = e.nativeEvent.coordinate;
+              placePin(latitude, longitude);
+              setResults([]);
+            }}>
+            <UrlTile
+              urlTemplate={`https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`}
+              maximumZ={19}
+              flipY={false}
+              tileSize={256}
+              zIndex={0}
             />
-          )}
-        </MapView>
+            {pin && (
+              <Marker
+                coordinate={pin}
+                pinColor="#16A34A"
+                draggable
+                onDragEnd={(e) => {
+                  const { latitude, longitude } = e.nativeEvent.coordinate;
+                  placePin(latitude, longitude);
+                }}
+              />
+            )}
+          </MapView>
+        ) : (
+          <View style={[styles.mapFallback, { backgroundColor: C.backgroundElement }]}>
+            <ThemedText style={styles.mapFallbackIcon}>📍</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.mapFallbackText}>
+              Газрын зураг түр идэвхгүй. Дээрх хайлтаас байршил сонгох эсвэл “Миний байршил” товчийг ашиглана уу.
+            </ThemedText>
+            {pin ? (
+              <ThemedText type="smallBold">
+                {pin.latitude.toFixed(5)}, {pin.longitude.toFixed(5)}
+              </ThemedText>
+            ) : null}
+          </View>
+        )}
 
         {/* Map дээр дарах заавар */}
         {!pin && (
@@ -287,6 +302,12 @@ const styles = StyleSheet.create({
     borderColor: '#D7DAE0',
   },
   map: { width: '100%', height: '100%' },
+  mapFallback: {
+    width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center',
+    padding: Spacing.three, gap: Spacing.two,
+  },
+  mapFallbackIcon: { fontSize: 30 },
+  mapFallbackText: { textAlign: 'center' },
   mapHint: {
     position: 'absolute',
     bottom: 12,

@@ -1,11 +1,11 @@
 import type { Href } from 'expo-router';
-import { router } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { Image as ExpoImage } from 'expo-image';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -23,6 +23,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 import { loginHref } from '@/lib/auth-return';
+import { nativeMapAvailable } from '@/lib/map-support';
 import {
   ApiError,
   createFavorite,
@@ -107,6 +108,7 @@ export default function DiscoveryScreen() {
   const { isAuthenticated } = useAuth();
   const { width: windowWidth } = useWindowDimensions();
   const mapRef = useRef<MapView>(null);
+  const hasFocusedOnce = useRef(false);
 
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [listings, setListings] = useState<ListingSummary[]>([]);
@@ -120,12 +122,24 @@ export default function DiscoveryScreen() {
   const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  useFocusEffect(useCallback(() => {
+    if (hasFocusedOnce.current) {
+      setReloadKey((value) => value + 1);
+    } else {
+      hasFocusedOnce.current = true;
+    }
+  }, []));
+
   useEffect(() => {
     let isMounted = true;
     fetchListings(appliedFilters)
       .then((data) => {
         if (!isMounted) return;
-        setListings([...data].sort((a, b) => b.id - a.id));
+        setListings([...data].sort((a, b) => {
+          const availabilityDifference = Number(Boolean(b.has_available_dates))
+            - Number(Boolean(a.has_available_dates));
+          return availabilityDifference || b.id - a.id;
+        }));
         setSelectedId((current) =>
           current != null && data.some((item) => item.id === current) ? current : null,
         );
@@ -365,7 +379,16 @@ export default function DiscoveryScreen() {
               <ModeButton
                 label="Газрын зураг"
                 active={viewMode === 'map'}
-                onPress={() => setViewMode('map')}
+                onPress={() => {
+                  if (!nativeMapAvailable) {
+                    Alert.alert(
+                      'Газрын зураг түр идэвхгүй',
+                      'Android Maps тохиргоо хийгдсэний дараа энэ харагдац идэвхжинэ.',
+                    );
+                    return;
+                  }
+                  setViewMode('map');
+                }}
               />
             </View>
           </View>
@@ -391,7 +414,7 @@ export default function DiscoveryScreen() {
             actionLabel="Шүүлт цэвэрлэх"
             onAction={clearFilters}
           />
-        ) : viewMode === 'map' ? (
+        ) : viewMode === 'map' && nativeMapAvailable ? (
           <View style={[styles.mapShell, { marginBottom: BottomTabInset }]}>
             <MapView
               ref={mapRef}
@@ -656,10 +679,12 @@ function ListingCard({
       style={({ pressed }) => [styles.listingCard, { width }, pressed && styles.pressed]}>
       <View style={[styles.listingImageWrap, { width, height: width }]}>
         {imageUrl ? (
-          <Image
+          <ExpoImage
             source={{ uri: imageUrl }}
             style={[styles.listingImage, { width, height: width }]}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={180}
           />
         ) : (
           <View style={[styles.listingImage, styles.imagePlaceholder, { width, height: width }]}>
@@ -718,7 +743,13 @@ function MapListingCard({
         pressed && styles.pressed,
       ]}>
       {imageUrl ? (
-        <Image source={{ uri: imageUrl }} style={styles.mapCardImage} resizeMode="cover" />
+        <ExpoImage
+          source={{ uri: imageUrl }}
+          style={styles.mapCardImage}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={180}
+        />
       ) : (
         <View style={[styles.mapCardImage, styles.imagePlaceholder]}>
           <Text style={styles.mapPlaceholderIcon}>⌂</Text>

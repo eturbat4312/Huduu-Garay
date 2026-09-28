@@ -102,6 +102,29 @@ class BookingMessageTests(TestCase):
         self.booking.save()
         self.assertEqual(self.send().status_code, 403)
 
+    def test_checkout_closes_chat_and_marks_booking_completed(self):
+        self.paid()
+        message_notification = Notification.objects.create(
+            user=self.guest,
+            type='booking_message',
+            related_booking=self.booking,
+            message='Unread chat reminder',
+        )
+        self.booking.check_in = date.today() - timedelta(days=3)
+        self.booking.check_out = date.today() - timedelta(days=1)
+        self.booking.save(update_fields=['check_in', 'check_out'])
+
+        response = self.send()
+
+        self.assertEqual(response.status_code, 403)
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, Booking.STATUS_COMPLETED)
+        detail = self.client.get(f'/api/bookings/{self.booking.pk}/')
+        self.assertEqual(detail.data['status'], Booking.STATUS_COMPLETED)
+        self.assertFalse(detail.data['can_contact'])
+        message_notification.refresh_from_db()
+        self.assertTrue(message_notification.is_read)
+
     def test_validation_and_cursor(self):
         self.paid()
         for body in ['', '   ', 'x' * 2001]:

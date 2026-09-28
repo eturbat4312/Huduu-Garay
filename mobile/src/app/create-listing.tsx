@@ -27,6 +27,7 @@ import {
 } from '@/lib/api';
 import type { ListingAmenity, ListingCategory } from '@/types/api';
 import MapPickerField from '@/components/map-picker-field';
+import { MonthCalendar } from '@/components/month-calendar';
 import { compressListingImages } from '@/lib/image-compression';
 
 // ─── Stepper компонент ────────────────────────────────────────────────────────
@@ -66,91 +67,6 @@ const stepperStyles = StyleSheet.create({
   btnText: { fontSize: 20, lineHeight: 24, fontWeight: '700' },
   val: { fontSize: 18, fontWeight: '700', minWidth: 28, textAlign: 'center' },
 });
-
-// ─── Энгийн Calendar компонент ────────────────────────────────────────────────
-function MonthCalendar({
-  year,
-  month,
-  selected,
-  onToggle,
-  textColor,
-  bgSelected,
-}: {
-  year: number;
-  month: number;
-  selected: Set<string>;
-  onToggle: (d: string) => void;
-  textColor: string;
-  bgSelected: string;
-}) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const pad = firstDay === 0 ? 6 : firstDay - 1; // Mon=0
-  const cells: (number | null)[] = [];
-  for (let i = 0; i < pad; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-
-  const monthNames = [
-    '1-р сар','2-р сар','3-р сар','4-р сар','5-р сар','6-р сар',
-    '7-р сар','8-р сар','9-р сар','10-р сар','11-р сар','12-р сар',
-  ];
-
-  return (
-    <View>
-      <Text style={{ color: textColor, fontWeight: '700', marginBottom: 8, fontSize: 15 }}>
-        {year} · {monthNames[month]}
-      </Text>
-      <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-        {['Да','Мя','Лх','Пү','Ба','Бя','Ня'].map((d) => (
-          <Text key={d} style={{ flex: 1, textAlign: 'center', fontSize: 11, color: '#9CA3AF' }}>{d}</Text>
-        ))}
-      </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-        {cells.map((day, i) => {
-          if (!day) return <View key={`e-${i}`} style={{ width: `${100 / 7}%` }} />;
-          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          const dateObj = new Date(year, month, day);
-          const isPast = dateObj < today;
-          const isSel = selected.has(dateStr);
-          return (
-            <Pressable
-              key={dateStr}
-              disabled={isPast}
-              onPress={() => onToggle(dateStr)}
-              style={{
-                width: `${100 / 7}%`,
-                aspectRatio: 1,
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: 2,
-              }}>
-              <View
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 16,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: isSel ? '#16A34A' : 'transparent',
-                }}>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: isSel ? '700' : '400',
-                    color: isPast ? '#D1D5DB' : isSel ? '#fff' : textColor,
-                  }}>
-                  {day}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
 
 // ─── Үндсэн хуудас ────────────────────────────────────────────────────────────
 export default function CreateListingScreen() {
@@ -603,7 +519,6 @@ export default function CreateListingScreen() {
             selected={selectedDates}
             onToggle={toggleDate}
             textColor={C.text}
-            bgSelected={C.backgroundSelected}
           />
         </View>
 

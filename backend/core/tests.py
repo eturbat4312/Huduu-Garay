@@ -357,9 +357,13 @@ class ListingImageUploadTests(TestCase):
         self.assertEqual(response.status_code, 201)
         stored = ListingImage.objects.get()
         self.assertTrue(stored.image.name.endswith(".jpg"))
+        self.assertTrue(stored.thumbnail.name.endswith(".jpg"))
         with Image.open(stored.image.path) as optimized:
             self.assertEqual(optimized.format, "JPEG")
             self.assertEqual(optimized.size, (1920, 1280))
+        with Image.open(stored.thumbnail.path) as thumbnail:
+            self.assertEqual(thumbnail.format, "JPEG")
+            self.assertEqual(thumbnail.size, (720, 480))
 
 
 class PaymentFoundationTests(TestCase):
@@ -638,6 +642,46 @@ class PaymentApiSkeletonTests(TestCase):
         detail = self.client.get(f"/api/payments/{response.data['id']}/")
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.data["id"], response.data["id"])
+
+    def test_pending_payment_is_not_a_booking_and_can_be_cancelled(self):
+        booking = self._create_pending_booking()
+        payment_response = self.client.post(
+            "/api/payments/", {"booking_id": booking.id}, format="json"
+        )
+        payment_id = payment_response.data["id"]
+
+        guest_bookings = self.client.get("/api/bookings/my/")
+        host_client = APIClient()
+        host_client.force_authenticate(user=self.host)
+        host_bookings = host_client.get("/api/host-bookings/")
+        self.assertNotIn(booking.id, [item["id"] for item in guest_bookings.data])
+        self.assertNotIn(booking.id, [item["id"] for item in host_bookings.data])
+        self.assertFalse(
+            Notification.objects.filter(
+                related_booking=booking,
+                type="payment",
+            ).exists()
+        )
+
+        cancelled = self.client.post(f"/api/payments/{payment_id}/cancel/")
+
+        self.assertEqual(cancelled.status_code, 200)
+        booking.refresh_from_db()
+        payment = Payment.objects.get(id=payment_id)
+        self.assertEqual(booking.status, Booking.STATUS_EXPIRED)
+        self.assertEqual(payment.status, Payment.STATUS_CANCELLED)
+        self.assertEqual(BookingHold.objects.filter(booking=booking).count(), 0)
+        self.assertEqual(
+            Availability.objects.filter(
+                listing=self.listing,
+                date__gte=self.check_in,
+                date__lt=self.check_out,
+            ).count(),
+            2,
+        )
+
+        repeated = self.client.post(f"/api/payments/{payment_id}/cancel/")
+        self.assertEqual(repeated.status_code, 200)
 
     @override_settings(QPAY_ENABLED=True)
     def test_payment_create_uses_qpay_invoice_when_enabled(self):

@@ -9,17 +9,26 @@ MAX_LISTING_IMAGE_BYTES = 20 * 1024 * 1024
 MAX_LISTING_IMAGE_PIXELS = 50_000_000
 MAX_LISTING_IMAGE_DIMENSION = 1920
 LISTING_IMAGE_QUALITY = 85
+LISTING_THUMBNAIL_DIMENSION = 720
+LISTING_THUMBNAIL_QUALITY = 78
 
 
 class ListingImageProcessingError(ValueError):
     pass
 
 
-def process_listing_image(uploaded_image) -> ContentFile:
+def _process_listing_image(
+    uploaded_image,
+    *,
+    max_dimension,
+    quality,
+    filename_prefix,
+) -> ContentFile:
     if uploaded_image.size > MAX_LISTING_IMAGE_BYTES:
         raise ListingImageProcessingError("Нэг зураг 20 MB-аас ихгүй байх ёстой.")
 
     try:
+        uploaded_image.seek(0)
         with Image.open(uploaded_image) as candidate:
             candidate.verify()
         uploaded_image.seek(0)
@@ -33,7 +42,7 @@ def process_listing_image(uploaded_image) -> ContentFile:
             source.seek(0)
             image = ImageOps.exif_transpose(source)
             image.thumbnail(
-                (MAX_LISTING_IMAGE_DIMENSION, MAX_LISTING_IMAGE_DIMENSION),
+                (max_dimension, max_dimension),
                 Image.Resampling.LANCZOS,
                 reducing_gap=3.0,
             )
@@ -50,7 +59,7 @@ def process_listing_image(uploaded_image) -> ContentFile:
             image.save(
                 buffer,
                 format="JPEG",
-                quality=LISTING_IMAGE_QUALITY,
+                quality=quality,
                 optimize=True,
                 progressive=True,
                 subsampling="4:2:0",
@@ -67,5 +76,23 @@ def process_listing_image(uploaded_image) -> ContentFile:
     buffer.seek(0)
     return ContentFile(
         buffer.read(),
-        name=f"listing-{uuid.uuid4().hex}.jpg",
+        name=f"{filename_prefix}-{uuid.uuid4().hex}.jpg",
+    )
+
+
+def process_listing_image(uploaded_image) -> ContentFile:
+    return _process_listing_image(
+        uploaded_image,
+        max_dimension=MAX_LISTING_IMAGE_DIMENSION,
+        quality=LISTING_IMAGE_QUALITY,
+        filename_prefix="listing",
+    )
+
+
+def process_listing_thumbnail(uploaded_image) -> ContentFile:
+    return _process_listing_image(
+        uploaded_image,
+        max_dimension=LISTING_THUMBNAIL_DIMENSION,
+        quality=LISTING_THUMBNAIL_QUALITY,
+        filename_prefix="listing-thumb",
     )

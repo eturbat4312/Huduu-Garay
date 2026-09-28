@@ -1,4 +1,5 @@
 from .services.booking_contact import booking_contact_allowed
+from .services.booking_lifecycle import complete_finished_bookings
 from django.db.models import F
 from rest_framework import serializers
 from datetime import timedelta
@@ -127,14 +128,11 @@ class UserSerializer(serializers.ModelSerializer):
         except IntegrityError:
             raise serializers.ValidationError({"email": "Энэ имэйлээр бүртгэл байна."})
 
-        # 🟢 HostApplication update хийх
-        # if instance.is_host and hostapp_data:
-        #     HostApplication.objects.update_or_create(
-        #         user=instance,
-        #         defaults={
-        #             "phone_number": hostapp_data.get("phone_number", ""),
-        #         },
-        #     )
+        # Profile дээрх host утас нь баталгаажсан өргөдөлтэй нэг эх үүсвэртэй байна.
+        if instance.is_host and hostapp_data:
+            HostApplication.objects.filter(user=instance).update(
+                phone_number=hostapp_data.get("phone_number", "")
+            )
 
         return instance
 
@@ -188,14 +186,20 @@ class AmenitySerializer(serializers.ModelSerializer):
 
 class ListingImageSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()
 
     class Meta:
         model = ListingImage
-        fields = ["id", "image", "uploaded_at"]
+        fields = ["id", "image", "thumbnail", "uploaded_at"]
 
     def get_image(self, obj):
         request = self.context.get("request")
         return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+
+    def get_thumbnail(self, obj):
+        image = obj.thumbnail if obj.thumbnail else obj.image
+        request = self.context.get("request")
+        return request.build_absolute_uri(image.url) if request else image.url
 
 
 # -------------------- LISTING --------------------
@@ -206,6 +210,9 @@ def can_view_private_listing_location(listing, request):
         return False
 
     user = request.user
+    if not getattr(request, "_booking_lifecycle_synced", False):
+        complete_finished_bookings()
+        request._booking_lifecycle_synced = True
     if user.is_staff or listing.host_id == user.id:
         return True
 
@@ -237,6 +244,7 @@ class ListingSerializer(serializers.ModelSerializer):
     average_rating = serializers.SerializerMethodField()
     can_view_private_location = serializers.SerializerMethodField()
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    has_available_dates = serializers.SerializerMethodField()
 
     category_id = serializers.PrimaryKeyRelatedField(
         queryset=Category.objects.all(), source="category", write_only=True
@@ -275,6 +283,7 @@ class ListingSerializer(serializers.ModelSerializer):
             "thumbnail",
             "host",
             "average_rating",
+            "has_available_dates",
             "location_lat",
             "location_lng",
             "is_active",
@@ -294,6 +303,15 @@ class ListingSerializer(serializers.ModelSerializer):
 
     def get_host_username(self, obj):
         return obj.host.username if obj.host else None
+
+    def get_has_available_dates(self, obj):
+        annotated_value = getattr(obj, "has_available_dates", None)
+        if annotated_value is not None:
+            return bool(annotated_value)
+        return Availability.objects.filter(
+            listing=obj,
+            date__gte=timezone.localdate(),
+        ).exists()
 
     def get_can_view_private_location(self, obj):
         return can_view_private_listing_location(obj, self.context.get("request"))
@@ -354,7 +372,8 @@ class ListingSerializer(serializers.ModelSerializer):
 
     def get_thumbnail(self, obj):
         if obj.images.exists():
-            image = obj.images.first().image
+            listing_image = obj.images.first()
+            image = listing_image.thumbnail if listing_image.thumbnail else listing_image.image
             request = self.context.get("request")
             return request.build_absolute_uri(image.url) if request else image.url
         return None
@@ -615,7 +634,12 @@ class BookingSerializer(serializers.ModelSerializer):
         can_view_private_location = can_view_private_listing_location(obj.listing, request)
         thumbnail = None
         if obj.listing.images.exists():
-            image_url = obj.listing.images.first().image.url
+            listing_image = obj.listing.images.first()
+            image_url = (
+                listing_image.thumbnail.url
+                if listing_image.thumbnail
+                else listing_image.image.url
+            )
             thumbnail = request.build_absolute_uri(image_url) if request else image_url
 
         return {

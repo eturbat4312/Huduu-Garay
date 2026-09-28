@@ -12,7 +12,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FacebookSignInButton } from '@/components/facebook-sign-in-button';
-import { facebookReturnPath } from '@/lib/facebook';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -39,6 +38,7 @@ export default function SignupScreen() {
     if (username.trim().length < 3) return 'Хэрэглэгчийн нэр хамгийн багадаа 3 тэмдэгт байна.';
     if (!password) return 'Нууц үгээ оруулна уу.';
     if (password.length < 8) return 'Нууц үг хамгийн багадаа 8 тэмдэгт байна.';
+    if (/^\d+$/.test(password)) return 'Нууц үг зөвхөн тооноос бүрдэх боломжгүй.';
     if (password !== password2) return 'Нууц үг таарахгүй байна.';
     return null;
   };
@@ -54,7 +54,14 @@ export default function SignupScreen() {
     setIsSubmitting(true);
     try {
       await signup(email.trim(), username.trim(), password);
-      router.replace(await facebookReturnPath(returnTo));
+      router.replace({
+        pathname: '/login',
+        params: {
+          registered: '1',
+          email: email.trim(),
+          ...(returnTo ? { returnTo } : {}),
+        },
+      } as never);
     } catch (err) {
       if (err instanceof ApiError) {
         const data = err.data as Record<string, unknown> | undefined;

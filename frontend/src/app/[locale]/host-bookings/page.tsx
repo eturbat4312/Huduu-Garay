@@ -116,6 +116,10 @@ export default function HostBookingsPage() {
                       {Number(booking.total_price).toLocaleString()}
                     </p>
 
+                    {booking.status === "completed" && (
+                      <p className="mt-2 font-medium text-gray-600">✓ Байрласан хугацаа дууссан</p>
+                    )}
+
                     {booking.notes && (
                       <p className="text-sm text-gray-600 mt-1">
                         💬 {booking.notes}

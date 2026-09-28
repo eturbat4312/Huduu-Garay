@@ -48,16 +48,11 @@ def notify_staff_about_new_listing(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=Booking)
 def notify_staff_about_new_booking(sender, instance, created, **kwargs):
-    if not created:
+    if not created or instance.status == Booking.STATUS_PENDING_PAYMENT:
         return
-    is_pending = instance.status == "pending_payment"
     notify_staff_activity(
-        notification_type="payment" if is_pending else "admin_booking",
-        subject=(
-            f"Шинэ захиалгын хүсэлт #{instance.pk} — төлбөр хүлээж байна"
-            if is_pending
-            else f"Шинэ захиалга #{instance.pk} үүслээ"
-        ),
+        notification_type="admin_booking",
+        subject=f"Шинэ захиалга #{instance.pk} үүслээ",
         message=(
             f"Захиалга #{instance.pk}. Зар: '{instance.listing.title}' #{instance.listing_id}. "
             f"Зочин: {instance.full_name} ({instance.guest.username}), "

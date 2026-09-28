@@ -76,8 +76,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = useCallback(async (email: string, username: string, password: string) => {
     await apiSignup(email, username, password);
-    const user = await fetchMe();
-    setState({ status: 'authenticated', user });
   }, []);
 
   const loginWithGoogle = useCallback(async (idToken: string) => {

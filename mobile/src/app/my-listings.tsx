@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,23 +13,81 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
+import { MonthCalendar } from '@/components/month-calendar';
 import { Colors, Spacing } from '@/constants/theme';
-import { fetchMyListings, resolveMediaUrl } from '@/lib/api';
+import { fetchAvailability, fetchHostBookings, fetchMyListings, resolveMediaUrl } from '@/lib/api';
 import type { ListingSummary } from '@/types/api';
 
 export default function MyListingsScreen() {
   const scheme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const C = Colors[scheme];
   const [listings, setListings] = useState<ListingSummary[]>([]);
+  const [availableDates, setAvailableDates] = useState<Set<string>>(new Set());
+  const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+  const [bookingByDate, setBookingByDate] = useState<Map<string, number>>(new Map());
+  const now = new Date();
+  const [calendarYear, setCalendarYear] = useState(now.getFullYear());
+  const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    fetchMyListings()
-      .then(setListings)
-      .catch(() => setError('Мэдээлэл татахад алдаа гарлаа.'))
-      .finally(() => setLoading(false));
-  }, []);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+    Promise.all([fetchMyListings(), fetchHostBookings()])
+      .then(async ([myListings, bookings]) => {
+        if (!active) return;
+        setListings(myListings);
+        const availability = await Promise.all(
+          myListings.map((listing) => fetchAvailability(listing.id)),
+        );
+        if (!active) return;
+        setAvailableDates(new Set(availability.flat().map((day) => day.date)));
+
+        const nextBooked = new Set<string>();
+        const nextBookingByDate = new Map<string, number>();
+        for (const booking of bookings) {
+          if (booking.is_cancelled_by_host || booking.status !== 'confirmed') continue;
+          const current = new Date(`${booking.check_in}T00:00:00`);
+          const end = new Date(`${booking.check_out}T00:00:00`);
+          while (current < end) {
+            const date = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
+            nextBooked.add(date);
+            nextBookingByDate.set(date, booking.id);
+            current.setDate(current.getDate() + 1);
+          }
+        }
+        setBookedDates(nextBooked);
+        setBookingByDate(nextBookingByDate);
+      })
+      .catch(() => {
+        if (active) setError('Мэдээлэл татахад алдаа гарлаа.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => { active = false; };
+  }, []));
+
+  const previousMonth = () => {
+    if (calendarMonth === 0) {
+      setCalendarYear((year) => year - 1);
+      setCalendarMonth(11);
+    } else {
+      setCalendarMonth((month) => month - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (calendarMonth === 11) {
+      setCalendarYear((year) => year + 1);
+      setCalendarMonth(0);
+    } else {
+      setCalendarMonth((month) => month + 1);
+    }
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -68,6 +126,31 @@ export default function MyListingsScreen() {
             keyExtractor={(item) => String(item.id)}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{ gap: Spacing.three, paddingBottom: Spacing.five }}
+            ListHeaderComponent={(
+              <View style={[styles.calendarCard, { backgroundColor: C.backgroundElement }]}>
+                <Text style={[styles.calendarTitle, { color: C.text }]}>📅 Нэгдсэн хуваарь</Text>
+                <View style={styles.calendarLegend}>
+                  <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#16A34A' }]} /><Text style={{ color: C.textSecondary, fontSize: 12 }}>Боломжтой</Text></View>
+                  <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#F87171' }]} /><Text style={{ color: C.textSecondary, fontSize: 12 }}>Захиалгатай</Text></View>
+                </View>
+                <View style={styles.calendarNavigation}>
+                  <Pressable onPress={previousMonth} style={styles.calendarButton}><Text style={{ color: C.text, fontSize: 18 }}>‹</Text></Pressable>
+                  <Text style={{ color: C.textSecondary, fontSize: 12 }}>Улаан өдрийг дарж захиалгыг нээнэ</Text>
+                  <Pressable onPress={nextMonth} style={styles.calendarButton}><Text style={{ color: C.text, fontSize: 18 }}>›</Text></Pressable>
+                </View>
+                <MonthCalendar
+                  year={calendarYear}
+                  month={calendarMonth}
+                  selected={availableDates}
+                  bookedDates={bookedDates}
+                  onPressDate={(date) => {
+                    const bookingId = bookingByDate.get(date);
+                    if (bookingId) router.push(`/host-bookings/${bookingId}` as never);
+                  }}
+                  textColor={C.text}
+                />
+              </View>
+            )}
             renderItem={({ item }) => {
               const thumbUrl = resolveMediaUrl(item.thumbnail);
               const moderationLabels: Record<string, string> = {
@@ -148,6 +231,17 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 18, fontWeight: '700' },
   emptySub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+
+  calendarCard: { borderRadius: 16, padding: Spacing.three, gap: Spacing.two },
+  calendarTitle: { fontSize: 17, fontWeight: '700' },
+  calendarLegend: { flexDirection: 'row', gap: Spacing.three, flexWrap: 'wrap' },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 12, height: 12, borderRadius: 6 },
+  calendarNavigation: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  calendarButton: {
+    width: 38, height: 34, borderRadius: 10, backgroundColor: '#E5E7EB',
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   card: { borderRadius: 16, overflow: 'hidden' },
   cardImage: { width: '100%', height: 180 },

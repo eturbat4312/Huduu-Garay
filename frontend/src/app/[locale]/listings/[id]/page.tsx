@@ -173,6 +173,9 @@ export default function ListingDetailPage() {
       : 0;
 
   const totalPrice = () => calculateNights() * (listing?.price_per_night ?? 0);
+  const hasFutureAvailability = Array.from(availableDateStrings).some(
+    (date) => date >= formatDateString(new Date())
+  );
 
   const handleBooking = () => {
     if (!selectedRange?.from || !selectedRange?.to) {
@@ -401,6 +404,11 @@ export default function ListingDetailPage() {
               {isOwner && <p>{t(locale as string, "booked_days_hint")}</p>}
               <p>{t(locale as string, "unavailable_days_hint")}</p>
             </div>
+            {!isOwner && !hasFutureAvailability && (
+              <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Одоогоор захиалах боломжтой өдөр байхгүй байна.
+              </div>
+            )}
           </div>
 
           {!isOwner && listing.status === "active" && (
@@ -432,7 +440,10 @@ export default function ListingDetailPage() {
               <button
                 onClick={handleBooking}
                 disabled={
-                  authLoading || !selectedRange?.from || !selectedRange?.to
+                  authLoading ||
+                  !hasFutureAvailability ||
+                  !selectedRange?.from ||
+                  !selectedRange?.to
                 }
                 className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white w-full py-2 rounded mt-2"
               >

@@ -17,11 +17,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import MapPickerField from '@/components/map-picker-field';
+import { MonthCalendar } from '@/components/month-calendar';
 import { Colors, Spacing } from '@/constants/theme';
 import {
+  createAvailabilityBulk,
+  deleteAvailabilityByListing,
   deleteListingImage,
   fetchAmenities,
+  fetchAvailability,
   fetchCategories,
+  fetchHostBookings,
   fetchListing,
   updateListing,
   uploadListingImages,
@@ -31,6 +36,9 @@ import { compressListingImages } from '@/lib/image-compression';
 
 const formatPrice = (value: string) =>
   value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+const formatLocalDate = (value: Date) =>
+  `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 
 // ─── Stepper ─────────────────────────────────────────────────────────────────
 function Stepper({
@@ -100,6 +108,14 @@ export default function EditListingScreen() {
   const [newImageUris, setNewImageUris] = useState<string[]>([]);
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
 
+  // ── Available dates ──
+  const [selectedDates, setSelectedDates] = useState<Set<string>>(new Set());
+  const [initialDates, setInitialDates] = useState<string[]>([]);
+  const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+  const now = new Date();
+  const [calYear, setCalYear] = useState(now.getFullYear());
+  const [calMonth, setCalMonth] = useState(now.getMonth());
+
   // ── Submit ──
   const [submitting, setSubmitting] = useState(false);
 
@@ -109,8 +125,10 @@ export default function EditListingScreen() {
     Promise.all([
       fetchListing(id),
       fetchCategories(),
+      fetchAvailability(id),
+      fetchHostBookings(),
     ])
-      .then(([listing, cats]) => {
+      .then(([listing, cats, availability, bookings]) => {
         // Pre-fill form
         setTitle(listing.title ?? '');
         setDescription(listing.description ?? '');
@@ -136,6 +154,23 @@ export default function EditListingScreen() {
         setExistingImages(listing.images ?? []);
 
         setCategories(cats);
+
+        const availableDates = availability.map((day) => day.date);
+        setInitialDates(availableDates);
+        setSelectedDates(new Set(availableDates));
+
+        const booked = new Set<string>();
+        for (const booking of bookings) {
+          if (booking.listing.id !== Number(id)) continue;
+          if (booking.is_cancelled_by_host || booking.status !== 'confirmed') continue;
+          const current = new Date(`${booking.check_in}T00:00:00`);
+          const end = new Date(`${booking.check_out}T00:00:00`);
+          while (current < end) {
+            booked.add(formatLocalDate(current));
+            current.setDate(current.getDate() + 1);
+          }
+        }
+        setBookedDates(booked);
       })
       .catch((err: unknown) => {
         setInitError(err instanceof Error ? err.message : 'Мэдээлэл татахад алдаа гарлаа.');
@@ -175,6 +210,34 @@ export default function EditListingScreen() {
 
   // ── Helpers ──
   const plainPrice = Number(price.replace(/,/g, ''));
+
+  const toggleDate = (date: string) => {
+    if (bookedDates.has(date)) return;
+    setSelectedDates((current) => {
+      const next = new Set(current);
+      if (next.has(date)) next.delete(date);
+      else next.add(date);
+      return next;
+    });
+  };
+
+  const previousMonth = () => {
+    if (calMonth === 0) {
+      setCalYear((year) => year - 1);
+      setCalMonth(11);
+    } else {
+      setCalMonth((month) => month - 1);
+    }
+  };
+
+  const nextMonth = () => {
+    if (calMonth === 11) {
+      setCalYear((year) => year + 1);
+      setCalMonth(0);
+    } else {
+      setCalMonth((month) => month + 1);
+    }
+  };
 
   const toggleAmenity = (aid: number) =>
     setAmenityIds((prev) =>
@@ -260,6 +323,19 @@ export default function EditListingScreen() {
         category_id: categoryId,
         amenity_ids: amenityIds.length > 0 ? amenityIds : [],
       });
+
+      const currentDates = Array.from(selectedDates).sort();
+      const originalDates = [...initialDates].sort();
+      const datesChanged =
+        currentDates.length !== originalDates.length ||
+        currentDates.some((date, index) => date !== originalDates[index]);
+
+      if (datesChanged) {
+        await deleteAvailabilityByListing(id!);
+        if (currentDates.length > 0) {
+          await createAvailabilityBulk(Number(id), currentDates);
+        }
+      }
 
       if (newImageUris.length > 0) {
         await uploadListingImages(Number(id), newImageUris);
@@ -544,6 +620,34 @@ export default function EditListingScreen() {
           )}
         </View>
 
+        <View style={[S.section, { backgroundColor: C.backgroundElement }]}>
+          <Text style={[S.sectionTitle, { color: C.text }]}>📅 Боломжит огноо</Text>
+          <Text style={{ color: C.textSecondary, fontSize: 13, lineHeight: 19 }}>
+            Ногоон өдөр захиалах боломжтой. Улаан өдөр баталгаажсан захиалгатай тул өөрчлөх боломжгүй.
+          </Text>
+          <View style={S.calendarLegend}>
+            <View style={S.legendItem}><View style={[S.legendDot, { backgroundColor: '#16A34A' }]} /><Text style={{ color: C.textSecondary, fontSize: 12 }}>Боломжтой</Text></View>
+            <View style={S.legendItem}><View style={[S.legendDot, { backgroundColor: '#F87171' }]} /><Text style={{ color: C.textSecondary, fontSize: 12 }}>Захиалгатай</Text></View>
+          </View>
+          <View style={S.calendarNavigation}>
+            <Pressable onPress={previousMonth} style={S.calendarButton}>
+              <Text style={{ color: C.text, fontSize: 18 }}>‹</Text>
+            </Pressable>
+            <Text style={{ color: C.textSecondary, fontSize: 13 }}>{selectedDates.size} өдөр сонгосон</Text>
+            <Pressable onPress={nextMonth} style={S.calendarButton}>
+              <Text style={{ color: C.text, fontSize: 18 }}>›</Text>
+            </Pressable>
+          </View>
+          <MonthCalendar
+            year={calYear}
+            month={calMonth}
+            selected={selectedDates}
+            bookedDates={bookedDates}
+            onToggle={toggleDate}
+            textColor={C.text}
+          />
+        </View>
+
         {/* ── Submit ── */}
         <Pressable
           onPress={handleSubmit}
@@ -650,6 +754,17 @@ const S = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center', justifyContent: 'center',
   },
+  calendarNavigation: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: Spacing.one,
+  },
+  calendarButton: {
+    width: 38, height: 34, borderRadius: 10, backgroundColor: '#E5E7EB',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  calendarLegend: { flexDirection: 'row', gap: Spacing.three, flexWrap: 'wrap' },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot: { width: 12, height: 12, borderRadius: 6 },
   submitBtn: {
     minHeight: 54, alignItems: 'center', justifyContent: 'center',
     borderRadius: 14, backgroundColor: '#16A34A',

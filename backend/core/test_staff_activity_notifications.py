@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.test import TestCase, override_settings
 from allauth.account.models import EmailAddress
 from allauth.account.models import EmailConfirmationHMAC
@@ -27,6 +28,17 @@ class EmailConfirmationLinkTests(TestCase):
         self.assertEqual(
             url,
             "https://www.tanaid-honoy.mn/mn/confirm-email?key=abc%3A123",
+        )
+
+    def test_mobile_registration_confirmation_link_opens_app(self):
+        request = SimpleNamespace(META={"HTTP_X_CLIENT_PLATFORM": "mobile"})
+        url = AccountAdapter().get_email_confirmation_url(
+            request, SimpleNamespace(key="abc:123")
+        )
+
+        self.assertEqual(
+            url,
+            "tanaidhonoy://confirm-email?key=abc%3A123",
         )
 
     @override_settings(
@@ -56,6 +68,26 @@ class EmailConfirmationLinkTests(TestCase):
         self.assertEqual(verified.status_code, 200)
         address.refresh_from_db()
         self.assertTrue(address.verified)
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"
+    )
+    def test_mobile_registration_email_contains_app_deep_link(self):
+        response = APIClient().post(
+            "/api/auth/registration/",
+            {
+                "username": "mobile-verify-user",
+                "email": "mobile-verify@example.com",
+                "password1": "StrongVerifyPass1!",
+                "password2": "StrongVerifyPass1!",
+            },
+            format="json",
+            HTTP_X_CLIENT_PLATFORM="mobile",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(mail.outbox)
+        self.assertIn("tanaidhonoy://confirm-email?key=", mail.outbox[-1].body)
 
 
 @override_settings(STAFF_ACTIVITY_EMAILS_ENABLED=True)
@@ -135,7 +167,8 @@ class StaffActivityNotificationTests(TestCase):
                 service_fee=10000,
                 status="pending_payment",
             )
-        self.assert_staff_event("payment", send_email)
+        self.assertFalse(Notification.objects.filter(related_booking=booking).exists())
+        send_email.assert_not_called()
 
         Notification.objects.all().delete()
         send_email.reset_mock()

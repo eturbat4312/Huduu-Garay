@@ -46,6 +46,7 @@ from .views import (
     BookingRetrieveView,
     PaymentCreateView,
     PaymentCheckView,
+    PaymentCancelView,
     PaymentRetrieveView,
     PaymentMockConfirmView,
     QPayCallbackView,
@@ -97,6 +98,11 @@ urlpatterns = [
         "payments/<int:payment_id>/check/",
         PaymentCheckView.as_view(),
         name="payment-check",
+    ),
+    path(
+        "payments/<int:payment_id>/cancel/",
+        PaymentCancelView.as_view(),
+        name="payment-cancel",
     ),
     path(
         "payments/qpay/callback/",
