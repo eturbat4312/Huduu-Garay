@@ -5,13 +5,23 @@ import { useParams } from "next/navigation";
 import api from "@/lib/axios";
 import { facebookError, startFacebook } from "@/lib/facebook";
 
-export default function FacebookLoginButton({
-  intent = "login",
-  returnTo,
-}: {
+const FACEBOOK_LOGIN_VISIBLE =
+  process.env.NEXT_PUBLIC_FACEBOOK_LOGIN_VISIBLE === "true";
+
+type FacebookLoginButtonProps = {
   intent?: "login" | "connect";
   returnTo?: string | null;
-}) {
+};
+
+export default function FacebookLoginButton(props: FacebookLoginButtonProps) {
+  if (!FACEBOOK_LOGIN_VISIBLE) return null;
+  return <EnabledFacebookLoginButton {...props} />;
+}
+
+function EnabledFacebookLoginButton({
+  intent = "login",
+  returnTo,
+}: FacebookLoginButtonProps) {
   const { locale } = useParams() as { locale: string };
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);

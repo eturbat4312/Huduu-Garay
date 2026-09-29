@@ -41,6 +41,14 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const openSignup = () => {
+    router.push(
+      returnTo
+        ? ({ pathname: '/signup', params: { returnTo } } as never)
+        : '/signup',
+    );
+  };
+
   const handleLogin = async () => {
     if (isSubmitting) return;
     if (!email.trim() || !password) {
@@ -73,15 +81,43 @@ export default function LoginScreen() {
             contentContainerStyle={styles.scroll}
             keyboardShouldPersistTaps="handled">
             <View style={styles.header}>
-              <ThemedText type="title">Нэвтрэх</ThemedText>
+              <ThemedText type="title">
+                {isBookingLogin ? 'Захиалгаа үргэлжлүүлэх' : 'Нэвтрэх'}
+              </ThemedText>
               <ThemedText themeColor="textSecondary">
                 {isBookingLogin
-                  ? 'Захиалгаа үргэлжлүүлэхийн тулд нэвтэрнэ үү. Нэвтэрсний дараа сонгосон захиалга руу буцаана.'
+                  ? 'Бүртгэлтэй бол нэвтэрнэ үү. Шинэ хэрэглэгч бол эхлээд үнэгүй бүртгэл үүсгээрэй.'
                   : 'Танайд Хоноё — Орон сууц, Зуслан, Амралт захиалгын цогц платформ'}
               </ThemedText>
             </View>
 
+            {isBookingLogin ? (
+              <View style={styles.signupCard}>
+                <View style={styles.signupCopy}>
+                  <ThemedText type="smallBold" style={styles.signupTitle}>
+                    Шинэ хэрэглэгч үү?
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.signupDescription}>
+                    Бүртгэл үүсгээд сонгосон захиалга руугаа шууд буцна.
+                  </ThemedText>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={openSignup}
+                  style={({ pressed }) => [styles.signupButton, pressed && styles.pressed]}>
+                  <ThemedText type="smallBold" style={styles.signupButtonText}>
+                    Шинээр бүртгүүлэх
+                  </ThemedText>
+                </Pressable>
+              </View>
+            ) : null}
+
             <View style={styles.form}>
+              {isBookingLogin ? (
+                <ThemedText type="smallBold" style={styles.loginSectionTitle}>
+                  Бүртгэлтэй бол нэвтрэх
+                </ThemedText>
+              ) : null}
               {registered === '1' ? (
                 <View style={styles.successBox}>
                   <ThemedText type="small" style={styles.successText}>
@@ -161,21 +197,18 @@ export default function LoginScreen() {
               <FacebookSignInButton returnTo={returnTo} />
             </View>
 
-            <View style={styles.footer}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Бүртгэл байхгүй юу?
-              </ThemedText>
-              <Pressable
-                onPress={() => router.push(
-                  returnTo
-                    ? ({ pathname: '/signup', params: { returnTo } } as never)
-                    : '/signup',
-                )}>
-                <ThemedText type="smallBold" style={styles.linkText}>
-                  Бүртгүүлэх
+            {!isBookingLogin ? (
+              <View style={styles.footer}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Бүртгэл байхгүй юу?
                 </ThemedText>
-              </Pressable>
-            </View>
+                <Pressable onPress={openSignup}>
+                  <ThemedText type="smallBold" style={styles.linkText}>
+                    Бүртгүүлэх
+                  </ThemedText>
+                </Pressable>
+              </View>
+            ) : null}
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -194,6 +227,27 @@ const styles = StyleSheet.create({
     gap: Spacing.four,
   },
   header: { gap: Spacing.two },
+  signupCard: {
+    gap: Spacing.three,
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+    borderRadius: 12,
+    padding: Spacing.three,
+    backgroundColor: '#F0FDF4',
+  },
+  signupCopy: { gap: Spacing.one },
+  signupTitle: { color: '#14532D' },
+  signupDescription: { color: '#166534' },
+  signupButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    backgroundColor: '#16A34A',
+    paddingHorizontal: Spacing.three,
+  },
+  signupButtonText: { color: '#FFFFFF', fontSize: 16 },
+  loginSectionTitle: { fontSize: 17 },
   form: { gap: Spacing.three },
   field: { gap: Spacing.one },
   input: {

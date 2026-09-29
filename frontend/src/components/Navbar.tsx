@@ -73,9 +73,12 @@ export default function Navbar() {
                   {t(locale as string, "add_listing")}
                 </Link>
               ) : user.host_application_status === "pending" ? (
-                <span className="bg-gray-300 text-gray-700 px-3 py-1 rounded cursor-not-allowed text-sm">
+                <Link
+                  href={`/${locale}/become-host`}
+                  className="bg-amber-600 text-white px-3 py-1 rounded hover:bg-amber-700 text-sm"
+                >
                   ⏳ {t(locale as string, "host_application_pending")}
-                </span>
+                </Link>
               ) : (
                 <Link
                   href={`/${locale}/become-host`}
@@ -143,6 +146,33 @@ export default function Navbar() {
         )}
       </div>
 
+      {/* Mobile web дээр role-ийн үндсэн үйлдлийг menu нээхгүйгээр байнга харуулна. */}
+      {!loading && user ? (
+        <div className="md:hidden ml-auto mr-2">
+          {user.is_host ? (
+            <Link
+              href={`/${locale}/listings/new`}
+              className="inline-flex min-h-10 items-center rounded-full bg-green-600 px-3 text-xs font-bold text-white shadow hover:bg-green-700"
+            >
+              ＋ {t(locale as string, "add_listing")}
+            </Link>
+          ) : (
+            <Link
+              href={`/${locale}/become-host`}
+              className={`inline-flex min-h-10 items-center rounded-full px-3 text-xs font-bold text-white shadow ${
+                user.host_application_status === "pending"
+                  ? "bg-amber-600 hover:bg-amber-700"
+                  : "bg-green-600 hover:bg-green-700"
+              }`}
+            >
+              {user.host_application_status === "pending"
+                ? `⏳ ${t(locale as string, "host_application_pending")}`
+                : `🏠 ${t(locale as string, "become_host")}`}
+            </Link>
+          )}
+        </div>
+      ) : null}
+
       {/* ✅ Mobile menu button */}
       <button
         ref={buttonRef}
@@ -175,9 +205,12 @@ export default function Navbar() {
                     {t(locale as string, "add_listing")}
                   </Link>
                 ) : user.host_application_status === "pending" ? (
-                  <span className="bg-gray-300 text-gray-700 px-3 py-1 rounded cursor-not-allowed text-sm text-center mt-2">
+                  <Link
+                    href={`/${locale}/become-host`}
+                    className="bg-amber-600 text-white px-3 py-1 rounded hover:bg-amber-700 text-sm text-center mt-2"
+                  >
                     ⏳ {t(locale as string, "host_application_pending")}
-                  </span>
+                  </Link>
                 ) : (
                   <Link
                     href={`/${locale}/become-host`}

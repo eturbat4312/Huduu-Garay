@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedView } from '@/components/themed-view';
 import { FacebookSignInButton } from '@/components/facebook-sign-in-button';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
+import { HostAction } from '@/components/host-action';
 import { BottomTabInset, Colors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 import {
@@ -181,6 +182,8 @@ export default function ProfileScreen() {
               <Text style={[styles.editBtnText, { color: C.text }]}>✏️  Профайл засах</Text>
             </Pressable>
           </View>
+
+          <HostAction variant="card" />
 
           {/* ── Статистик ── */}
           <View style={[styles.statsRow, { backgroundColor: C.backgroundElement }]}>

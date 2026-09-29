@@ -9,6 +9,7 @@ import { User, HostApplication } from "@/types";
 import { useRefreshUser } from "@/context/AuthContext";
 import { t } from "@/lib/i18n";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 
 export default function ProfilePage() {
   const raw = useParams().locale;
@@ -128,16 +129,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleBecomeHost = async () => {
-    try {
-      await api.patch("/me/", { is_host: true });
-      setUser((prev) => (prev ? { ...prev, is_host: true } : null));
-      alert(t(locale, "become_host_success"));
-    } catch {
-      alert(t(locale, "become_host_error"));
-    }
-  };
-
   if (loading) return <p className="p-6">{t(locale, "loading")}</p>;
   if (!user)
     return <p className="p-6 text-red-600">{t(locale, "profile_not_found")}</p>;
@@ -151,6 +142,35 @@ export default function ProfilePage() {
 
       {errorMsg && <p className="text-red-600">{errorMsg}</p>}
       {successMsg && <p className="text-green-600">{successMsg}</p>}
+
+      {!editMode && (
+        <section className="rounded-2xl border border-green-200 bg-green-50 p-5">
+          <h2 className="text-xl font-bold text-gray-900">
+            {user.is_host ? "Шинэ зар оруулах" : "Байраа түрээслүүлэх үү?"}
+          </h2>
+          <p className="mt-1 text-sm text-gray-600">
+            {user.is_host
+              ? "Байр, зуслан эсвэл амралтын газрын шинэ зараа эндээс оруулна."
+              : user.host_application_status === "pending"
+                ? "Таны түрээслүүлэгч болох хүсэлтийг ажилтан хянаж байна."
+                : "Баталгаажсаны дараа зар оруулж, захиалга хүлээн авах боломжтой."}
+          </p>
+          <Link
+            href={user.is_host ? `/${locale}/listings/new` : `/${locale}/become-host`}
+            className={`mt-4 inline-flex min-h-11 items-center justify-center rounded-xl px-5 font-bold text-white ${
+              !user.is_host && user.host_application_status === "pending"
+                ? "bg-amber-600 hover:bg-amber-700"
+                : "bg-green-600 hover:bg-green-700"
+            }`}
+          >
+            {user.is_host
+              ? `＋ ${t(locale, "add_listing")}`
+              : user.host_application_status === "pending"
+                ? `⏳ ${t(locale, "host_application_pending")}`
+                : `🏠 ${t(locale, "become_host")}`}
+          </Link>
+        </section>
+      )}
 
       {/* 🖼 Avatar */}
       <div className="flex items-center gap-6">
@@ -331,14 +351,6 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {!user.is_host && !editMode && (
-        <button
-          onClick={handleBecomeHost}
-          className="mt-6 bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded"
-        >
-          {t(locale, "become_host")}
-        </button>
-      )}
     </main>
   );
 }

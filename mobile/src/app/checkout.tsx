@@ -292,15 +292,17 @@ export default function CheckoutScreen() {
             editable={!isSubmitting}
             onChangeText={setNotes}
             placeholder="Нэмэлт тэмдэглэл"
-            placeholderTextColor={C.textSecondary}
+            placeholderTextColor="#6B7280"
+            selectionColor="#16A34A"
+            cursorColor="#16A34A"
             multiline
             style={[
               styles.input,
               styles.notesInput,
               {
-                backgroundColor: C.backgroundElement,
-                color: C.text,
-                borderColor: C.backgroundSelected,
+                backgroundColor: '#FFFFFF',
+                color: '#111827',
+                borderColor: '#D1D5DB',
               },
             ]}
           />
@@ -416,6 +418,7 @@ const styles = StyleSheet.create({
   notesInput: {
     minHeight: 92,
     paddingTop: Spacing.two,
+    textAlignVertical: 'top',
   },
   summaryRow: {
     flexDirection: 'row',

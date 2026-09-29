@@ -6,13 +6,22 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-
 import { ThemedText } from '@/components/themed-text';
 import { facebookError, facebookRequest, prepareFacebook, wasFacebookCallbackHandled } from '@/lib/facebook';
 
-export function FacebookSignInButton({
-  intent = 'login',
-  returnTo,
-}: {
+const FACEBOOK_LOGIN_VISIBLE = process.env.EXPO_PUBLIC_FACEBOOK_LOGIN_VISIBLE === 'true';
+
+type FacebookSignInButtonProps = {
   intent?: 'login' | 'connect';
   returnTo?: string | null;
-}) {
+};
+
+export function FacebookSignInButton(props: FacebookSignInButtonProps) {
+  if (!FACEBOOK_LOGIN_VISIBLE) return null;
+  return <EnabledFacebookSignInButton {...props} />;
+}
+
+function EnabledFacebookSignInButton({
+  intent = 'login',
+  returnTo,
+}: FacebookSignInButtonProps) {
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
