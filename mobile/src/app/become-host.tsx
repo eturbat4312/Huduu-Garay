@@ -12,6 +12,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -87,7 +88,7 @@ export default function BecomeHostScreen() {
     if (!bankName)             { setError('Банк сонгоно уу.'); return; }
     if (!accountNumber.trim()) { setError('Дансны дугаар оруулна уу.'); return; }
     if (!idCardImage)          { setError('Иргэний үнэмлэхний зургийг оруулна уу.'); return; }
-    if (!selfieImage)          { setError('Иргэний үнэмлэхтэй хамт зурсан зургийг оруулна уу.'); return; }
+    if (!selfieImage)          { setError('Иргэний үнэмлэхээ барьсан өөрийн зургийг оруулна уу.'); return; }
     if (!termsAccepted)        { setError('Түрээслүүлэгчийн нөхцөлийг зөвшөөрнө үү.'); return; }
 
     setSubmitting(true);
@@ -212,6 +213,14 @@ export default function BecomeHostScreen() {
                 <Text style={styles.exampleRow}>Шимтгэл: <Text style={{ fontWeight: '700' }}>10,000₮</Text></Text>
                 <Text style={[styles.exampleRow, { color: '#16A34A', fontWeight: '700' }]}>Таны авах: 90,000₮</Text>
               </View>
+              <View style={styles.priceTipBox}>
+                <Text style={styles.priceTipTitle}>Үнээ хэрхэн тохируулах вэ?</Text>
+                <Text style={styles.priceTipText}>
+                  Та ойролцоогоор 100,000₮ авахыг хүсвэл хоногийн үнээ 110,000₮ гэж
+                  оруулж болно. Өөрийн авахыг хүссэн дүнгээ тооцоод үнээ тохируулах
+                  боломжтой.
+                </Text>
+              </View>
             </View>
 
             {/* Бүтэн нэр */}
@@ -287,10 +296,22 @@ export default function BecomeHostScreen() {
 
             {/* Selfie */}
             <View style={styles.fieldGroup}>
-              <Text style={[styles.label, { color: C.text }]}>Иргэний үнэмлэхтэй хамт selfie *</Text>
-              <Text style={[styles.selfieNote, { color: C.textSecondary }]}>
-                Иргэний үнэмлэхээ гартаа барьж, нүүрийнхээ хажууд байлган зурна уу.
-              </Text>
+              <Text style={[styles.label, { color: C.text }]}>Иргэний үнэмлэхээ барьсан өөрийн зураг *</Text>
+              <View style={styles.selfieGuide}>
+                <Text style={styles.selfieGuideTitle}>Ямар зураг илгээх вэ?</Text>
+                <Text style={styles.selfieGuideText}>
+                  Иргэний үнэмлэхээ гартаа барьж, нүүрнийхээ хажууд байрлуулан зургаа
+                  авахуулаад илгээнэ үү. Таны нүүр болон үнэмлэх хоёул тод, бүтнээрээ
+                  харагдсан байна.
+                </Text>
+                <Image
+                  source={require('../../assets/images/sample-selfie.png')}
+                  resizeMode="contain"
+                  accessibilityLabel="Иргэний үнэмлэхээ нүүрнийхээ хажууд барьсан жишээ зураг"
+                  style={styles.selfieExample}
+                />
+                <Text style={styles.selfieExampleCaption}>Жишээ зураг</Text>
+              </View>
               <Pressable
                 onPress={() => pickImage('selfie')}
                 style={[styles.pickerBtn, { backgroundColor: C.backgroundElement, borderColor: C.backgroundSelected }]}
@@ -373,6 +394,12 @@ const styles = StyleSheet.create({
     borderRadius: 10, padding: Spacing.two, gap: 4,
   },
   exampleRow: { fontSize: 13, color: '#374151' },
+  priceTipBox: {
+    backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A',
+    borderRadius: 10, padding: Spacing.two, gap: 4,
+  },
+  priceTipTitle: { color: '#92400E', fontSize: 13, fontWeight: '700' },
+  priceTipText: { color: '#374151', fontSize: 13, lineHeight: 20 },
 
   fieldGroup: { marginBottom: Spacing.three },
   label: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
@@ -392,7 +419,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three, gap: Spacing.two,
   },
   pickerText: { fontSize: 14, fontWeight: '500' },
-  selfieNote: { fontSize: 12, marginBottom: Spacing.one, lineHeight: 18 },
+  selfieGuide: {
+    backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#CBD5E1',
+    borderRadius: 12, padding: Spacing.two, marginBottom: Spacing.two, gap: 6,
+  },
+  selfieGuideTitle: { color: '#0F172A', fontSize: 13, fontWeight: '700' },
+  selfieGuideText: { color: '#334155', fontSize: 13, lineHeight: 20 },
+  selfieExample: { width: '100%', aspectRatio: 924 / 772, borderRadius: 10 },
+  selfieExampleCaption: { color: '#64748B', fontSize: 12, textAlign: 'center' },
 
   errorBox: {
     backgroundColor: '#FEF2F2', borderRadius: 12,

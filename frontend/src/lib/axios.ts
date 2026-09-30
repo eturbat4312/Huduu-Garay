@@ -12,13 +12,45 @@ const baseURL = rawBase.replace(/\/+$/, "");
 
 const api = axios.create({ baseURL });
 
+// Logged-out pages can still have an expired token left in localStorage. DRF
+// authenticates a supplied Bearer token before checking AllowAny, so attaching
+// that stale token makes otherwise public auth endpoints return 401.
+const PUBLIC_AUTH_PATHS = [
+  "/auth/registration/",
+  "/auth/registration/verify-email/",
+  "/token/",
+  "/token/refresh/",
+  "/password-reset/",
+  "/password-reset/confirm/",
+  "/auth/google/",
+  "/auth/facebook/config/",
+  "/auth/facebook/start/",
+  "/auth/facebook/exchange/",
+  "/auth/facebook/send-code/",
+  "/auth/facebook/register/",
+];
+
+function isPublicAuthRequest(url?: string) {
+  if (!url) return false;
+  const path = url.split("?", 1)[0].replace(/\/+$/, "/");
+  return PUBLIC_AUTH_PATHS.some((publicPath) => path.endsWith(publicPath));
+}
+
 // --- Access токен автоматаар хавсаргах ---
 api.interceptors.request.use((config) => {
+  const hdrs: AxiosRequestHeaders =
+    (config.headers as AxiosRequestHeaders) ?? {};
+
+  if (isPublicAuthRequest(config.url)) {
+    delete hdrs["Authorization"];
+    delete hdrs["authorization"];
+    config.headers = hdrs;
+    return config;
+  }
+
   if (typeof window !== "undefined") {
     const token = localStorage.getItem("access_token");
     if (token) {
-      const hdrs: AxiosRequestHeaders =
-        (config.headers as AxiosRequestHeaders) ?? {};
       hdrs["Authorization"] = `Bearer ${token}`;
       config.headers = hdrs;
     }
@@ -41,8 +73,14 @@ api.interceptors.response.use(
     const status = err.response?.status;
     const url = (original?.url || "").toString();
     const isRefreshCall = url.includes("/token/refresh/");
+    const isPublicAuthCall = isPublicAuthRequest(url);
 
-    if (status === 401 && !original?._retry && !isRefreshCall) {
+    if (
+      status === 401 &&
+      !original?._retry &&
+      !isRefreshCall &&
+      !isPublicAuthCall
+    ) {
       original._retry = true;
 
       if (!isRefreshing) {

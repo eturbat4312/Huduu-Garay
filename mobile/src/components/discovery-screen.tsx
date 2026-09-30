@@ -19,6 +19,7 @@ import {
 import MapView, { Marker, UrlTile } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { HostAction } from '@/components/host-action';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
@@ -355,6 +356,10 @@ export default function DiscoveryScreen() {
               />
             ))}
           </ScrollView>
+
+          <View style={styles.hostActionRow}>
+            <HostAction />
+          </View>
 
           <View style={styles.resultsRow}>
             <View>
@@ -1014,6 +1019,10 @@ const styles = StyleSheet.create({
   },
   categoryIcon: { fontSize: 15 },
   categoryLabel: { fontSize: 13, fontWeight: '600' },
+  hostActionRow: {
+    alignItems: 'flex-end',
+    paddingBottom: 10,
+  },
   resultsRow: {
     paddingBottom: 12,
     flexDirection: 'row',

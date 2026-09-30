@@ -141,6 +141,14 @@ export default function BecomeHostPage() {
           <p className="text-gray-600">Үйлчилгээний шимтгэл 10%: <strong>10,000₮</strong></p>
           <p className="text-green-700 font-semibold">Түрээслүүлэгчид олгох дүн: <strong>90,000₮</strong></p>
         </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+          <p className="font-medium text-amber-800 mb-1">Үнээ хэрхэн тохируулах вэ?</p>
+          <p className="text-gray-700">
+            Та ойролцоогоор 100,000₮ авахыг хүсвэл хоногийн үнээ 110,000₮ гэж
+            оруулж болно. Өөрийн авахыг хүссэн дүнгээ тооцоод үнээ тохируулах
+            боломжтой.
+          </p>
+        </div>
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
           <p className="font-medium text-yellow-800 mb-1">Төлбөр олголт</p>
           <p className="text-gray-700">
@@ -220,7 +228,7 @@ export default function BecomeHostPage() {
           <div className="mt-2">
             <Image
               src="/sample_selfie.png"
-              alt="selfie"
+              alt="Иргэний үнэмлэхээ нүүрнийхээ хажууд барьсан жишээ зураг"
               width={300}
               height={200}
               className="rounded border"

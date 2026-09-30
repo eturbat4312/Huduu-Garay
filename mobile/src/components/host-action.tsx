@@ -5,10 +5,10 @@ import { Colors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
 
 type HostActionProps = {
-  variant?: 'floating' | 'card';
+  variant?: 'inline' | 'card';
 };
 
-export function HostAction({ variant = 'floating' }: HostActionProps) {
+export function HostAction({ variant = 'inline' }: HostActionProps) {
   const scheme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const C = Colors[scheme];
   const { isAuthenticated, user } = useAuth();
@@ -30,18 +30,18 @@ export function HostAction({ variant = 'floating' }: HostActionProps) {
 
   const openAction = () => router.push(route as never);
 
-  if (variant === 'floating') {
+  if (variant === 'inline') {
     return (
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={buttonLabel}
         onPress={openAction}
         style={({ pressed }) => [
-          styles.floatingButton,
+          styles.inlineButton,
           pending && styles.pendingButton,
           pressed && styles.pressed,
         ]}>
-        <Text style={styles.floatingLabel}>{buttonLabel}</Text>
+        <Text style={styles.inlineLabel}>{buttonLabel}</Text>
       </Pressable>
     );
   }
@@ -84,22 +84,16 @@ export function HostAction({ variant = 'floating' }: HostActionProps) {
 }
 
 const styles = StyleSheet.create({
-  floatingButton: {
-    minHeight: 48,
-    maxWidth: 250,
+  inlineButton: {
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 24,
+    borderRadius: 12,
     paddingHorizontal: Spacing.three,
     backgroundColor: '#16A34A',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.24,
-    shadowRadius: 8,
-    elevation: 8,
   },
   pendingButton: { backgroundColor: '#B45309' },
-  floatingLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  inlineLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
   card: {
     gap: Spacing.three,
     borderWidth: 1,
