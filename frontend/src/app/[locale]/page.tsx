@@ -29,6 +29,7 @@ export default function HomePage() {
   const [showMap, setShowMap] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [listings, setListings] = useState<Listing[]>([]);
+  const [listingsLoading, setListingsLoading] = useState(true);
   const [filters, setFilters] = useState<FilterValues>({
     category: "",
     search: "",
@@ -66,6 +67,8 @@ export default function HomePage() {
 
   // Fetch listings
   useEffect(() => {
+    let active = true;
+    setListingsLoading(true);
     api
       .get<Listing[]>("/listings/", {
         params: {
@@ -90,9 +93,15 @@ export default function HomePage() {
           }
           return (b.id ?? 0) - (a.id ?? 0);
         });
-        setListings(sorted);
+        if (active) setListings(sorted);
       })
-      .catch((err) => console.error("❌ Error fetching listings:", err));
+      .catch((err) => console.error("❌ Error fetching listings:", err))
+      .finally(() => {
+        if (active) setListingsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [
     filters.category,
     filters.search,
@@ -232,7 +241,17 @@ export default function HomePage() {
 
       {/* Mobile listings */}
       <div className="xl:hidden px-4 mt-4">
-        {listings.length === 0 ? (
+        {listingsLoading ? (
+          <div className="grid grid-cols-2 gap-4" aria-label="Зарууд ачаалж байна">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div key={index} className="animate-pulse">
+                <div className="aspect-[4/3] rounded-xl bg-gray-200" />
+                <div className="mt-3 h-4 w-3/4 rounded bg-gray-200" />
+                <div className="mt-2 h-3 w-1/2 rounded bg-gray-100" />
+              </div>
+            ))}
+          </div>
+        ) : listings.length === 0 ? (
           <div className="text-center text-gray-500 mt-10">
             {t(locale, "no_listings")}
           </div>
@@ -250,7 +269,17 @@ export default function HomePage() {
       {/* Desktop listings + map */}
       <div className="hidden xl:grid grid-cols-[1fr_560px] gap-6 px-6 mt-8 w-full">
         <div>
-          {listings.length === 0 ? (
+          {listingsLoading ? (
+            <div className="grid grid-cols-3 gap-6" aria-label="Зарууд ачаалж байна">
+              {Array.from({ length: 6 }, (_, index) => (
+                <div key={index} className="animate-pulse">
+                  <div className="aspect-[4/3] rounded-xl bg-gray-200" />
+                  <div className="mt-3 h-4 w-3/4 rounded bg-gray-200" />
+                  <div className="mt-2 h-3 w-1/2 rounded bg-gray-100" />
+                </div>
+              ))}
+            </div>
+          ) : listings.length === 0 ? (
             <div className="text-center text-gray-500 mt-10">
               {t(locale, "no_listings")}
             </div>
@@ -273,31 +302,61 @@ export default function HomePage() {
 
       {/* Mobile filter overlay */}
       {showFilters && (
-        <div className="fixed inset-0 z-50 bg-white">
-          <div className="h-12 flex items-center justify-between border-b px-4">
+        <div
+          className="fixed inset-0 z-50 flex items-end bg-black/40 p-2 sm:p-4"
+          onClick={() => setShowFilters(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={t(locale, "filters") || "Шүүлтүүр"}
+            className="mx-auto flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+          <div className="h-14 shrink-0 flex items-center justify-between border-b px-4">
             <span className="font-semibold">
               {t(locale, "filters") || "Шүүлтүүр"}
             </span>
-            <button onClick={() => setShowFilters(false)}>✖</button>
+            <button
+              onClick={() => setShowFilters(false)}
+              aria-label="Шүүлтүүр хаах"
+              className="flex size-10 items-center justify-center rounded-full hover:bg-gray-100"
+            >✕</button>
           </div>
-          <div className="h-[calc(100vh-48px)] overflow-y-auto p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
             <FilterSidebar
               locale={locale}
               filters={filters}
               setFilters={setFilters}
               isOpen={true}
+              showActions={false}
             />
-            <div className="mt-4">
+          </div>
+            <div className="flex shrink-0 items-center gap-3 border-t bg-white p-4">
+              <button
+                onClick={() => setFilters({
+                  category: "",
+                  search: "",
+                  location: "",
+                  priceMin: null,
+                  priceMax: null,
+                  amenities: [],
+                  __refresh: Date.now(),
+                })}
+                className="min-h-12 rounded-xl border px-4 font-semibold text-gray-700"
+              >
+                {t(locale, "clear") || "Цэвэрлэх"}
+              </button>
               <button
                 onClick={() => {
                   setFilters({ ...filters, __refresh: Date.now() });
                   setShowFilters(false);
                 }}
-                className="w-full bg-green-600 text-white py-3 rounded-lg"
+                className="min-h-12 flex-1 rounded-xl bg-green-600 px-4 font-bold text-white shadow-sm hover:bg-green-700"
               >
                 {t(locale, "search_button") || "Хайх"}
               </button>
-            </div>
+          </div>
           </div>
         </div>
       )}

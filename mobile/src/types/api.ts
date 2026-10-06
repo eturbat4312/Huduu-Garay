@@ -253,7 +253,7 @@ export type Payment = {
   sender_invoice_no: string;
   amount: number | string;
   currency: string;
-  status: 'pending' | 'paid' | 'failed' | 'cancelled' | 'expired' | 'refunded';
+  status: 'pending' | 'cancellation_pending' | 'paid' | 'failed' | 'cancelled' | 'expired' | 'refunded';
   raw_response: {
     qr_text?: string;
     qr_image?: string;
@@ -267,6 +267,11 @@ export type Payment = {
     [key: string]: unknown;
   };
   paid_at: string | null;
+  cancellation_requested_at?: string | null;
+  cancellation_reason?: string;
+  cancellation_attempt_count?: number;
+  next_cancellation_attempt_at?: string | null;
+  last_cancellation_error?: string;
   created_at: string;
   updated_at: string;
 };

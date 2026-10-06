@@ -8,6 +8,7 @@ import Script from "next/script";
 import { AuthProvider } from "@/context/AuthContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import Navbar from "@/components/Navbar";
+import PrivateRouteGuard from "@/components/PrivateRouteGuard";
 
 export const metadata: Metadata = {
   title: "Танайд Хоноё",
@@ -45,7 +46,7 @@ export default async function LocaleLayout({
         <AuthProvider>
           <NotificationProvider>
             <Navbar />
-            {children}
+            <PrivateRouteGuard>{children}</PrivateRouteGuard>
           </NotificationProvider>
         </AuthProvider>
       </body>

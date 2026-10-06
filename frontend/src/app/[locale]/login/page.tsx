@@ -10,6 +10,7 @@ import GoogleLoginButton from "@/components/GoogleLoginButton";
 import { t } from "@/lib/i18n";
 import LoadingButton from "@/components/LoadingButton"; // ⭐ CHANGE: импорт нэмсэн
 import Link from "next/link";
+import PageSkeleton from "@/components/PageSkeleton";
 
 function LoginContent() {
   const router = useRouter();
@@ -125,7 +126,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="p-6">Түр хүлээнэ үү...</div>}>
+    <Suspense fallback={<PageSkeleton cards={1} />}>
       <LoginContent />
     </Suspense>
   );

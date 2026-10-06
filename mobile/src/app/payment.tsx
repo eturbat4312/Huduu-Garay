@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   BackHandler,
   Linking,
   Pressable,
@@ -47,6 +48,7 @@ export default function PaymentScreen() {
   const [cancelling, setCancelling] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastResumeCheckAt = useRef(0);
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -72,7 +74,7 @@ export default function PaymentScreen() {
       const p = await fetchPayment(payment_id);
       setPayment(p);
       if (p.status === 'paid') handlePaid(p);
-      else if (p.status !== 'pending') stopPolling(); // failed / expired / cancelled
+      else if (!['pending', 'cancellation_pending'].includes(p.status)) stopPolling();
     } catch {
       // Quiet fail — keep polling
     }
@@ -87,7 +89,7 @@ export default function PaymentScreen() {
         setPayment(p);
         if (p.status === 'paid') {
           handlePaid(p);
-        } else if (p.status === 'pending') {
+        } else if (['pending', 'cancellation_pending'].includes(p.status)) {
           pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
         }
       })
@@ -96,6 +98,28 @@ export default function PaymentScreen() {
 
     return () => stopPolling();
   }, [payment_id, poll, handlePaid]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !payment_id) return;
+      const now = Date.now();
+      if (now - lastResumeCheckAt.current < 3_000) return;
+      lastResumeCheckAt.current = now;
+      if (payment?.status === 'pending') {
+        // One provider check when returning from a bank app; the 5s timer itself
+        // continues to read only our database.
+        void checkPayment(payment_id)
+          .then((nextPayment) => {
+            setPayment(nextPayment);
+            if (nextPayment.status === 'paid') handlePaid(nextPayment);
+          })
+          .catch(() => poll());
+      } else {
+        void poll();
+      }
+    });
+    return () => subscription.remove();
+  }, [handlePaid, payment?.status, payment_id, poll]);
 
   useEffect(() => {
     if (payment?.status !== 'pending') return;
@@ -124,7 +148,7 @@ export default function PaymentScreen() {
       const nextPayment = await checkPayment(payment_id);
       setPayment(nextPayment);
       if (nextPayment.status === 'paid') handlePaid(nextPayment);
-      else if (nextPayment.status !== 'pending') stopPolling();
+      else if (!['pending', 'cancellation_pending'].includes(nextPayment.status)) stopPolling();
     } catch (e: unknown) {
       const err = e as { message?: string };
       Alert.alert('Алдаа', err.message ?? 'Төлбөр шалгахад алдаа гарлаа.');
@@ -140,7 +164,11 @@ export default function PaymentScreen() {
     try {
       const nextPayment = await cancelPayment(payment_id);
       setPayment(nextPayment);
-      router.replace('/(tabs)' as never);
+      if (nextPayment.status === 'cancellation_pending') {
+        pollRef.current = setInterval(poll, POLL_INTERVAL_MS);
+      } else {
+        router.replace('/(tabs)' as never);
+      }
     } catch (e: unknown) {
       const err = e as { message?: string };
       Alert.alert('Буцах боломжгүй', err.message ?? 'Төлбөрийг цуцлахад алдаа гарлаа.');
@@ -157,7 +185,7 @@ export default function PaymentScreen() {
     if (payment?.status === 'pending') {
       Alert.alert(
         'Төлбөрийг цуцлах уу?',
-        'Буцвал төлбөрийн нэхэмжлэх хаагдаж, сонгосон огноо дахин боломжтой болно.',
+        'QPay нэхэмжлэх амжилттай хаагдсаны дараа л сонгосон огноо дахин боломжтой болно.',
         [
           { text: 'Үгүй', style: 'cancel' },
           { text: 'Цуцлаад буцах', style: 'destructive', onPress: cancelAndReturnToListings },
@@ -241,6 +269,14 @@ export default function PaymentScreen() {
                 <Text style={[styles.statusTitle, { color: '#92400E' }]}>💳 Төлбөр хүлээгдэж байна</Text>
                 <ThemedText themeColor="textSecondary" style={styles.statusSub}>
                   QPay апп нээж дараах мэдээллийг ашиглан төлбөрөө гүйцэтгэнэ үү.
+                </ThemedText>
+              </View>
+            ) : payment.status === 'cancellation_pending' ? (
+              <View style={[styles.statusBox, { backgroundColor: '#FEF3C7' }]}>
+                <ActivityIndicator color="#92400E" />
+                <Text style={[styles.statusTitle, { color: '#92400E' }]}>Нэхэмжлэх хаагдаж байна</Text>
+                <ThemedText themeColor="textSecondary" style={styles.statusSub}>
+                  Хаалт баталгаажих хүртэл сонгосон огноо бусдад суллагдахгүй.
                 </ThemedText>
               </View>
             ) : payment.status === 'paid' ? (
@@ -385,7 +421,7 @@ export default function PaymentScreen() {
             )}
 
             {/* Буцах */}
-            {payment.status !== 'pending' && (
+            {!['pending', 'cancellation_pending'].includes(payment.status) && (
               <Pressable
                 onPress={() => router.replace('/(tabs)/bookings' as never)}
                 style={styles.backBtn}>

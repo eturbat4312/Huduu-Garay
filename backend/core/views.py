@@ -23,6 +23,12 @@ from core.services.cancellations import (
 )
 from core.services.booking_lifecycle import complete_finished_bookings
 from core.services.settlements import ensure_host_payout, sync_cancellation_settlements
+from core.services.payment_expiry import (
+    REASON_GUEST_CANCELLED,
+    REASON_HOLD_EXPIRED,
+    release_expired_booking_without_invoice,
+    request_payment_cancellation,
+)
 from decimal import Decimal
 from google.oauth2 import id_token
 import logging
@@ -489,7 +495,6 @@ class AvailabilityListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
-        _release_expired_booking_holds()
         public_filter = Q(
             listing__is_active=True,
             listing__status=Listing.STATUS_ACTIVE,
@@ -781,105 +786,6 @@ def _booking_has_hold(booking, requested_dates, lock=False):
     return set(requested_dates).issubset(set(held_dates))
 
 
-def _release_booking_hold(
-    booking,
-    now=None,
-    *,
-    booking_status=Booking.STATUS_EXPIRED,
-    payment_status=Payment.STATUS_EXPIRED,
-    reason="payment_hold_expired",
-):
-    released_at = now or timezone.now()
-    hold_rows = list(
-        BookingHold.objects.select_for_update().filter(
-            booking=booking, listing=booking.listing
-        )
-    )
-
-    for hold in hold_rows:
-        Availability.objects.get_or_create(listing=booking.listing, date=hold.date)
-
-    if hold_rows:
-        BookingHold.objects.filter(id__in=[hold.id for hold in hold_rows]).delete()
-
-    booking.status = booking_status
-    booking.save(update_fields=["status"])
-
-    pending_payments = list(
-        Payment.objects.select_for_update().filter(
-            booking=booking,
-            status=Payment.STATUS_PENDING,
-        )
-    )
-    for payment in pending_payments:
-        payment.status = payment_status
-        payment.raw_response = {
-            **(payment.raw_response or {}),
-            "closed_reason": reason,
-            "closed_at": released_at.isoformat(),
-        }
-        payment.save(update_fields=["status", "raw_response", "updated_at"])
-
-        if (
-            settings.QPAY_ENABLED
-            and payment.provider == Payment.PROVIDER_QPAY
-            and payment.invoice_id
-            and not payment.invoice_id.startswith("mock-")
-        ):
-            transaction.on_commit(
-                lambda payment_id=payment.id, invoice_id=payment.invoice_id: (
-                    _cancel_qpay_invoice(
-                        payment_id,
-                        invoice_id,
-                        expected_status=payment_status,
-                    )
-                )
-            )
-    return len(hold_rows)
-
-
-def _cancel_qpay_invoice(payment_id, invoice_id, *, expected_status):
-    cancelled = False
-    error_code = ""
-    try:
-        QPayClient().cancel_invoice(invoice_id=invoice_id)
-        cancelled = True
-    except QPayConfigurationError:
-        error_code = "configuration_error"
-        logger.warning("QPay invoice cancellation is not configured for payment %s", payment_id)
-    except QPayAPIError:
-        error_code = "provider_error"
-        logger.exception("QPay invoice cancellation failed for payment %s", payment_id)
-
-    payment = Payment.objects.filter(
-        id=payment_id,
-        status=expected_status,
-    ).first()
-    if payment is None:
-        return
-    payment.raw_response = {
-        **(payment.raw_response or {}),
-        "qpay_invoice_cancelled": cancelled,
-        "qpay_invoice_cancel_error": error_code,
-    }
-    payment.save(update_fields=["raw_response", "updated_at"])
-
-
-def _release_expired_booking_holds(now=None):
-    now = now or timezone.now()
-    expired_bookings = (
-        Booking.objects.select_for_update()
-        .filter(status="pending_payment", hold_expires_at__isnull=False)
-        .filter(hold_expires_at__lte=now)
-        .select_related("listing")
-    )
-    released = 0
-    with transaction.atomic():
-        for booking in expired_bookings:
-            released += _release_booking_hold(booking, now=now)
-    return released
-
-
 def _booking_hold_is_expired(booking, now=None):
     return (
         booking.status == "pending_payment"
@@ -1048,35 +954,32 @@ def _notify_confirmed_booking(booking, payment, requested_dates):
         "host_payout": details["host_payout"],
     }
 
-    try:
-        send_notification_email(
-            user=listing.host,
-            notif_type="booking_created",
-            context=email_context,
-        )
-    except Exception as e:
-        print(f"❌ Host email илгээхэд алдаа гарлаа: {e}")
+    email_jobs = [
+        (listing.host, "booking_created"),
+        (booking.guest, "booking_confirmed"),
+        *[
+            (admin_user, "admin_booking_confirmed")
+            for admin_user in admin_users
+            if admin_user.email
+        ],
+    ]
 
-    try:
-        send_notification_email(
-            user=booking.guest,
-            notif_type="booking_confirmed",
-            context=email_context,
-        )
-    except Exception as e:
-        print(f"❌ Guest email илгээхэд алдаа гарлаа: {e}")
+    def send_emails_after_commit():
+        for user, notif_type in email_jobs:
+            try:
+                send_notification_email(
+                    user=user,
+                    notif_type=notif_type,
+                    context=email_context,
+                )
+            except Exception:
+                logger.exception(
+                    "Booking confirmation email failed for booking %s (%s)",
+                    booking.id,
+                    notif_type,
+                )
 
-    for admin_user in admin_users:
-        if not admin_user.email:
-            continue
-        try:
-            send_notification_email(
-                user=admin_user,
-                notif_type="admin_booking_confirmed",
-                context=email_context,
-            )
-        except Exception as e:
-            print(f"❌ Admin email илгээхэд алдаа гарлаа: {e}")
+    transaction.on_commit(send_emails_after_commit)
 
 
 def _confirm_paid_payment(payment, raw_response, request=None):
@@ -1088,19 +991,11 @@ def _confirm_paid_payment(payment, raw_response, request=None):
     if booking.status == "cancelled" or booking.is_cancelled_by_host:
         return payment, "Цуцлагдсан захиалгын төлбөрийг дахин баталгаажуулах боломжгүй."
 
-    if payment.status != Payment.STATUS_PENDING:
-        return payment, "Зөвхөн pending төлбөрийг баталгаажуулна."
-
-    if _booking_hold_is_expired(booking):
-        _release_booking_hold(booking)
-        payment.status = Payment.STATUS_EXPIRED
-        payment.raw_response = {
-            **payment.raw_response,
-            "qpay_check": raw_response,
-            "confirm_error": "hold_expired",
-        }
-        payment.save(update_fields=["status", "raw_response", "updated_at"])
-        return payment, "Төлбөрийн хугацаа дууссан байна."
+    if payment.status not in {
+        Payment.STATUS_PENDING,
+        Payment.STATUS_CANCELLATION_PENDING,
+    }:
+        return payment, "Энэ төлбөрийг баталгаажуулах боломжгүй төлөвт байна."
 
     requested_dates, _ = _get_requested_dates(booking.check_in, booking.check_out)
     if not _booking_has_hold(booking, requested_dates, lock=True):
@@ -1117,11 +1012,22 @@ def _confirm_paid_payment(payment, raw_response, request=None):
 
     payment.status = Payment.STATUS_PAID
     payment.paid_at = timezone.now()
+    payment.next_cancellation_attempt_at = None
+    payment.last_cancellation_error = ""
     payment.raw_response = {
         **payment.raw_response,
         "qpay_check": raw_response,
     }
-    payment.save(update_fields=["status", "paid_at", "raw_response", "updated_at"])
+    payment.save(
+        update_fields=[
+            "status",
+            "paid_at",
+            "next_cancellation_attempt_at",
+            "last_cancellation_error",
+            "raw_response",
+            "updated_at",
+        ]
+    )
 
     booking.status = "confirmed"
     booking.save(update_fields=["status"])
@@ -1138,7 +1044,6 @@ class BookingPaymentIntentCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, format=None):
-        _release_expired_booking_holds()
         serializer = PendingBookingCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -1224,7 +1129,6 @@ class PaymentCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, format=None):
-        _release_expired_booking_holds()
         serializer = PaymentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -1233,14 +1137,20 @@ class PaymentCreateView(APIView):
             return Response({"error": "Захиалга олдсонгүй."}, status=404)
 
         if _booking_hold_is_expired(booking):
-            with transaction.atomic():
-                booking = (
-                    Booking.objects.select_for_update()
-                    .select_related("listing")
-                    .get(id=booking.id)
+            live_payment = Payment.objects.filter(
+                booking=booking,
+                status__in=[
+                    Payment.STATUS_PENDING,
+                    Payment.STATUS_CANCELLATION_PENDING,
+                ],
+            ).first()
+            if live_payment:
+                request_payment_cancellation(
+                    live_payment.id,
+                    REASON_HOLD_EXPIRED,
                 )
-                if _booking_hold_is_expired(booking):
-                    _release_booking_hold(booking)
+            else:
+                release_expired_booking_without_invoice(booking.id)
             return Response(
                 {"error": "Төлбөрийн хугацаа дууссан байна."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -1264,7 +1174,11 @@ class PaymentCreateView(APIView):
                 )
 
         existing_pending = Payment.objects.filter(
-            booking=booking, status=Payment.STATUS_PENDING
+            booking=booking,
+            status__in=[
+                Payment.STATUS_PENDING,
+                Payment.STATUS_CANCELLATION_PENDING,
+            ],
         ).first()
         if existing_pending:
             return Response(
@@ -1333,10 +1247,6 @@ class PaymentRetrieveView(RetrieveAPIView):
     serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated]
 
-    def retrieve(self, request, *args, **kwargs):
-        _release_expired_booking_holds()
-        return super().retrieve(request, *args, **kwargs)
-
     def get_queryset(self):
         return Payment.objects.filter(booking__guest=self.request.user).select_related(
             "booking", "booking__listing", "booking__guest", "booking__listing__host"
@@ -1348,8 +1258,6 @@ class PaymentCheckView(APIView):
     throttle_classes = [PaymentCheckThrottle]
 
     def post(self, request, payment_id, format=None):
-        _release_expired_booking_holds()
-
         try:
             payment = (
                 Payment.objects.select_related("booking", "booking__listing")
@@ -1364,9 +1272,12 @@ class PaymentCheckView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        if payment.status != Payment.STATUS_PENDING:
+        if payment.status not in {
+            Payment.STATUS_PENDING,
+            Payment.STATUS_CANCELLATION_PENDING,
+        }:
             return Response(
-                {"error": "Зөвхөн pending төлбөрийг шалгана."},
+                {"error": "Энэ төлбөрийг шалгах боломжгүй төлөвт байна."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -1426,54 +1337,40 @@ class PaymentCancelView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, payment_id, format=None):
-        with transaction.atomic():
-            try:
-                payment = (
-                    Payment.objects.select_for_update()
-                    .select_related("booking", "booking__listing")
-                    .get(id=payment_id, booking__guest=request.user)
-                )
-            except Payment.DoesNotExist:
-                return Response({"error": "Төлбөр олдсонгүй."}, status=404)
-
-            if payment.status == Payment.STATUS_PAID:
-                return Response(
-                    {"error": "Төлбөр аль хэдийн баталгаажсан тул цуцлах боломжгүй."},
-                    status=status.HTTP_409_CONFLICT,
-                )
-
-            if payment.status in {
-                Payment.STATUS_CANCELLED,
-                Payment.STATUS_EXPIRED,
-                Payment.STATUS_FAILED,
-            }:
-                return Response(
-                    PaymentSerializer(payment, context={"request": request}).data,
-                    status=status.HTTP_200_OK,
-                )
-
-            booking = (
-                Booking.objects.select_for_update()
-                .select_related("listing")
-                .get(id=payment.booking_id)
+        try:
+            payment = Payment.objects.select_related("booking").get(
+                id=payment_id,
+                booking__guest=request.user,
             )
-            if booking.status == Booking.STATUS_CONFIRMED:
-                return Response(
-                    {"error": "Захиалга аль хэдийн баталгаажсан тул цуцлах боломжгүй."},
-                    status=status.HTTP_409_CONFLICT,
-                )
+        except Payment.DoesNotExist:
+            return Response({"error": "Төлбөр олдсонгүй."}, status=404)
 
-            _release_booking_hold(
-                booking,
-                booking_status=Booking.STATUS_EXPIRED,
-                payment_status=Payment.STATUS_CANCELLED,
-                reason="cancelled_by_guest_before_payment",
+        if payment.status == Payment.STATUS_PAID or payment.booking.status == Booking.STATUS_CONFIRMED:
+            return Response(
+                {"error": "Төлбөр аль хэдийн баталгаажсан тул цуцлах боломжгүй."},
+                status=status.HTTP_409_CONFLICT,
             )
-            payment.refresh_from_db()
+
+        if payment.status not in {
+            Payment.STATUS_CANCELLED,
+            Payment.STATUS_EXPIRED,
+            Payment.STATUS_FAILED,
+        }:
+            payment = request_payment_cancellation(
+                payment.id,
+                REASON_GUEST_CANCELLED,
+            )
+        payment = Payment.objects.select_related(
+            "booking", "booking__listing", "booking__guest", "booking__listing__host"
+        ).get(id=payment.id)
 
         return Response(
             PaymentSerializer(payment, context={"request": request}).data,
-            status=status.HTTP_200_OK,
+            status=(
+                status.HTTP_202_ACCEPTED
+                if payment.status == Payment.STATUS_CANCELLATION_PENDING
+                else status.HTTP_200_OK
+            ),
         )
 
 
@@ -1484,7 +1381,6 @@ class PaymentMockConfirmView(APIView):
         if not settings.DEBUG:
             return Response({"error": "Not found."}, status=404)
 
-        _release_expired_booking_holds()
         with transaction.atomic():
             try:
                 payment = (
@@ -1503,9 +1399,12 @@ class PaymentMockConfirmView(APIView):
                     status=status.HTTP_200_OK,
                 )
 
-            if payment.status != Payment.STATUS_PENDING:
+            if payment.status not in {
+                Payment.STATUS_PENDING,
+                Payment.STATUS_CANCELLATION_PENDING,
+            }:
                 return Response(
-                    {"error": "Зөвхөн pending төлбөрийг баталгаажуулна."},
+                    {"error": "Энэ төлбөрийг баталгаажуулах боломжгүй төлөвт байна."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -1565,8 +1464,6 @@ class QPayCallbackView(APIView):
         if not sender_invoice_no and not callback_reference:
             return Response({"error": "Төлбөрийн лавлах дугаар дутуу байна."}, status=400)
 
-        _release_expired_booking_holds()
-
         payment_query = Payment.objects.select_related(
             "booking", "booking__listing"
         ).filter(provider=Payment.PROVIDER_QPAY)
@@ -1579,6 +1476,15 @@ class QPayCallbackView(APIView):
             return Response({"error": "Төлбөр олдсонгүй."}, status=404)
 
         if payment.status == Payment.STATUS_PAID:
+            return Response(
+                PaymentSerializer(payment, context={"request": request}).data,
+                status=status.HTTP_200_OK,
+            )
+
+        if payment.status not in {
+            Payment.STATUS_PENDING,
+            Payment.STATUS_CANCELLATION_PENDING,
+        }:
             return Response(
                 PaymentSerializer(payment, context={"request": request}).data,
                 status=status.HTTP_200_OK,

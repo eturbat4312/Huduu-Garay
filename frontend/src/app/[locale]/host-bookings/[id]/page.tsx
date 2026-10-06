@@ -10,6 +10,7 @@ import BookingContact from "@/components/BookingContact";
 import HostCancellationAction from "@/components/HostCancellationAction";
 import type { Booking } from "@/types";
 import { CHECK_IN_TIME, CHECK_OUT_TIME } from "@/lib/bookingTimes";
+import PageSkeleton from "@/components/PageSkeleton";
 
 export default function HostBookingDetailPage() {
   const { id, locale } = useParams() as { id: string; locale: string };
@@ -32,7 +33,7 @@ export default function HostBookingDetailPage() {
   }, [fetchBooking]);
 
   if (loading)
-    return <p className="p-6">{t(locale, "booking_detail.loading")}</p>;
+    return <PageSkeleton cards={1} />;
   if (!booking)
     return <p className="p-6">{t(locale, "booking_detail.not_found")}</p>;
 

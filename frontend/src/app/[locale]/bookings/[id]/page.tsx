@@ -6,6 +6,7 @@ import api from "@/lib/axios";
 import BookingSuccessPage from "@/components/BookingSuccessPage";
 import { t } from "@/lib/i18n";
 import type { Booking } from "@/types";
+import PageSkeleton from "@/components/PageSkeleton";
 
 export default function BookingDetailPage() {
   const params = useParams();
@@ -23,7 +24,7 @@ export default function BookingDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return <div className="p-6">⏳ {t(locale, "loading")}</div>;
+  if (loading) return <PageSkeleton cards={1} />;
   if (error) return <p role="alert" className="p-6 text-red-700">{error}</p>;
   if (!booking)
     return (

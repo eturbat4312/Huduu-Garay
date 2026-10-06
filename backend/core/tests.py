@@ -20,7 +20,12 @@ from .models import (
     Notification,
     Payment,
 )
-from .services.qpay import QPayClient, QPayConfig, QPayConfigurationError
+from .services.payment_expiry import (
+    REASON_HOLD_EXPIRED,
+    process_due_payment_cancellations,
+    request_payment_cancellation,
+)
+from .services.qpay import QPayAPIError, QPayClient, QPayConfig, QPayConfigurationError
 
 
 class FakeQPayResponse:
@@ -508,7 +513,7 @@ class BookingCreateRegressionTests(TestCase):
         )
 
 
-@override_settings(DEBUG=True)
+@override_settings(DEBUG=True, QPAY_ENABLED=False)
 class PaymentApiSkeletonTests(TestCase):
     def setUp(self):
         User = get_user_model()
@@ -777,7 +782,7 @@ class PaymentApiSkeletonTests(TestCase):
 
         with patch("core.views.QPayClient") as qpay_client_class, patch(
             "core.views.send_notification_email"
-        ) as send_email:
+        ) as send_email, self.captureOnCommitCallbacks(execute=True):
             qpay_client_class.return_value.check_payment.return_value = {
                 "count": 1,
                 "rows": [{
@@ -1129,7 +1134,7 @@ class PaymentApiSkeletonTests(TestCase):
         self.assertEqual(payment.status, Payment.STATUS_PAID)
 
     @override_settings(QPAY_ENABLED=True)
-    def test_expired_payment_hold_is_released_and_invoice_is_cancelled(self):
+    def test_expired_payment_get_has_no_side_effect_then_worker_cancels_provider_first(self):
         booking = self._create_pending_booking()
         payment = Payment.objects.create(
             booking=booking,
@@ -1141,11 +1146,21 @@ class PaymentApiSkeletonTests(TestCase):
         booking.hold_expires_at = timezone.now() - timedelta(minutes=1)
         booking.save(update_fields=["hold_expires_at"])
 
-        with patch("core.views.QPayClient") as qpay_client_class:
-            with self.captureOnCommitCallbacks(execute=True):
-                response = self.client.get(f"/api/payments/{payment.id}/")
+        response = self.client.get(f"/api/payments/{payment.id}/")
 
         self.assertEqual(response.status_code, 200)
+        booking.refresh_from_db()
+        payment.refresh_from_db()
+        self.assertEqual(booking.status, Booking.STATUS_PENDING_PAYMENT)
+        self.assertEqual(payment.status, Payment.STATUS_PENDING)
+        self.assertEqual(BookingHold.objects.filter(booking=booking).count(), 2)
+
+        with patch("core.services.payment_expiry.QPayClient") as qpay_client_class:
+            qpay_client_class.return_value.cancel_invoice.return_value = {
+                "cancelled": True,
+            }
+            process_due_payment_cancellations()
+
         qpay_client_class.return_value.cancel_invoice.assert_called_once_with(
             invoice_id=payment.invoice_id
         )
@@ -1162,4 +1177,86 @@ class PaymentApiSkeletonTests(TestCase):
                 date__lt=self.check_out,
             ).count(),
             2,
+        )
+
+    @override_settings(QPAY_ENABLED=True)
+    def test_cancel_failure_keeps_dates_held_for_retry(self):
+        booking = self._create_pending_booking()
+        payment = Payment.objects.create(
+            booking=booking,
+            provider=Payment.PROVIDER_QPAY,
+            sender_invoice_no="cancel-failure-test",
+            invoice_id="qpay-cancel-failure-test",
+            amount=booking.total_price + booking.service_fee,
+        )
+
+        with patch("core.services.payment_expiry.QPayClient") as qpay_client_class:
+            qpay_client_class.return_value.cancel_invoice.side_effect = QPayAPIError(
+                "temporary provider failure"
+            )
+            response = self.client.post(f"/api/payments/{payment.id}/cancel/")
+
+        self.assertEqual(response.status_code, 202)
+        booking.refresh_from_db()
+        payment.refresh_from_db()
+        self.assertEqual(booking.status, Booking.STATUS_PENDING_PAYMENT)
+        self.assertEqual(payment.status, Payment.STATUS_CANCELLATION_PENDING)
+        self.assertEqual(BookingHold.objects.filter(booking=booking).count(), 2)
+        self.assertEqual(
+            Availability.objects.filter(
+                listing=self.listing,
+                date__gte=self.check_in,
+                date__lt=self.check_out,
+            ).count(),
+            0,
+        )
+        self.assertIsNotNone(payment.next_cancellation_attempt_at)
+
+    @override_settings(QPAY_ENABLED=True)
+    def test_paid_callback_wins_after_hold_deadline_while_cancel_pending(self):
+        booking = self._create_pending_booking()
+        payment = Payment.objects.create(
+            booking=booking,
+            provider=Payment.PROVIDER_QPAY,
+            sender_invoice_no="paid-during-close-test",
+            invoice_id="qpay-paid-during-close-test",
+            amount=booking.total_price + booking.service_fee,
+        )
+        booking.hold_expires_at = timezone.now() - timedelta(minutes=1)
+        booking.save(update_fields=["hold_expires_at"])
+        request_payment_cancellation(
+            payment.id,
+            REASON_HOLD_EXPIRED,
+            attempt_now=False,
+        )
+
+        with patch("core.views.QPayClient") as qpay_client_class:
+            qpay_client_class.return_value.check_payment.return_value = {
+                "count": 1,
+                "rows": [{
+                    "payment_id": "paid-during-close-provider-id",
+                    "payment_status": "PAID",
+                    "payment_amount": str(payment.amount),
+                    "payment_currency": "MNT",
+                }],
+            }
+            response = APIClient().post(
+                "/api/payments/qpay/callback/",
+                {"invoice_id": payment.invoice_id},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        booking.refresh_from_db()
+        payment.refresh_from_db()
+        self.assertEqual(booking.status, Booking.STATUS_CONFIRMED)
+        self.assertEqual(payment.status, Payment.STATUS_PAID)
+        self.assertEqual(BookingHold.objects.filter(booking=booking).count(), 0)
+        self.assertEqual(
+            Availability.objects.filter(
+                listing=self.listing,
+                date__gte=self.check_in,
+                date__lt=self.check_out,
+            ).count(),
+            0,
         )

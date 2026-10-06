@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { t } from "@/lib/i18n";
 import { CHECK_IN_TIME, CHECK_OUT_TIME } from "@/lib/bookingTimes";
+import PageSkeleton from "@/components/PageSkeleton";
 
 type Booking = {
   id: number;
@@ -53,7 +54,7 @@ export default function HostBookingsPage() {
       </h1>
 
       {loading ? (
-        <p>{t(locale, "host_bookings.loading")}</p>
+        <PageSkeleton cards={3} />
       ) : bookings.length === 0 ? (
         <p>{t(locale, "host_bookings.no_bookings")}</p>
       ) : (

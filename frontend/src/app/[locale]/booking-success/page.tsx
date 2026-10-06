@@ -4,6 +4,7 @@
 
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
+import PageSkeleton from "@/components/PageSkeleton";
 
 // Dynamic import ашиглана
 const BookingSuccessWrapperPage = dynamic(
@@ -13,7 +14,7 @@ const BookingSuccessWrapperPage = dynamic(
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="p-6">Loading...</div>}>
+    <Suspense fallback={<PageSkeleton cards={1} />}>
       <BookingSuccessWrapperPage />
     </Suspense>
   );

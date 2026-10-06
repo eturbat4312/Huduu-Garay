@@ -384,6 +384,7 @@ class Payment(models.Model):
     ]
 
     STATUS_PENDING = "pending"
+    STATUS_CANCELLATION_PENDING = "cancellation_pending"
     STATUS_PAID = "paid"
     STATUS_FAILED = "failed"
     STATUS_CANCELLED = "cancelled"
@@ -391,6 +392,7 @@ class Payment(models.Model):
     STATUS_REFUNDED = "refunded"
     STATUS_CHOICES = [
         (STATUS_PENDING, "Хүлээгдэж байна"),
+        (STATUS_CANCELLATION_PENDING, "Нэхэмжлэх хаагдаж байна"),
         (STATUS_PAID, "Төлөгдсөн"),
         (STATUS_FAILED, "Амжилтгүй"),
         (STATUS_CANCELLED, "Цуцлагдсан"),
@@ -426,6 +428,15 @@ class Payment(models.Model):
     )
     raw_response = models.JSONField(default=dict, blank=True)
     paid_at = models.DateTimeField(blank=True, null=True)
+    cancellation_requested_at = models.DateTimeField(blank=True, null=True)
+    cancellation_reason = models.CharField(max_length=80, blank=True)
+    cancellation_attempt_count = models.PositiveIntegerField(default=0)
+    next_cancellation_attempt_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+    last_cancellation_error = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

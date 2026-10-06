@@ -173,6 +173,15 @@ export default function Navbar() {
         </div>
       ) : null}
 
+      {!loading && !user ? (
+        <Link
+          href={`/${locale}/signup`}
+          className="ml-auto mr-2 inline-flex min-h-10 items-center rounded-full bg-green-600 px-4 text-sm font-bold text-white shadow-sm hover:bg-green-700 md:hidden"
+        >
+          {t(locale as string, "signup")}
+        </Link>
+      ) : null}
+
       {/* ✅ Mobile menu button */}
       <button
         ref={buttonRef}

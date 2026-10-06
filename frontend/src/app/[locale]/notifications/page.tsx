@@ -4,6 +4,7 @@ import { MouseEvent, useEffect, useState } from "react";
 import api from "@/lib/axios";
 import Link from "next/link";
 import { t } from "@/lib/i18n";
+import PageSkeleton from "@/components/PageSkeleton";
 import { useParams, useRouter } from "next/navigation";
 import { useNotification } from "@/context/NotificationContext";
 
@@ -122,7 +123,7 @@ export default function NotificationsPage() {
   };
 
   if (loading)
-    return <p className="p-6">{t(locale, "notifications.loading")}</p>;
+    return <PageSkeleton cards={3} />;
 
   return (
     <main className="max-w-3xl mx-auto p-6">

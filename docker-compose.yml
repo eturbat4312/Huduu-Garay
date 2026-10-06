@@ -51,6 +51,17 @@ services:
         condition: service_healthy
     restart: always
 
+  payment_worker:
+    build:
+      context: ./backend
+    command: ["python", "manage.py", "process_expired_payments", "--watch", "--interval", "5"]
+    env_file:
+      - ./backend/.env
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: always
+
   frontend:
     build:
       context: ./frontend

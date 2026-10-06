@@ -141,6 +141,7 @@ export type Category = {
 
   export type PaymentStatus =
     | "pending"
+    | "cancellation_pending"
     | "paid"
     | "failed"
     | "cancelled"
@@ -172,6 +173,11 @@ export type Category = {
       [key: string]: unknown;
     };
     paid_at?: string | null;
+    cancellation_requested_at?: string | null;
+    cancellation_reason?: string;
+    cancellation_attempt_count?: number;
+    next_cancellation_attempt_at?: string | null;
+    last_cancellation_error?: string;
     created_at: string;
     updated_at: string;
   };

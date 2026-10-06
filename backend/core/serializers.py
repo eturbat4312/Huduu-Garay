@@ -758,6 +758,11 @@ class PaymentSerializer(serializers.ModelSerializer):
             "status",
             "raw_response",
             "paid_at",
+            "cancellation_requested_at",
+            "cancellation_reason",
+            "cancellation_attempt_count",
+            "next_cancellation_attempt_at",
+            "last_cancellation_error",
             "created_at",
             "updated_at",
         ]

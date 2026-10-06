@@ -15,6 +15,7 @@ import { AxiosError } from "axios";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { loginHref } from "@/lib/authReturn";
+import PageSkeleton from "@/components/PageSkeleton";
 
 // ---------- Extra Types ----------
 type BookingDay = {
@@ -212,7 +213,7 @@ export default function ListingDetailPage() {
     date.toLocaleDateString((locale as string) || "mn-MN");
 
   // ---------- Render ----------
-  if (!listing) return <p className="p-6">{t(locale as string, "loading")}</p>;
+  if (!listing) return <PageSkeleton cards={3} />;
 
   const amenities = listing.amenities.filter(
     (option) => option.amenity_type !== "activity"
@@ -445,10 +446,20 @@ export default function ListingDetailPage() {
                   !selectedRange?.from ||
                   !selectedRange?.to
                 }
-                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white w-full py-2 rounded mt-2"
+                className="mt-3 min-h-12 w-full rounded-xl bg-green-600 px-4 py-3 text-base font-bold text-white shadow-sm hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600 disabled:shadow-none"
               >
                 {t(locale as string, "create_booking")}
               </button>
+              {!authLoading && !selectedRange?.from && hasFutureAvailability && (
+                <p className="mt-2 text-center text-sm text-gray-600">
+                  Захиалахын тулд хуанлиас орох, гарах өдрөө сонгоно уу.
+                </p>
+              )}
+              {!authLoading && selectedRange?.from && !selectedRange?.to && (
+                <p className="mt-2 text-center text-sm text-gray-600">
+                  Гарах өдрөө сонгоно уу.
+                </p>
+              )}
               {bookingMessage && (
                 <p
                   className={`mt-3 text-sm ${

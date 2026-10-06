@@ -20,6 +20,31 @@ const nextConfig: NextConfig = {
     return [{ source: "/", destination: "/mn", permanent: false }];
   },
 
+  async headers() {
+    const privateRoutes = [
+      "/:locale(mn)/bookings/:path*",
+      "/:locale(mn)/profile/:path*",
+      "/:locale(mn)/favorites/:path*",
+      "/:locale(mn)/notifications/:path*",
+      "/:locale(mn)/my-listings/:path*",
+      "/:locale(mn)/host-bookings/:path*",
+      "/:locale(mn)/checkout/:path*",
+      "/:locale(mn)/payment/:path*",
+      "/:locale(mn)/booking-success/:path*",
+      "/:locale(mn)/support/:path*",
+      "/:locale(mn)/edit-listing/:path*",
+      "/:locale(mn)/listings/new/:path*",
+      "/:locale(mn)/become-host/:path*",
+    ];
+    return privateRoutes.map((source) => ({
+      source,
+      headers: [
+        { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        { key: "Cache-Control", value: "private, no-store, max-age=0" },
+      ],
+    }));
+  },
+
   async rewrites() {
     if (!isDev) return []; // ← PROD-д НӨЛӨӨЛӨХГҮЙ
     return [

@@ -20,6 +20,7 @@ type Props = {
   filters: FilterValues;
   setFilters: (filters: FilterValues) => void;
   isOpen?: boolean;
+  showActions?: boolean;
 };
 
 type AmenityOption = {
@@ -33,6 +34,7 @@ export default function FilterSidebar({
   filters,
   setFilters,
   isOpen = true,
+  showActions = true,
 }: Props) {
   const [amenityOptions, setAmenityOptions] = useState<AmenityOption[]>([]);
 
@@ -99,7 +101,7 @@ export default function FilterSidebar({
   return (
     <aside
       className={`
-        border rounded p-4 space-y-6 bg-white w-full md:w-72
+        rounded-xl p-4 space-y-6 bg-white w-full md:w-72
         ${isOpen ? "block" : "hidden"}
         md:block
       `}
@@ -194,7 +196,7 @@ export default function FilterSidebar({
       </div>
 
       {/* Action buttons */}
-      <div className="space-y-2 pt-4">
+      {showActions && <div className="space-y-2 pt-4">
         <div className="flex gap-2 justify-between">
           <button
             onClick={handleClear}
@@ -209,7 +211,7 @@ export default function FilterSidebar({
             {t(locale, "search_button")}
           </button>
         </div>
-      </div>
+      </div>}
     </aside>
   );
 }

@@ -3,7 +3,7 @@
 
 import axios from "axios";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "@/lib/axios";
 import { Payment } from "@/types";
 
@@ -36,6 +36,7 @@ export default function PaymentContent() {
   const [error, setError] = useState("");
   const [redirecting, setRedirecting] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const lastResumeCheckAt = useRef(0);
 
   const redirectIfPaid = useCallback(
     (nextPayment: Payment) => {
@@ -101,7 +102,10 @@ export default function PaymentContent() {
   }, [paymentId, redirectIfPaid]);
 
   useEffect(() => {
-    if (!paymentId || payment?.status !== "pending") return undefined;
+    if (
+      !paymentId ||
+      !["pending", "cancellation_pending"].includes(payment?.status || "")
+    ) return undefined;
 
     const intervalId = window.setInterval(() => {
       // QPay callback updates our database. Poll only our own API here so the
@@ -111,6 +115,25 @@ export default function PaymentContent() {
 
     return () => window.clearInterval(intervalId);
   }, [fetchPayment, payment?.status, paymentId]);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastResumeCheckAt.current < 3000) return;
+      lastResumeCheckAt.current = now;
+      // Returning from a bank app is a strong payment signal. Do one provider
+      // check as callback-loss fallback; the regular 5s loop still reads only our DB.
+      if (payment?.status === "pending") void checkPayment(true);
+      else void fetchPayment();
+    };
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [checkPayment, fetchPayment, payment?.status]);
 
   useEffect(() => {
     if (payment?.status !== "pending") return undefined;
@@ -144,7 +167,7 @@ export default function PaymentContent() {
     }
     if (
       !window.confirm(
-        "Буцвал төлбөрийн нэхэмжлэх хаагдаж, сонгосон огноо дахин боломжтой болно. Үргэлжлүүлэх үү?"
+        "QPay нэхэмжлэх амжилттай хаагдсаны дараа л сонгосон огноо дахин боломжтой болно. Үргэлжлүүлэх үү?"
       )
     ) {
       return;
@@ -153,8 +176,11 @@ export default function PaymentContent() {
     setCancelling(true);
     setError("");
     try {
-      await api.post(`/payments/${payment.id}/cancel/`);
-      router.replace(`/${locale}/`);
+      const response = await api.post<Payment>(`/payments/${payment.id}/cancel/`);
+      setPayment(response.data);
+      if (response.data.status !== "cancellation_pending") {
+        router.replace(`/${locale}/`);
+      }
     } catch (err) {
       const msg = axios.isAxiosError(err)
         ? err.response?.data?.error || "Төлбөрийг цуцлахад алдаа гарлаа."
@@ -185,6 +211,7 @@ export default function PaymentContent() {
   }
 
   const isPending = payment.status === "pending";
+  const isClosing = payment.status === "cancellation_pending";
   const qrImage = isPending ? formatQrImage(payment.raw_response?.qr_image) : null;
   const urls = isPending ? payment.raw_response?.urls || [] : [];
   const isMock = isPending && payment.raw_response?.mode === "mock";
@@ -323,7 +350,17 @@ export default function PaymentContent() {
               </div>
             )}
 
-            {!isPending && payment.status !== "paid" && (
+            {isClosing && (
+              <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                <span className="mt-0.5 h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-amber-200 border-t-amber-700" />
+                <span>
+                  QPay нэхэмжлэхийг хааж байна. Хаалт баталгаажих хүртэл сонгосон
+                  огноо бусдад суллагдахгүй.
+                </span>
+              </div>
+            )}
+
+            {!isPending && !isClosing && payment.status !== "paid" && (
               <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
                 Төлбөрийн хугацаа дууссан тул QR нэхэмжлэхийг хаалаа. Захиалгаа дахин үүсгэнэ үү.
               </div>

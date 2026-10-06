@@ -8,6 +8,7 @@ import api from "@/lib/axios";
 import { t } from "@/lib/i18n";
 import Image from "next/image"; // ✅ next/image ашиглаж байна
 import { CHECK_IN_TIME, CHECK_OUT_TIME } from "@/lib/bookingTimes";
+import PageSkeleton from "@/components/PageSkeleton";
 
 const statusLabels: Record<string, string> = {
   confirmed: "Батлагдлаа", cancelled: "Цуцлагдсан", pending_payment: "Төлбөр хүлээгдэж байна",
@@ -49,7 +50,7 @@ export default function MyBookingsPage() {
     fetchBookings();
   }, [locale]);
 
-  if (loading) return <p className="p-6">{t(locale, "loading")}</p>;
+  if (loading) return <PageSkeleton cards={3} />;
   if (errorMsg) return <p className="p-6 text-red-600">{errorMsg}</p>;
 
   return (

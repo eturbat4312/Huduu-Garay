@@ -64,7 +64,10 @@ interface RefreshResponse {
 }
 
 let isRefreshing = false;
-let waiters: Array<(t: string) => void> = [];
+let waiters: Array<{
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+}> = [];
 
 api.interceptors.response.use(
   (r: AxiosResponse) => r,
@@ -106,7 +109,7 @@ api.interceptors.response.use(
           }
           api.defaults.headers.common["Authorization"] = `Bearer ${newAccess}`;
 
-          waiters.forEach((fn) => fn(newAccess));
+          waiters.forEach(({ resolve }) => resolve(newAccess));
           waiters = [];
 
           const hdrs: AxiosRequestHeaders =
@@ -116,6 +119,7 @@ api.interceptors.response.use(
 
           return api(original);
         } catch (e) {
+          waiters.forEach(({ reject }) => reject(e));
           waiters = [];
           if (typeof window !== "undefined") {
             localStorage.removeItem("access_token");
@@ -127,12 +131,15 @@ api.interceptors.response.use(
         }
       } else {
         return new Promise((resolve, reject) => {
-          waiters.push((newToken) => {
-            const hdrs: AxiosRequestHeaders =
-              (original.headers as AxiosRequestHeaders) ?? {};
-            hdrs["Authorization"] = `Bearer ${newToken}`;
-            original.headers = hdrs;
-            api(original).then(resolve).catch(reject);
+          waiters.push({
+            resolve: (newToken) => {
+              const hdrs: AxiosRequestHeaders =
+                (original.headers as AxiosRequestHeaders) ?? {};
+              hdrs["Authorization"] = `Bearer ${newToken}`;
+              original.headers = hdrs;
+              api(original).then(resolve).catch(reject);
+            },
+            reject,
           });
         });
       }

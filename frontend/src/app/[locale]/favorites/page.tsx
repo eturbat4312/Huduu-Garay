@@ -7,6 +7,7 @@ import api from "@/lib/axios";
 import ListingCard from "@/components/ListingCard";
 import { t } from "@/lib/i18n";
 import { Listing } from "@/types";
+import PageSkeleton from "@/components/PageSkeleton";
 
 type Favorite = {
   id: number;
@@ -34,7 +35,7 @@ export default function FavoritesPage() {
     fetchFavorites();
   }, []);
 
-  if (loading) return <p className="p-6">{t(locale, "loading_text")}</p>;
+  if (loading) return <PageSkeleton cards={3} />;
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-10 space-y-6">
