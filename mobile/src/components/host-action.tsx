@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native'
 
 import { Colors, Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth';
+import { loginHref } from '@/lib/auth-return';
 
 type HostActionProps = {
   variant?: 'inline' | 'card';
@@ -11,12 +12,12 @@ type HostActionProps = {
 export function HostAction({ variant = 'inline' }: HostActionProps) {
   const scheme = (useColorScheme() ?? 'light') as 'light' | 'dark';
   const C = Colors[scheme];
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
-  if (!isAuthenticated || !user) return null;
+  if (isLoading) return null;
 
-  const isHost = user.is_host;
-  const status = user.host_application_status;
+  const isHost = user?.is_host ?? false;
+  const status = user?.host_application_status;
   const pending = !isHost && status === 'pending';
   const rejected = !isHost && status === 'rejected';
   const route = isHost ? '/create-listing' : '/become-host';
@@ -28,7 +29,13 @@ export function HostAction({ variant = 'inline' }: HostActionProps) {
         ? '↻ Түрээслүүлэгч болох хүсэлт'
         : '🏠 Түрээслүүлэгч болох';
 
-  const openAction = () => router.push(route as never);
+  const openAction = () => {
+    if (!isAuthenticated) {
+      router.push(loginHref('/become-host'));
+      return;
+    }
+    router.push(route as never);
+  };
 
   if (variant === 'inline') {
     return (
@@ -62,7 +69,9 @@ export function HostAction({ variant = 'inline' }: HostActionProps) {
         <Text style={[styles.cardDescription, { color: C.textSecondary }]}>
           {isHost
             ? 'Байр, зуслан эсвэл амралтын газрын шинэ зараа эндээс оруулна.'
-            : pending
+            : !isAuthenticated
+              ? 'Нэвтэрч эсвэл бүртгүүлээд байраа зарлаж, захиалга хүлээн аваарай.'
+              : pending
               ? 'Таны түрээслүүлэгч болох хүсэлтийг ажилтан хянаж байна.'
               : rejected
                 ? 'Өмнөх хүсэлтийн хариуг хараад шаардлагатай мэдээллээ шалгана уу.'

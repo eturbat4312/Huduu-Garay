@@ -77,6 +77,8 @@ export default function ProfileScreen() {
               </Text>
             </View>
 
+            <HostAction variant="card" />
+
             {/* Товчнууд */}
             <View style={styles.guestButtons}>
               <Pressable
