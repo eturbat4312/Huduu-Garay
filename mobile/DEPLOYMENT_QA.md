@@ -1,7 +1,7 @@
 # Mobile deployment and web parity QA
 
-Last audited: 2026-10-06
-Audited source: the git commit containing this file
+Last audited: 2026-10-07
+Audited source: `8a6ed3dcb5b6ef59f1cdfd3e25e522bedebdad28`
 
 ## Automated checks
 
@@ -16,12 +16,44 @@ Audited source: the git commit containing this file
 | Production web `/mn` | HTTP 200 |
 | Production public listing/category/amenity/availability/review APIs | HTTP 200 |
 | Production protected APIs without a token | HTTP 401 as expected |
+| App Store Connect metadata, pricing, privacy, and review submission | Pass |
 
-The most recent EAS build (`7f19b8e4-446b-40d7-9a3f-274cb77f67d2`) is an
-Android preview APK created on 2026-09-26 from the current parity working tree.
-It is the device-QA candidate for the scenarios below. It is not a production
-store release: Android Maps and remote push still require the credentials
-listed below.
+## Public store release audit
+
+### iOS App Store
+
+- App Store Connect app ID: `6816730132`; bundle ID: `mn.tanaidhonoy.app`.
+- EAS iOS build: `85580afb-a481-439a-ba5f-4d78702a1f33`.
+- Store version: `1.0.0`; build number: `5`.
+- The build is valid in TestFlight and was submitted to App Review on
+  2026-10-07. Submission ID:
+  `ec60afed-1ff5-43e3-b75e-7484ae123fb3`.
+- Verified App Store Connect state after submission: **Waiting for Review**.
+- Release mode: automatic after Apple approval.
+- App price: free (`$0.00`).
+- Availability on release: Mongolia and Switzerland.
+- Three required iPhone screenshots at 1179 x 2556 were uploaded from
+  `mobile/store-assets/ios/`.
+- App Privacy was published with 17 collected data types. Product Interaction
+  is declared for Analytics and not linked to identity; the remaining declared
+  types are used for App Functionality and linked to identity. No declared data
+  type is used for tracking.
+- Content Rights is set to third-party/user content with the necessary rights.
+- App Review credentials and contact information are configured in App Store
+  Connect. The password is intentionally not stored in this repository.
+
+### Android Google Play
+
+- EAS production build: `474f4e66-1912-4d95-bc91-727b297fb06a`.
+- Store version: `1.0.0`; version code: `7`.
+- Source commit: `8a6ed3dcb5b6ef59f1cdfd3e25e522bedebdad28`.
+- Verified EAS state: **FINISHED** with store distribution and an Android App
+  Bundle (`.aab`).
+- Artifact:
+  `https://expo.dev/artifacts/eas/-7t8v7uWfPPfZ0WFL-8RkjPyDeykVRnsGmyg6qWuvwI.aab`.
+- Google Play submission is deferred until the owner creates and verifies the
+  Play Console developer account. No account type, fee, or submission has been
+  chosen on the owner's behalf.
 
 ## Deployment blockers
 
@@ -37,6 +69,8 @@ listed below.
 
 ### Android
 
+- The production AAB is built successfully, but it has not been uploaded to
+  Google Play because the developer account is not ready.
 - Maps SDK for Android is not enabled in Google Cloud and there is no Android
   Maps API key. A standalone `react-native-maps` build needs this even though
   MapTiler provides the visible tile layer.
@@ -50,9 +84,11 @@ listed below.
 
 ### iOS
 
-- The Expo account has no Apple team attached. A paid Apple Developer team,
-  registered test device, provisioning profile, and APNs key are required for
-  a device preview/TestFlight build.
+- Apple signing, App Store Connect delivery, TestFlight processing, store
+  metadata, privacy publication, and App Review submission are complete for
+  version `1.0.0` build `5`.
+- Public availability now depends on Apple review approval. App Store Connect
+  states that review can take up to 48 hours.
 
 ## Web/mobile feature parity
 
