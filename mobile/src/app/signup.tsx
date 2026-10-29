@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FacebookSignInButton } from '@/components/facebook-sign-in-button';
+import { AppleSignInButton } from '@/components/apple-sign-in-button';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -104,6 +105,10 @@ export default function SignupScreen() {
               {/* ─── Google товч ─── */}
               <GoogleSignInButton
                 label="Google-ээр бүртгүүлэх"
+                onError={(msg) => setError(msg)}
+                returnTo={returnTo}
+              />
+              <AppleSignInButton
                 onError={(msg) => setError(msg)}
                 returnTo={returnTo}
               />

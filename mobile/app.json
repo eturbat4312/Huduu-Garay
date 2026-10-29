@@ -10,6 +10,7 @@
     "ios": {
       "icon": "./assets/images/app-icon-brand.png",
       "bundleIdentifier": "mn.tanaidhonoy.app",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Байршлыг газрын зураг дээр харуулахад ашиглана.",
@@ -44,6 +45,7 @@
         }
       ],
       "expo-secure-store",
+      "expo-apple-authentication",
       [
         "expo-notifications",
         {

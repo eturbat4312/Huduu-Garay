@@ -51,6 +51,8 @@ from .views import (
     PaymentMockConfirmView,
     QPayCallbackView,
     GoogleLogin,
+    AppleLogin,
+    AccountDeletionView,
     PasswordResetRequestView,
     PasswordResetConfirmView,
     SupportRequestListCreateView,
@@ -86,6 +88,7 @@ urlpatterns = [
     ),
     path("signup/", SignupView.as_view(), name="signup"),
     path("me/", MeView.as_view(), name="me"),
+    path("account/", AccountDeletionView.as_view(), name="account-delete"),
     path("bookings/", BookingCreateView.as_view(), name="booking-create"),
     path(
         "bookings/payment-intent/",
@@ -187,6 +190,7 @@ urlpatterns = [
     path("auth/facebook/register/", FacebookRegisterView.as_view()),
     path("auth/facebook/connect/", FacebookConnectView.as_view()),
     path("auth/google/", GoogleLogin.as_view(), name="google_login"),
+    path("auth/apple/", AppleLogin.as_view(), name="apple_login"),
     # Claude: password reset
     path("password-reset/", PasswordResetRequestView.as_view(), name="password-reset"),
     path("password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),

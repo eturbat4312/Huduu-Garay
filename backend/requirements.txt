@@ -11,5 +11,6 @@ django-allauth
 requests
 cryptography 
 google-auth
+PyJWT[crypto]>=2.8
 gunicorn==21.2.0
 whitenoise

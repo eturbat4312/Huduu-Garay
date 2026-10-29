@@ -1,6 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-import { fetchMe, googleLogin as apiGoogleLogin, login as apiLogin, logout as apiLogout, signup as apiSignup, ACCESS_TOKEN_KEY, setAuthInvalidatedListener } from '@/lib/api';
+import {
+  appleLogin as apiAppleLogin,
+  deleteAccount as apiDeleteAccount,
+  fetchMe,
+  googleLogin as apiGoogleLogin,
+  login as apiLogin,
+  logout as apiLogout,
+  signup as apiSignup,
+  ACCESS_TOKEN_KEY,
+  setAuthInvalidatedListener,
+} from '@/lib/api';
 import { getItem } from '@/lib/storage';
 import { storeFacebookTokens } from '@/lib/facebook';
 import type { UserProfile } from '@/types/api';
@@ -22,7 +32,12 @@ type AuthContextValue = {
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  loginWithApple: (
+    identityToken: string,
+    fullName?: { givenName?: string | null; familyName?: string | null },
+  ) => Promise<void>;
   acceptFacebookSession: (tokens: { access: string; refresh: string }) => Promise<void>;
+  deleteAccount: () => Promise<{ message: string }>;
 };
 
 // ─── Context ─────────────────────────────────────────────────────────────────
@@ -84,6 +99,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState({ status: 'authenticated', user });
   }, []);
 
+  const loginWithApple = useCallback(async (
+    identityToken: string,
+    fullName: { givenName?: string | null; familyName?: string | null } = {},
+  ) => {
+    await apiAppleLogin(identityToken, fullName);
+    const user = await fetchMe();
+    setState({ status: 'authenticated', user });
+  }, []);
+
   const acceptFacebookSession = useCallback(async (tokens: { access: string; refresh: string }) => {
     await storeFacebookTokens(tokens);
     const user = await fetchMe();
@@ -93,6 +117,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await apiLogout();
     setState({ status: 'guest' });
+  }, []);
+
+  const deleteAccount = useCallback(async () => {
+    const result = await apiDeleteAccount();
+    setState({ status: 'guest' });
+    return result;
   }, []);
 
   const refresh = useCallback(async () => {
@@ -109,7 +139,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     refresh,
     loginWithGoogle,
+    loginWithApple,
     acceptFacebookSession,
+    deleteAccount,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

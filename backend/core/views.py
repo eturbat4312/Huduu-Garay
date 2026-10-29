@@ -33,6 +33,7 @@ from decimal import Decimal
 from google.oauth2 import id_token
 import logging
 import uuid
+import jwt
 from django.db import IntegrityError, transaction
 from django.db.models import Exists, OuterRef, Q
 # Claude: password reset imports
@@ -67,6 +68,10 @@ from .models import (
     HostApplication,
     SupportRequest,
     PushDevice,
+    PushDelivery,
+    BookingMessage,
+    AppleAccount,
+    FacebookAccount,
 )
 from .serializers import (
     CategorySerializer,
@@ -105,6 +110,47 @@ ALLOWED_LISTING_IMAGE_TYPES = {
     "image/webp",
     "image/gif",
 }
+APPLE_ISSUER = "https://appleid.apple.com"
+APPLE_JWKS_URL = f"{APPLE_ISSUER}/auth/keys"
+apple_jwk_client = jwt.PyJWKClient(APPLE_JWKS_URL)
+
+
+def verify_apple_identity_token(token):
+    """Apple OIDC ID token-ийн issuer, audience, signature, хугацааг шалгана."""
+    signing_key = apple_jwk_client.get_signing_key_from_jwt(token)
+    return jwt.decode(
+        token,
+        signing_key.key,
+        algorithms=["RS256"],
+        audience=settings.APPLE_CLIENT_IDS,
+        issuer=APPLE_ISSUER,
+        options={"require": ["exp", "iat", "sub"]},
+    )
+
+
+def unique_username(seed, fallback):
+    """OAuth account-д зориулах, давхардахгүй username үүсгэнэ."""
+    base_username = (seed or fallback)[:150]
+    username = base_username
+    counter = 1
+    while User.objects.filter(username=username).exists():
+        suffix = str(counter)
+        username = f"{base_username[:150 - len(suffix)]}{suffix}"
+        counter += 1
+    return username
+
+
+def delete_files_safely(files):
+    for storage, name in files:
+        try:
+            storage.delete(name)
+        except Exception:
+            logger.warning("Could not delete account-deletion file %s", name, exc_info=True)
+
+
+def remember_file_for_deletion(files, field_file):
+    if field_file and field_file.name:
+        files.append((field_file.storage, field_file.name))
 
 
 class AnalyticsEventThrottle(AnonRateThrottle):
@@ -229,6 +275,98 @@ class GoogleLogin(APIView):
             )
 
 
+class AppleLogin(APIView):
+    """Native Sign in with Apple credential-ийг сервер талд OIDC-р баталгаажуулна."""
+
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        token = request.data.get("identity_token")
+        if not token or not isinstance(token, str):
+            return Response(
+                {"error": "Apple нэвтрэх мэдээлэл дутуу байна."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not settings.APPLE_CLIENT_IDS:
+            logger.error("Apple login is enabled without APPLE_CLIENT_IDS")
+            return Response(
+                {"error": "Apple нэвтрэх тохиргоо бүрэн хийгдээгүй байна."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        try:
+            claims = verify_apple_identity_token(token)
+            apple_subject = (claims.get("sub") or "").strip()
+            email = (claims.get("email") or "").strip().lower()
+            email_verified = claims.get("email_verified") in {True, "true"}
+            if not apple_subject:
+                return Response(
+                    {"error": "Apple таних мэдээлэл хүчингүй байна."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if email and not email_verified:
+                return Response(
+                    {"error": "Apple имэйл баталгаажаагүй байна."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            given_name = str(request.data.get("given_name") or "").strip()[:150]
+            family_name = str(request.data.get("family_name") or "").strip()[:150]
+
+            with transaction.atomic():
+                apple_account = (
+                    AppleAccount.objects.select_related("user")
+                    .filter(apple_subject=apple_subject)
+                    .first()
+                )
+                if apple_account:
+                    user = apple_account.user
+                else:
+                    if not email:
+                        # Apple нь name/email-ийг зөвхөн эхний зөвшөөрөл дээр өгч
+                        # болох тул серверт урьд нь хадгалсан subject байх ёстой.
+                        return Response(
+                            {"error": "Apple имэйл ирсэнгүй. Apple ID тохиргооноос аппын зөвшөөрлийг цуцлаад дахин оролдоно уу."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+
+                    matches = list(User.objects.filter(email__iexact=email)[:2])
+                    if len(matches) > 1:
+                        return Response({"error": "Бүртгэлийн мэдээлэл давхардсан байна. Тусламжийн багтай холбогдоно уу."}, status=status.HTTP_400_BAD_REQUEST)
+                    user = matches[0] if matches else None
+                    if user is None:
+                        user = User.objects.create_user(
+                            username=unique_username(email.split("@", 1)[0], "apple-user"),
+                            email=email,
+                            password=None,
+                            first_name=given_name,
+                            last_name=family_name,
+                            full_name=" ".join(part for part in (given_name, family_name) if part)[:255],
+                        )
+                    AppleAccount.objects.create(user=user, apple_subject=apple_subject)
+
+            if not user.is_active:
+                return Response(
+                    {"error": "Энэ хэрэглэгчийн эрх идэвхгүй байна."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+            refresh = RefreshToken.for_user(user)
+            return Response({"refresh": str(refresh), "access": str(refresh.access_token)})
+        except (jwt.PyJWTError, ValueError, IntegrityError):
+            return Response(
+                {"error": "Apple нэвтрэх мэдээлэл хүчингүй байна."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception:
+            logger.exception("Apple token verification failed")
+            return Response(
+                {"error": "Apple нэвтрэх үйлчилгээтэй холбогдож чадсангүй."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+
 # class GoogleOneTapLoginView(SocialLoginView):
 #     adapter_class = GoogleOneTapAdapter
 #     callback_url = "http://localhost:3000"
@@ -262,6 +400,139 @@ class MeView(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=400)
+
+
+class AccountDeletionView(APIView):
+    """Remove a user account's personal data without destroying financial ledgers."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request):
+        user = request.user
+        if user.is_staff:
+            return Response(
+                {"error": "Админ эрхтэй бүртгэлийг энэ хэсгээс устгах боломжгүй."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Дууссан захиалгыг эхлээд бодит төлөвт нь оруулна. Харин хэрэгжиж
+        # буй захиалга, нэхэмжлэлтэй үед данс устгах нь зочин/түрээслүүлэгчид
+        # хохирол учруулах тул хэрэглэгч эхлээд цуцлах ёстой.
+        complete_finished_bookings()
+        today = timezone.localdate()
+        has_open_booking = (
+            Booking.objects.filter(Q(guest=user) | Q(listing__host=user))
+            .filter(
+                Q(status=Booking.STATUS_PENDING_PAYMENT)
+                | Q(status=Booking.STATUS_CONFIRMED, check_out__gte=today)
+            )
+            .exists()
+        )
+        if has_open_booking:
+            return Response(
+                {
+                    "error": (
+                        "Идэвхтэй захиалга эсвэл төлбөрийн нэхэмжлэл байна. "
+                        "Эхлээд захиалгаа цуцалж дууссаны дараа бүртгэлээ устгана уу."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        files_to_delete = []
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=user.pk)
+            if not user.is_active:
+                return Response(
+                    {"error": "Энэ бүртгэл аль хэдийн идэвхгүй болсон байна."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Иргэний үнэмлэх, selfie, профайл зураг зэрэг хуульд заавал
+            # хадгалах шаардлагагүй файлыг storage-оос нь хамт арилгана.
+            remember_file_for_deletion(files_to_delete, user.avatar)
+            try:
+                host_application = user.hostapplication
+            except HostApplication.DoesNotExist:
+                host_application = None
+            if host_application:
+                remember_file_for_deletion(files_to_delete, host_application.id_card_image)
+                remember_file_for_deletion(files_to_delete, host_application.selfie_with_id)
+                host_application.delete()
+
+            listing_images = ListingImage.objects.filter(listing__host=user)
+            for image in listing_images.iterator():
+                remember_file_for_deletion(files_to_delete, image.image)
+                remember_file_for_deletion(files_to_delete, image.thumbnail)
+            listing_images.delete()
+
+            listings = Listing.objects.filter(host=user)
+            Listing.amenities.through.objects.filter(listing__host=user).delete()
+            Availability.objects.filter(listing__host=user).delete()
+            listings.update(
+                is_active=False,
+                status=Listing.STATUS_SUSPENDED,
+                title="Устгасан зар",
+                description="",
+                location_city="",
+                location_district="",
+                location_khoroo="",
+                location_extra="",
+                location_building="",
+                location_apartment="",
+                location_lat=None,
+                location_lng=None,
+                review_notes="Эзэмшигчийн бүртгэл устсан.",
+                reviewed_at=timezone.now(),
+            )
+
+            # Захиалгын мөнгөн дүн, QPay болон payout/refund audit-ийг үлдээнэ.
+            # Зөвхөн зочны хувийн холбоо барих, чөлөөт текстийг anonymize хийнэ.
+            Booking.objects.filter(guest=user).update(
+                full_name="Устгасан хэрэглэгч",
+                phone_number="",
+                notes="",
+            )
+            BookingHold.objects.filter(booking__guest=user).delete()
+            BookingMessage.objects.filter(sender=user).delete()
+            Review.objects.filter(guest=user).delete()
+            Favorite.objects.filter(user=user).delete()
+            SupportRequest.objects.filter(user=user).delete()
+            PushDelivery.objects.filter(device__user=user).delete()
+            Notification.objects.filter(user=user).delete()
+            PushDevice.objects.filter(user=user).delete()
+            FacebookAccount.objects.filter(user=user).delete()
+            AppleAccount.objects.filter(user=user).delete()
+
+            deleted_identifier = uuid.uuid4().hex
+            user.username = f"deleted-{deleted_identifier}"
+            user.email = f"deleted-{deleted_identifier}@deleted.invalid"
+            user.first_name = ""
+            user.last_name = ""
+            user.full_name = ""
+            user.phone = ""
+            user.address = ""
+            user.bio = ""
+            user.avatar = None
+            user.is_active = False
+            user.is_host = False
+            user.is_guest = False
+            user.host_application_status = "none"
+            user.last_login = None
+            user.set_unusable_password()
+            user.save()
+            transaction.on_commit(
+                lambda files=files_to_delete: delete_files_safely(files)
+            )
+
+        return Response(
+            {
+                "message": (
+                    "Таны бүртгэл болон хувийн мэдээлэл устгагдлаа. "
+                    "Хууль, нягтлан бодохын шаардлагатай төлбөрийн гүйлгээний бүртгэл тусдаа хадгалагдана."
+                )
+            }
+        )
 
 
 # ---------------------- CATEGORY ----------------------

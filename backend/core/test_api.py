@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 
 from core.models import (
     Category, Amenity, Listing, Availability,
-    Booking, Favorite, Notification, Review, HostApplication,
+    AppleAccount, Booking, Favorite, Notification, Review, HostApplication,
 )
 from core.services.cancellations import HOST_CANCELLATION_POLICY_VERSION
 
@@ -170,6 +170,62 @@ class GoogleLoginTests(TestCase):
         self.assertTrue(User.objects.filter(id=existing_user.id).exists())
 
 
+@override_settings(APPLE_CLIENT_IDS=("mn.tanaidhonoy.app",))
+class AppleLoginTests(TestCase):
+    def post_apple_token(self, token="valid-apple-token", **extra):
+        return APIClient().post(
+            "/api/auth/apple/",
+            {"identity_token": token, **extra},
+            format="json",
+        )
+
+    def test_missing_token_is_rejected(self):
+        response = APIClient().post("/api/auth/apple/", {}, format="json")
+        self.assertEqual(response.status_code, 400)
+
+    @patch("core.views.verify_apple_identity_token")
+    def test_apple_login_creates_user_and_identity_link(self, verify_token):
+        verify_token.return_value = {
+            "sub": "apple-subject-1",
+            "email": "private@privaterelay.appleid.com",
+            "email_verified": True,
+        }
+
+        response = self.post_apple_token(given_name="Apple", family_name="User")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access", response.data)
+        user = User.objects.get(email="private@privaterelay.appleid.com")
+        self.assertEqual(user.full_name, "Apple User")
+        self.assertTrue(
+            AppleAccount.objects.filter(user=user, apple_subject="apple-subject-1").exists()
+        )
+
+    @patch("core.views.verify_apple_identity_token")
+    def test_apple_login_reuses_subject_when_email_is_not_sent_again(self, verify_token):
+        user = make_user("apple-existing", email="apple@example.com")
+        AppleAccount.objects.create(user=user, apple_subject="apple-subject-2")
+        verify_token.return_value = {"sub": "apple-subject-2"}
+
+        response = self.post_apple_token()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(User.objects.filter(email="apple@example.com").count(), 1)
+
+    @patch("core.views.verify_apple_identity_token")
+    def test_unverified_apple_email_is_rejected(self, verify_token):
+        verify_token.return_value = {
+            "sub": "apple-subject-3",
+            "email": "apple@example.com",
+            "email_verified": False,
+        }
+
+        response = self.post_apple_token()
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(AppleAccount.objects.filter(apple_subject="apple-subject-3").exists())
+
+
 # ── 2. ME ─────────────────────────────────────────────────────
 
 class MeTests(TestCase):
@@ -203,6 +259,59 @@ class MeTests(TestCase):
     def test_unauthenticated(self):
         r = APIClient().get("/api/me/")
         self.assertEqual(r.status_code, 401)
+
+
+class AccountDeletionTests(TestCase):
+    def setUp(self):
+        self.user = make_user("delete-user", email="delete@example.com", is_host=True)
+        self.user.full_name = "Delete User"
+        self.user.phone = "99112233"
+        self.user.address = "Ulaanbaatar"
+        self.user.bio = "Private profile text"
+        self.user.save()
+        self.client = auth_client(self.user)
+
+    def test_deletion_anonymizes_account_and_unpublishes_listings(self):
+        listing = make_listing(self.user, title="Private listing")
+        Favorite.objects.create(user=self.user, listing=listing)
+        Notification.objects.create(user=self.user, message="private notification")
+        AppleAccount.objects.create(user=self.user, apple_subject="delete-subject")
+
+        response = self.client.delete("/api/account/")
+
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        listing.refresh_from_db()
+        self.assertFalse(self.user.is_active)
+        self.assertTrue(self.user.email.endswith("@deleted.invalid"))
+        self.assertEqual(self.user.full_name, "")
+        self.assertEqual(self.user.phone, "")
+        self.assertFalse(self.user.has_usable_password())
+        self.assertEqual(listing.status, Listing.STATUS_SUSPENDED)
+        self.assertFalse(listing.is_active)
+        self.assertFalse(Favorite.objects.filter(user=self.user).exists())
+        self.assertFalse(Notification.objects.filter(user=self.user).exists())
+        self.assertFalse(AppleAccount.objects.filter(apple_subject="delete-subject").exists())
+        self.assertEqual(self.client.get("/api/me/").status_code, 401)
+
+    def test_deletion_requires_open_booking_to_be_resolved_first(self):
+        listing = make_listing(self.user, title="Still booked")
+        guest = make_user("deletion-guest", email="deletion-guest@example.com")
+        Booking.objects.create(
+            listing=listing,
+            guest=guest,
+            check_in=date.today() + timedelta(days=2),
+            check_out=date.today() + timedelta(days=4),
+            full_name="Guest",
+            phone_number="99000000",
+            status=Booking.STATUS_CONFIRMED,
+        )
+
+        response = self.client.delete("/api/account/")
+
+        self.assertEqual(response.status_code, 409)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.is_active)
 
 
 # ── 3. CATEGORIES ─────────────────────────────────────────────

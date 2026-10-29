@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedView } from '@/components/themed-view';
 import { FacebookSignInButton } from '@/components/facebook-sign-in-button';
+import { AppleSignInButton } from '@/components/apple-sign-in-button';
 import { GoogleSignInButton } from '@/components/google-sign-in-button';
 import { HostAction } from '@/components/host-action';
 import { BottomTabInset, Colors, Spacing } from '@/constants/theme';
@@ -108,6 +109,7 @@ export default function ProfileScreen() {
                 label="Google-ээр нэвтрэх"
                 onError={(msg) => setGoogleError(msg)}
               />
+              <AppleSignInButton onError={(msg) => setGoogleError(msg)} />
               <FacebookSignInButton />
               {googleError ? (
                 <Text style={styles.errorText}>{googleError}</Text>
@@ -316,6 +318,17 @@ export default function ProfileScreen() {
               />
             </MenuSection>
           )}
+
+          <MenuSection title="Бүртгэл ба мэдээлэл" color={C.textSecondary}>
+            <MenuRow
+              icon="🗑️"
+              label="Бүртгэл устгах"
+              color="#DC2626"
+              borderColor={C.backgroundSelected}
+              onPress={() => router.push('/delete-account' as never)}
+              isLast
+            />
+          </MenuSection>
 
           {/* ── Гарах ── */}
           <Pressable

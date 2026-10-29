@@ -1185,6 +1185,18 @@ class FacebookAccount(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
 
+class AppleAccount(models.Model):
+    """Apple-ийн тогтвортой `sub` identifier-ийг local account-той холбоно."""
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="apple_account",
+    )
+    apple_subject = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class FacebookAuthFlow(models.Model):
     """Short-lived OAuth handshake; never stores Facebook or application access tokens."""
 

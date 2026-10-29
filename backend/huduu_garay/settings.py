@@ -36,6 +36,20 @@ GOOGLE_CLIENT_IDS = tuple(
     )
 )
 
+# Sign in with Apple-ийн iOS native client нь app-ийн bundle identifier байдаг.
+# Энэ нь нууц биш тул production орчинд тусдаа secret тохируулахгүйгээр strict
+# audience validation хийх боломжтой. Нэмэлт client identifier-ийг env-ээр нэмж болно.
+APPLE_CLIENT_IDS = tuple(
+    dict.fromkeys(
+        client_id.strip()
+        for client_id in (
+            os.getenv("APPLE_CLIENT_ID", "mn.tanaidhonoy.app"),
+            *os.getenv("APPLE_CLIENT_IDS", "").split(","),
+        )
+        if client_id.strip()
+    )
+)
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 

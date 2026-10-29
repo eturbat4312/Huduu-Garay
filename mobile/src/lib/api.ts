@@ -50,10 +50,17 @@ export class ApiError extends Error {
   }
 }
 
-async function clearInvalidSession() {
-  await removeItem(ACCESS_TOKEN_KEY);
-  await removeItem(REFRESH_TOKEN_KEY);
+export async function clearLocalSession() {
+  await Promise.all([
+    removeItem(ACCESS_TOKEN_KEY),
+    removeItem(REFRESH_TOKEN_KEY),
+    removeItem(REGISTERED_PUSH_TOKEN_KEY),
+  ]);
   authInvalidatedListener?.();
+}
+
+async function clearInvalidSession() {
+  await clearLocalSession();
 }
 
 async function performTokenRefresh(): Promise<string | null> {
@@ -212,16 +219,30 @@ export async function logout(): Promise<void> {
     try {
       await deactivatePushDevice(pushToken);
     } catch {}
-    await removeItem(REGISTERED_PUSH_TOKEN_KEY);
   }
-  await removeItem(ACCESS_TOKEN_KEY);
-  await removeItem(REFRESH_TOKEN_KEY);
+  await clearLocalSession();
 }
 
 export async function googleLogin(idToken: string): Promise<void> {
   const data = await request<{ access: string; refresh: string }>('/auth/google/', {
     method: 'POST',
     body: { access_token: idToken }, // backend нь "access_token" гэж нэрлэсэн ч Google ID token
+  });
+  await setItem(ACCESS_TOKEN_KEY, data.access);
+  await setItem(REFRESH_TOKEN_KEY, data.refresh);
+}
+
+export async function appleLogin(
+  identityToken: string,
+  fullName: { givenName?: string | null; familyName?: string | null } = {},
+): Promise<void> {
+  const data = await request<{ access: string; refresh: string }>('/auth/apple/', {
+    method: 'POST',
+    body: {
+      identity_token: identityToken,
+      given_name: fullName.givenName ?? '',
+      family_name: fullName.familyName ?? '',
+    },
   });
   await setItem(ACCESS_TOKEN_KEY, data.access);
   await setItem(REFRESH_TOKEN_KEY, data.refresh);
@@ -236,6 +257,12 @@ export async function updateMe(data: Partial<UserProfile> | FormData): Promise<U
     return request<UserProfile>('/me/', { method: 'PATCH', multipart: data });
   }
   return request<UserProfile>('/me/', { method: 'PATCH', body: data });
+}
+
+export async function deleteAccount(): Promise<{ message: string }> {
+  const result = await request<{ message: string }>('/account/', { method: 'DELETE' });
+  await clearLocalSession();
+  return result;
 }
 
 // ─── Listings ────────────────────────────────────────────────────────────────
